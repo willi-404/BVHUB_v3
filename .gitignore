@@ -47,3 +47,5 @@ temp/
 *.sqlite-wal
 *.db
 
+build_deploy.sh
+
