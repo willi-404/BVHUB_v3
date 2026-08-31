@@ -31,6 +31,13 @@ jobs:
         working-directory: frontend
         run: pnpm typecheck
 
+      - name: Tests
+        working-directory: frontend
+        run: pnpm test
+
       - name: Production build
         working-directory: frontend
         run: pnpm build
+
+      - name: Validate shell scripts
+        run: bash -n scripts/deploy-preview.sh scripts/setup-pocketbase.sh scripts/start-pocketbase.sh

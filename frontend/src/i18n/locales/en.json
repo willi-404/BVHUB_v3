@@ -1,0 +1,19 @@
+{
+  "auth.signIn": "Sign in",
+  "auth.otpTitle": "Sign in with email code",
+  "auth.otpDescription": "We will send a one-time code. It is valid for 15 minutes.",
+  "auth.email": "Email address",
+  "auth.sendCode": "Send code",
+  "auth.code": "One-time code",
+  "auth.verifyCode": "Verify code",
+  "auth.retry": "Try again",
+  "auth.adminLogin": "Admin sign in",
+  "auth.adminDescription": "Password sign-in is available only to admins and super admins.",
+  "auth.identity": "Email or member ID",
+  "auth.password": "Password",
+  "auth.passwordLogin": "Sign in with password",
+  "auth.switchOtp": "Use email code",
+  "auth.switchPassword": "Admin password sign-in",
+  "auth.genericError": "Sign-in failed. Check your details or try again.",
+  "auth.codeSent": "If a matching account exists, a code has been sent."
+}

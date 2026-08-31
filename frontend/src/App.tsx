@@ -1,4 +1,6 @@
 import { useState, useRef } from "react";
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { Badge } from "./app/components/ui/badge";
 import { Button } from "./app/components/ui/button";
 import { Card, CardContent } from "./app/components/ui/card";
@@ -11,6 +13,11 @@ import AdminMembersView from "./app/components/AdminMembersView";
 import AdminPaymentsView from "./app/components/AdminPaymentsView";
 import AdminEventManageView from "./app/components/AdminEventManageView";
 import logoSrc from "./imports/logo1-high-resolution.png";
+import { AuthProvider, useAuth } from "./features/auth/AuthProvider";
+import { isAdminRole } from "./features/auth/policy";
+import { queryClient } from "./lib/queryClient";
+import { I18nProvider } from "./i18n";
+import { AdminGuard, ProtectedRoute, PublicOnlyRoute } from "./routes/guards";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -675,7 +682,7 @@ function AdminDrawer({ onClose, onAdminMembers, onAdminPayments, onAdminEvents }
   );
 }
 
-function ProfileView({ onEditProfile, onLogout, onAdminMembers, onAdminPayments, onAdminEvents }: { onEditProfile: () => void; onLogout: () => void; onAdminMembers: () => void; onAdminPayments: () => void; onAdminEvents: () => void }) {
+function ProfileView({ onEditProfile, onLogout, onAdminMembers, onAdminPayments, onAdminEvents, canAccessAdmin }: { onEditProfile: () => void; onLogout: () => void; onAdminMembers: () => void; onAdminPayments: () => void; onAdminEvents: () => void; canAccessAdmin: boolean }) {
   const [adminOpen, setAdminOpen] = useState(false);
 
   return (
@@ -718,13 +725,15 @@ function ProfileView({ onEditProfile, onLogout, onAdminMembers, onAdminPayments,
       </Card>
 
       {/* Enter Admin View — mobile only */}
-      <Button
-        className="lg:hidden gap-2 bg-amber-500 hover:bg-amber-600 text-white"
-        onClick={() => setAdminOpen(true)}
-      >
-        <Icon d={icons.shieldAdmin} size={15} />
-        Enter Admin View
-      </Button>
+      {canAccessAdmin && (
+        <Button
+          className="lg:hidden gap-2 bg-amber-500 hover:bg-amber-600 text-white"
+          onClick={() => setAdminOpen(true)}
+        >
+          <Icon d={icons.shieldAdmin} size={15} />
+          Enter Admin View
+        </Button>
+      )}
 
       <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 gap-2" onClick={onLogout}>
         <Icon d={icons.logout} size={15} /> Sign Out
@@ -794,6 +803,7 @@ function Sidebar({
   onAdminMembers,
   onAdminPayments,
   onAdminEvents,
+  canAccessAdmin,
 }: {
   active: NavTab;
   onChange: (t: NavTab) => void;
@@ -802,6 +812,7 @@ function Sidebar({
   onAdminMembers: () => void;
   onAdminPayments: () => void;
   onAdminEvents: () => void;
+  canAccessAdmin: boolean;
 }) {
   return (
     <aside className="hidden lg:flex flex-col w-[var(--sidebar-width)] shrink-0 bg-[var(--card)] border-r border-[var(--border)] h-full">
@@ -859,7 +870,7 @@ function Sidebar({
       </nav>
 
       {/* Admin section — desktop only */}
-      <div className="px-3 pb-2 pt-3 border-t border-[var(--border)]">
+      {canAccessAdmin && <div className="px-3 pb-2 pt-3 border-t border-[var(--border)]">
         <div className="flex items-center gap-2 px-3 mb-2">
           <div className="h-px flex-1 bg-[var(--border)]" />
           <span className="text-[10px] font-600 text-[var(--muted-foreground)] uppercase tracking-widest">Admin</span>
@@ -875,7 +886,7 @@ function Sidebar({
             {item.label}
           </button>
         ))}
-      </div>
+      </div>}
 
       {/* Bottom */}
       <div className="p-3 border-t border-[var(--border)] flex flex-col gap-1">
@@ -891,6 +902,8 @@ function Sidebar({
 // ─── AppShell (dashboard without login gate, used by FramePreview) ────────────
 
 export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: NavTab; onLogout?: () => void }) {
+  const { user, logout: authLogout } = useAuth();
+  const canAccessAdmin = isAdminRole(user?.role);
   const [tab, setTab] = useState<NavTab>(initialTab);
   const [events, setEvents] = useState<Event[]>(EVENTS);
   const [payments, setPayments] = useState<Payment[]>(INITIAL_PAYMENTS);
@@ -917,7 +930,7 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
     profile: "Profile",
   };
 
-  const logout = onLogout ?? (() => {});
+  const logout = onLogout ?? authLogout;
 
   function renderView() {
     switch (tab) {
@@ -928,13 +941,13 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
       case "payments":
         return <PaymentsView payments={payments} onPay={handlePay} />;
       case "profile":
-        return <ProfileView onEditProfile={() => setEditProfileOpen(true)} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} />;
+        return <ProfileView onEditProfile={() => setEditProfileOpen(true)} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} canAccessAdmin={canAccessAdmin} />;
     }
   }
 
   return (
     <div className="h-full flex bg-[var(--background)]" style={{ fontFamily: "'Outfit', system-ui, sans-serif" }}>
-      <Sidebar active={tab} onChange={setTab} unpaidCount={unpaidCount} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} />
+      <Sidebar active={tab} onChange={setTab} unpaidCount={unpaidCount} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} canAccessAdmin={canAccessAdmin} />
 
       <main className="flex-1 overflow-y-auto">
         <div className="hidden lg:flex items-center justify-between px-8 py-5 border-b border-[var(--border)] bg-[var(--card)] sticky top-0 z-10">
@@ -959,17 +972,17 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
       {editProfileOpen && <EditProfileOverlay onClose={() => setEditProfileOpen(false)} />}
 
       {/* Admin overlays */}
-      {adminView === "members" && (
+      {canAccessAdmin && adminView === "members" && (
         <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "var(--background)", display: "flex", flexDirection: "column" }}>
           <AdminMembersView onBack={() => setAdminView(null)} />
         </div>
       )}
-      {adminView === "payments" && (
+      {canAccessAdmin && adminView === "payments" && (
         <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "var(--background)", display: "flex", flexDirection: "column" }}>
           <AdminPaymentsView onBack={() => setAdminView(null)} />
         </div>
       )}
-      {adminView === "events" && (
+      {canAccessAdmin && adminView === "events" && (
         <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "var(--background)", display: "flex", flexDirection: "column" }}>
           <AdminEventManageView onBack={() => setAdminView(null)} />
         </div>
@@ -978,14 +991,49 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
   );
 }
 
-// ─── App (with login gate) ────────────────────────────────────────────────────
+function AdminRoutePage({ kind }: { kind: "members" | "payments" | "events" }) {
+  const navigate = useNavigate();
+  const onBack = () => navigate("/");
+
+  return (
+    <div className="min-h-full bg-[var(--background)]">
+      {kind === "members" && <AdminMembersView onBack={onBack} />}
+      {kind === "payments" && <AdminPaymentsView onBack={onBack} />}
+      {kind === "events" && <AdminEventManageView onBack={onBack} />}
+    </div>
+  );
+}
+
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/login" element={<PublicOnlyRoute><LoginView /></PublicOnlyRoute>} />
+      <Route element={<ProtectedRoute />}>
+        <Route index element={<AppShell />} />
+        <Route path="events" element={<AppShell initialTab="events" />} />
+        <Route path="payments" element={<AppShell initialTab="payments" />} />
+        <Route path="profile" element={<AppShell initialTab="profile" />} />
+        <Route element={<AdminGuard />}>
+          <Route path="admin/members" element={<AdminRoutePage kind="members" />} />
+          <Route path="admin/payments" element={<AdminRoutePage kind="payments" />} />
+          <Route path="admin/events" element={<AdminRoutePage kind="events" />} />
+        </Route>
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
 
 export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
-
-  if (!isLoggedIn) {
-    return <LoginView onLogin={() => setIsLoggedIn(true)} />;
-  }
-
-  return <AppShell onLogout={() => setIsLoggedIn(false)} />;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <I18nProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </I18nProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
 }

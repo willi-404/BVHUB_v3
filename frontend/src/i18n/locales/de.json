@@ -1,0 +1,19 @@
+{
+  "auth.signIn": "Anmelden",
+  "auth.otpTitle": "Mit E-Mail-Code anmelden",
+  "auth.otpDescription": "Wir senden dir einen einmaligen Code. Er ist 15 Minuten gültig.",
+  "auth.email": "E-Mail-Adresse",
+  "auth.sendCode": "Code senden",
+  "auth.code": "Einmaliger Code",
+  "auth.verifyCode": "Code bestätigen",
+  "auth.retry": "Erneut versuchen",
+  "auth.adminLogin": "Admin-Anmeldung",
+  "auth.adminDescription": "Passwort-Anmeldung ist nur für Admins und Super-Admins verfügbar.",
+  "auth.identity": "E-Mail oder Benutzerkennung",
+  "auth.password": "Passwort",
+  "auth.passwordLogin": "Mit Passwort anmelden",
+  "auth.switchOtp": "Zur Code-Anmeldung",
+  "auth.switchPassword": "Admin-Passwortanmeldung",
+  "auth.genericError": "Anmeldung nicht möglich. Bitte prüfe deine Eingaben oder versuche es erneut.",
+  "auth.codeSent": "Wenn ein passendes Konto existiert, wurde ein Code versendet."
+}

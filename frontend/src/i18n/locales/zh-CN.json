@@ -1,0 +1,19 @@
+{
+  "auth.signIn": "登录",
+  "auth.otpTitle": "使用邮箱验证码登录",
+  "auth.otpDescription": "我们会发送一次性验证码，有效期为 15 分钟。",
+  "auth.email": "邮箱地址",
+  "auth.sendCode": "发送验证码",
+  "auth.code": "一次性验证码",
+  "auth.verifyCode": "验证验证码",
+  "auth.retry": "重试",
+  "auth.adminLogin": "管理员登录",
+  "auth.adminDescription": "只有管理员和超级管理员可以使用密码登录。",
+  "auth.identity": "邮箱或会员编号",
+  "auth.password": "密码",
+  "auth.passwordLogin": "使用密码登录",
+  "auth.switchOtp": "使用邮箱验证码",
+  "auth.switchPassword": "管理员密码登录",
+  "auth.genericError": "登录失败，请检查信息后重试。",
+  "auth.codeSent": "如果账户匹配，验证码已发送。"
+}

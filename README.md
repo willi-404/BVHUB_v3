@@ -1,6 +1,6 @@
 # bvHub
 
-Frontend-Prototyp des Badminton Vereins Erlangen. Die Anwendung ist aktuell eine eigenstaendige React/Vite-Anwendung und verwendet ausschliesslich Mock-Daten. PocketBase, echte Authentifizierung sowie Rollen- und Gruppenlogik sind noch nicht angeschlossen.
+Frontend des Badminton Vereins Erlangen. Die bestehenden Event-, Zahlungs- und Admin-Fachbereiche verwenden weiterhin Mock-Daten; Authentifizierung und Sessionverwaltung laufen in WU-02 erstmals gegen PocketBase. Die Fachbereiche selbst bleiben bis zu den folgenden WUs Mock-Daten.
 
 ## Voraussetzungen
 
@@ -17,6 +17,19 @@ pnpm dev
 
 Der Entwicklungsserver ist anschliessend unter `http://localhost:8443` erreichbar.
 
+## PocketBase und Authentifizierung
+
+PocketBase ist auf `v0.40.1` gepinnt. Binary und lokale Datenbank werden nicht versioniert; Migrationen und serverseitige Auth-Hooks liegen unter `pocketbase/`.
+
+```bash
+./scripts/setup-pocketbase.sh
+./scripts/start-pocketbase.sh
+```
+
+Das Frontend verwendet standardmäßig `http://127.0.0.1:8090`. Für eine andere Instanz kann `VITE_POCKETBASE_URL` gesetzt werden. Gäste und Mitglieder melden sich per E-Mail-OTP (15 Minuten Gültigkeit) an; Admins und Super-Admins verwenden den getrennten Passwort-Flow. `_superusers` ist ausschließlich für die lokale PocketBase-Administration und niemals im Browser vorgesehen.
+
+Details zu Migrationen, API-Regeln und dem lokalen Setup stehen in [pocketbase/README.md](pocketbase/README.md).
+
 ## Pruefen und bauen
 
 ```bash
@@ -26,6 +39,8 @@ pnpm build
 # oder beides zusammen
 pnpm check
 ```
+
+`pnpm check` führt Typecheck, die Auth-/Guard-Regressionstests und den Production-Build aus.
 
 ## Production-Preview
 
