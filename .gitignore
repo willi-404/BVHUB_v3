@@ -1,0 +1,49 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Node / frontend
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+coverage/
+frontend/coverage/
+.vite/
+frontend/.vite/
+
+# TypeScript / build cache
+*.tsbuildinfo
+
+# Misc local artifacts
+.cache/
+tmp/
+temp/
+
+# Project-local generated data
+.codex/
+.agents/
+.figma/
+
+# SQLite / local databases
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+
