@@ -1,15 +1,15 @@
 import { useState, useRef } from "react";
-import { Badge } from "./components/ui/badge";
-import { Button } from "./components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
-import { Avatar } from "./components/ui/avatar";
-import { Progress } from "./components/ui/progress";
-import { Separator } from "./components/ui/separator";
-import { MemberCard } from "./components/MemberCard";
-import LoginView from "./components/LoginView";
-import AdminMembersView from "./components/AdminMembersView";
-import AdminPaymentsView from "./components/AdminPaymentsView";
-import AdminEventManageView from "./components/AdminEventManageView";
+import { Badge } from "./app/components/ui/badge";
+import { Button } from "./app/components/ui/button";
+import { Card, CardContent } from "./app/components/ui/card";
+import { Avatar } from "./app/components/ui/avatar";
+import { Progress } from "./app/components/ui/progress";
+import { Separator } from "./app/components/ui/separator";
+import { MemberCard } from "./app/components/MemberCard";
+import LoginView from "./app/components/LoginView";
+import AdminMembersView from "./app/components/AdminMembersView";
+import AdminPaymentsView from "./app/components/AdminPaymentsView";
+import AdminEventManageView from "./app/components/AdminEventManageView";
 import logoSrc from "./imports/logo1-high-resolution.png";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────

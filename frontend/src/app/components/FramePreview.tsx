@@ -1,6 +1,6 @@
 import { useState } from "react";
 import LoginView from "./LoginView";
-import { AppShell } from "../App";
+import { AppShell } from "../../App";
 
 const FRAMES = [
   { id: "login", label: "Login" },

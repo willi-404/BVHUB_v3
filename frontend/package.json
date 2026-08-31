@@ -1,12 +1,15 @@
 {
-  "name": "figma-make-app",
+  "name": "bvhub-frontend",
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "packageManager": "pnpm@10.34.3",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "check": "pnpm typecheck && pnpm build",
     "format": "oxfmt"
   },
   "dependencies": {
