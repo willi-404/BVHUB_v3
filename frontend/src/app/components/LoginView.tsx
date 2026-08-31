@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "./ui/button";
-import logoSrc from "../imports/logo1-high-resolution.png";
+import logoSrc from "../../imports/logo1-high-resolution.png";
 
 interface LoginViewProps {
   onLogin: () => void;

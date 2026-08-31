@@ -1,4 +1,4 @@
-import logoSrc from "../imports/logo1-high-resolution.png";
+import logoSrc from "../../imports/logo1-high-resolution.png";
 
 interface MemberCardProps {
   name: string;
