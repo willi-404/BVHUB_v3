@@ -1,4 +1,4 @@
-# bvHub v2
+# bvHub
 
 Frontend-Prototyp des Badminton Vereins Erlangen. Die Anwendung ist aktuell eine eigenstaendige React/Vite-Anwendung und verwendet ausschliesslich Mock-Daten. PocketBase, echte Authentifizierung sowie Rollen- und Gruppenlogik sind noch nicht angeschlossen.
 
