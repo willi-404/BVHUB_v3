@@ -11,4 +11,5 @@ if [[ ! -x "$binary" ]]; then
 fi
 
 cd "$pb_dir"
-exec "$binary" serve --http="${PB_HTTP:-127.0.0.1:8090}"
+PB_HTTP="${PB_HTTP:-127.0.0.1:18099}"
+exec "$binary" serve --http="$PB_HTTP"

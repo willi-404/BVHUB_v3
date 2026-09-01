@@ -26,7 +26,7 @@ PocketBase ist auf `v0.40.1` gepinnt. Binary und lokale Datenbank werden nicht v
 ./scripts/start-pocketbase.sh
 ```
 
-Das Frontend verwendet standardmäßig `http://127.0.0.1:8090`. Für eine andere Instanz kann `VITE_POCKETBASE_URL` gesetzt werden. Gäste und Mitglieder melden sich per E-Mail-OTP (15 Minuten Gültigkeit) an; Admins und Super-Admins verwenden den getrennten Passwort-Flow. `_superusers` ist ausschließlich für die lokale PocketBase-Administration und niemals im Browser vorgesehen.
+Das Frontend verwendet standardmäßig `http://127.0.0.1:18099`. Für eine andere Instanz kann `VITE_POCKETBASE_URL` gesetzt werden. Gäste und Mitglieder melden sich per E-Mail-OTP (15 Minuten Gültigkeit) an; Admins und Super-Admins verwenden den getrennten Passwort-Flow. `_superusers` ist ausschließlich für die lokale PocketBase-Administration und niemals im Browser vorgesehen. Für einen absichtlichen Port-Override kann `PB_HTTP=127.0.0.1:18100 ./scripts/start-pocketbase.sh` verwendet werden.
 
 Details zu Migrationen, API-Regeln und dem lokalen Setup stehen in [pocketbase/README.md](pocketbase/README.md).
 

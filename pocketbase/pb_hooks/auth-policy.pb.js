@@ -1,35 +1,35 @@
 /// <reference path="../pb_data/types.d.ts" />
 
-// Password authentication is server-side restricted to elevated bvHub roles.
+const OTP_ROLES = ["GUEST", "MEMBER"];
+const PASSWORD_ROLES = ["ADMIN", "SUPER_ADMIN"];
+
+function genericAuthError() { throw new BadRequestError("Invalid credentials"); }
+
+function activeRole(record, roles) {
+  return Boolean(record && record.getBool("active") === true && roles.includes(record.getString("role")));
+}
+
+// Password authentication is available only to active ADMIN/SUPER_ADMIN accounts.
 onRecordAuthWithPasswordRequest((e) => {
-  const allowedRoles = ["ADMIN", "SUPER_ADMIN"];
-  if (e.record && !(e.record.getBool("active") === true && allowedRoles.includes(e.record.getString("role")))) {
-    throw new BadRequestError("Invalid credentials");
-  }
+  if (!activeRole(e.record, PASSWORD_ROLES)) genericAuthError();
   e.next();
 }, "users");
 
-// OTP is the standard flow for guests and members only.
+// Every OTP request has the same generic failure for unknown, inactive, or disallowed accounts.
 onRecordRequestOTPRequest((e) => {
-  const allowedRoles = ["GUEST", "MEMBER"];
-  if (e.record && !(e.record.getBool("active") === true && allowedRoles.includes(e.record.getString("role")))) {
-    throw new BadRequestError("Invalid credentials");
-  }
+  // PocketBase deliberately uses a record-less dummy path for unknown identities.
+  // Reuse it for disallowed records so no email is sent and the response stays indistinguishable.
+  if (e.record && !activeRole(e.record, OTP_ROLES)) e.record = null;
   e.next();
 }, "users");
 
 onRecordAuthWithOTPRequest((e) => {
-  const allowedRoles = ["GUEST", "MEMBER"];
-  if (!(e.record && e.record.getBool("active") === true && allowedRoles.includes(e.record.getString("role")))) {
-    throw new BadRequestError("Invalid credentials");
-  }
+  if (!activeRole(e.record, OTP_ROLES)) genericAuthError();
   e.next();
 }, "users");
 
-// This also runs for authRefresh, invalidating sessions of deactivated users.
+// This hook also runs during authRefresh, invalidating tokens for deactivated users.
 onRecordAuthRequest((e) => {
-  if (!(e.record && e.record.getBool("active") === true)) {
-    throw new BadRequestError("Invalid credentials");
-  }
+  if (!e.record || e.record.getBool("active") !== true) genericAuthError();
   e.next();
 }, "users");
