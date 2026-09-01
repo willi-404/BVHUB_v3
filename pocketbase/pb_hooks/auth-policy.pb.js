@@ -6,20 +6,14 @@ const PASSWORD_ROLES = ["ADMIN", "SUPER_ADMIN"];
 function genericAuthError() { throw new BadRequestError("Invalid credentials"); }
 
 function activeRole(record, roles) {
+  // PocketBase resolves the record for auth hooks; keep the nil guard for malformed requests.
   return Boolean(record && record.getBool("active") === true && roles.includes(record.getString("role")));
 }
 
 // Password authentication is available only to active ADMIN/SUPER_ADMIN accounts.
-onRecordAuthWithPasswordRequest((e) => {
-  if (!activeRole(e.record, PASSWORD_ROLES)) genericAuthError();
-  e.next();
-}, "users");
-
 // Every OTP request has the same generic failure for unknown, inactive, or disallowed accounts.
 onRecordRequestOTPRequest((e) => {
-  // PocketBase deliberately uses a record-less dummy path for unknown identities.
-  // Reuse it for disallowed records so no email is sent and the response stays indistinguishable.
-  if (e.record && !activeRole(e.record, OTP_ROLES)) e.record = null;
+  if (!activeRole(e.record, OTP_ROLES)) genericAuthError();
   e.next();
 }, "users");
 

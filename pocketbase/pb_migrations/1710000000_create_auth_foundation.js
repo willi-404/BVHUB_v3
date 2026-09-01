@@ -83,10 +83,9 @@ migrate((app) => {
   });
   userGroups.listRule = `${ACTIVE_AUTH} && (user = @request.auth.id || @request.auth.role = 'ADMIN' || @request.auth.role = 'SUPER_ADMIN')`;
   userGroups.viewRule = `${ACTIVE_AUTH} && (user = @request.auth.id || @request.auth.role = 'ADMIN' || @request.auth.role = 'SUPER_ADMIN')`;
-  const manageableAssignment = "(@collection.users.id = user && (@collection.users.role = 'GUEST' || @collection.users.role = 'MEMBER'))";
-  userGroups.createRule = `${SUPER_ADMIN_AUTH} || (${ELEVATED_AUTH} && ${manageableAssignment})`;
-  userGroups.updateRule = `${SUPER_ADMIN_AUTH} || (${ELEVATED_AUTH} && ${manageableAssignment})`;
-  userGroups.deleteRule = `${SUPER_ADMIN_AUTH} || (${ELEVATED_AUTH} && ${manageableAssignment})`;
+  userGroups.createRule = ELEVATED_AUTH;
+  userGroups.updateRule = ELEVATED_AUTH;
+  userGroups.deleteRule = ELEVATED_AUTH;
   userGroups.indexes = ["CREATE UNIQUE INDEX IF NOT EXISTS idx_user_groups_pair ON user_groups (user, group)"];
   app.save(userGroups);
 }, (app) => {

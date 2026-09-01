@@ -28,30 +28,9 @@ health_url="http://127.0.0.1:$port/api/health"
 for _ in $(seq 1 60); do curl --fail --silent "$health_url" >/dev/null 2>&1 && break; sleep 0.25; done
 curl --fail --silent "$health_url" >/dev/null
 
-response="$data_dir/response.json"
-status="$(curl --silent --request POST --header 'Content-Type: application/json' --data "{\"identity\":\"$test_email\",\"password\":\"$test_password\"}" --output "$response" --write-out '%{http_code}' "http://127.0.0.1:$port/api/collections/_superusers/auth-with-password")"
-[[ "$status" == "200" ]] || { cat "$response" >&2; exit 1; }
-token="$(node -e 'const fs=require("fs"); process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1])).token)' "$response")"
-auth_header="Authorization: $token"
-
-for length in 8 11; do
-  password="$(printf 'x%.0s' $(seq 1 "$length"))"
-  status="$(curl --silent --request POST --header "$auth_header" --header 'Content-Type: application/json' --data "{\"email\":\"short-$length@example.test\",\"password\":\"$password\",\"passwordConfirm\":\"$password\",\"displayName\":\"Short\",\"firstName\":\"Short\",\"lastName\":\"Password\",\"role\":\"MEMBER\",\"active\":true,\"verified\":true}" --output "$response" --write-out '%{http_code}' "http://127.0.0.1:$port/api/collections/users/records")"
-  [[ "$status" == "400" ]] || { printf 'Password length %s was unexpectedly accepted\n' "$length" >&2; exit 1; }
-done
-
-status="$(curl --silent --request POST --header "$auth_header" --header 'Content-Type: application/json' --data '{"email":"member@example.test","password":"Member-password-12!","passwordConfirm":"Member-password-12!","displayName":"Member","firstName":"Test","lastName":"Member","role":"MEMBER","active":true,"verified":true}' --output "$response" --write-out '%{http_code}' "http://127.0.0.1:$port/api/collections/users/records")"
-[[ "$status" == "200" ]] || { cat "$response" >&2; exit 1; }
-member_id="$(node -e 'const fs=require("fs"); process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1])).id)' "$response")"
-status="$(curl --silent --request PATCH --header "$auth_header" --header 'Content-Type: application/json' --data '{"active":false}' --output "$response" --write-out '%{http_code}' "http://127.0.0.1:$port/api/collections/users/records/$member_id")"
-[[ "$status" == "200" ]] || { cat "$response" >&2; exit 1; }
-grep -q '"active":false' "$response"
-
-status="$(curl --silent --request POST --header "$auth_header" --header 'Content-Type: application/json' --data '{"name":"Integration Group","description":"Temporary","active":true}' --output "$response" --write-out '%{http_code}' "http://127.0.0.1:$port/api/collections/groups/records")"
-[[ "$status" == "200" ]] || { cat "$response" >&2; exit 1; }
-group_id="$(node -e 'const fs=require("fs"); process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1])).id)' "$response")"
-status="$(curl --silent --request PATCH --header "$auth_header" --header 'Content-Type: application/json' --data '{"active":false}' --output "$response" --write-out '%{http_code}' "http://127.0.0.1:$port/api/collections/groups/records/$group_id")"
-[[ "$status" == "200" ]] || { cat "$response" >&2; exit 1; }
-grep -q '"active":false' "$response"
+PB_TEST_URL="http://127.0.0.1:$port" \
+PB_TEST_SUPERUSER_EMAIL="$test_email" \
+PB_TEST_SUPERUSER_PASSWORD="$test_password" \
+node "$repo_root/scripts/pocketbase-integration.mjs"
 
 printf 'PocketBase integration tests passed on 127.0.0.1:%s\n' "$port"
