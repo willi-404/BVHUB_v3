@@ -5,7 +5,7 @@ import zhCN from "./locales/zh-CN.json";
 
 const messages = { de, en, "zh-CN": zhCN } as const;
 export type Locale = keyof typeof messages;
-type MessageKey = keyof typeof de;
+export type MessageKey = keyof typeof de;
 
 function initialLocale(): Locale {
   const language = typeof navigator === "undefined" ? "de" : navigator.language;

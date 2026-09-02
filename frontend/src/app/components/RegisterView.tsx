@@ -2,13 +2,13 @@ import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import logoSrc from "../../imports/logo1-high-resolution.png";
-import { useI18n } from "../../i18n";
+import { useI18n, type MessageKey } from "../../i18n";
 import { register, type RegistrationInput } from "../../features/auth/registrationService";
 
 type Field = keyof RegistrationInput;
 const required: Field[] = ["username", "firstName", "lastName", "email", "street", "houseNumber", "postalCode", "city", "birthDate"];
 
-function validate(values: RegistrationInput, t: (key: any) => string): Partial<Record<Field, string>> {
+function validate(values: RegistrationInput, t: (key: MessageKey) => string): Partial<Record<Field, string>> {
   const errors: Partial<Record<Field, string>> = {};
   for (const field of required) if (!String(values[field] ?? "").trim()) errors[field] = t("register.required");
   if (!errors.email && !/^\S+@\S+\.\S+$/.test(values.email)) errors.email = t("register.invalidEmail");
