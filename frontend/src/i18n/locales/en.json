@@ -20,7 +20,6 @@
   "auth.register": "Register now",
   "register.title": "Registration",
   "register.subtitle": "Create your bvHub account.",
-  "register.username": "Display name / username",
   "register.displayName": "Display name",
   "register.firstName": "First name",
   "register.lastName": "Last name",

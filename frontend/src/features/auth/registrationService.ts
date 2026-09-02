@@ -2,7 +2,6 @@ import { ClientResponseError } from "pocketbase";
 import { pb } from "../../lib/pocketbase";
 
 export interface RegistrationInput {
-  username: string;
   displayName: string;
   firstName: string;
   lastName: string;

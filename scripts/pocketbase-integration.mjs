@@ -36,6 +36,67 @@ const auth = expectStatus(await request("POST", "/api/collections/_superusers/au
 }), 200, "superuser login");
 const rootToken = auth.token;
 
+const registrationEmail = "new-registration@example.test";
+const registrationDisplayName = "New Registration";
+const registration = expectStatus(await request("POST", "/api/bvhub/register", {
+  body: {
+    displayName: registrationDisplayName,
+    firstName: "New",
+    lastName: "Registration",
+    email: registrationEmail,
+    street: "Teststrasse",
+    houseNumber: "12a",
+    postalCode: "91052",
+    city: "Erlangen",
+    birthDate: "2000-01-01",
+    phone: "",
+    contactInfo: "",
+    role: "SUPER_ADMIN",
+    active: true,
+    verified: true,
+    groups: ["forbidden"],
+  },
+}), 201, "guest registration");
+assert.equal(registration.email, "ne***@example.test", "registration response masks email");
+
+const registeredUsers = expectStatus(await request(
+  "GET",
+  `/api/collections/users/records?filter=${encodeURIComponent(`email = "${registrationEmail}"`)}`,
+  { token: rootToken },
+), 200, "find registered guest");
+assert.equal(registeredUsers.items.length, 1, "registration creates one user");
+const registeredUser = registeredUsers.items[0];
+assert.equal(registeredUser.displayName, registrationDisplayName, "registration stores one public name");
+assert.equal(registeredUser.role, "GUEST");
+assert.equal(registeredUser.active, false);
+assert.equal(registeredUser.verified, false);
+
+const registeredProfiles = expectStatus(await request(
+  "GET",
+  `/api/collections/user_profiles/records?filter=${encodeURIComponent(`user = "${registeredUser.id}"`)}`,
+  { token: rootToken },
+), 200, "find registered profile");
+assert.equal(registeredProfiles.items.length, 1, "registration creates one profile");
+assert.equal(registeredProfiles.items[0].postalCode, "91052");
+
+expectStatus(await request("POST", "/api/bvhub/register", {
+  body: {
+    displayName: "",
+    firstName: "New",
+    lastName: "Registration",
+    email: "invalid@example.test",
+    street: "Teststrasse",
+    houseNumber: "12a",
+    postalCode: "91052",
+    city: "Erlangen",
+    birthDate: "2000-01-01",
+  },
+}), 400, "invalid registration");
+
+expectStatus(await request("POST", "/api/bvhub/verify-email", {
+  body: { token: "invalid-token" },
+}), 400, "invalid verification token");
+
 for (const length of [8, 11]) {
   const password = "x".repeat(length);
   expectStatus(await request("POST", "/api/collections/users/records", {
