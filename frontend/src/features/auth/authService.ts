@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { ClientResponseError } from "pocketbase";
 import { pb } from "../../lib/pocketbase";
 import { toAuthUser, type AuthUser } from "./policy";
+import { mapPBError } from "../../lib/errorMapper";
 
 export class AuthServiceError extends Error {
   readonly status: number | undefined;
@@ -18,9 +19,9 @@ const GENERIC_AUTH_ERROR = "Anmeldung nicht möglich. Bitte prüfe deine Eingabe
 function normalizeError(error: unknown): AuthServiceError {
   if (error instanceof AuthServiceError) return error;
   if (error instanceof ClientResponseError) {
-    return new AuthServiceError(GENERIC_AUTH_ERROR, error.status);
+    return new AuthServiceError(mapPBError(error), error.status);
   }
-  return new AuthServiceError(GENERIC_AUTH_ERROR);
+  return new AuthServiceError(mapPBError(error));
 }
 
 function currentUser(): AuthUser {
