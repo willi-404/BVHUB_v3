@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { useAuth } from "../features/auth/AuthProvider";
+import { useAuth, useAuthUser } from "../features/auth/AuthProvider";
 import { isAdminRole, type Role } from "../features/auth/policy";
 import { canAccessRole, protectedRouteDecision } from "./guardLogic";
 
@@ -31,13 +31,13 @@ export function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
 }
 
 export function RoleGuard({ roles }: { roles: readonly Role[] }) {
-  const { user } = useAuth();
+  const { data: user } = useAuthUser();
   if (!user || !canAccessRole(user.role, roles)) return <Navigate to="/" replace />;
   return <Outlet />;
 }
 
 export function AdminGuard() {
-  const { user } = useAuth();
+  const { data: user } = useAuthUser();
   if (!user || !isAdminRole(user.role)) return <Navigate to="/" replace />;
   return <Outlet />;
 }
