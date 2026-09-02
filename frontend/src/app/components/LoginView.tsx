@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
 import logoSrc from "../../imports/logo1-high-resolution.png";
 import { useAuth } from "../../features/auth/AuthProvider";
@@ -177,6 +178,7 @@ export default function LoginView({ onLogin }: LoginViewProps) {
               {mode === "otp" ? t("auth.switchPassword") : t("auth.switchOtp")}
             </button>
             {mode === "otp" && otpId && <button type="button" onClick={() => { setOtpId(null); setOtp(""); setNotice(""); setError(""); }} className="w-full text-center text-xs text-[var(--muted-foreground)] mt-3 hover:text-[var(--foreground)]">{t("auth.retry")}</button>}
+            <p className="text-center text-xs text-[var(--muted-foreground)] mt-4">{t("auth.noAccount")} <Link to="/register" className="text-[var(--primary)] font-600 hover:underline">{t("auth.register")}</Link></p>
           </div>
         </div>
 

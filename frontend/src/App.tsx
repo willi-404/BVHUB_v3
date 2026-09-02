@@ -9,6 +9,9 @@ import { Progress } from "./app/components/ui/progress";
 import { Separator } from "./app/components/ui/separator";
 import { MemberCard } from "./app/components/MemberCard";
 import LoginView from "./app/components/LoginView";
+import RegisterView from "./app/components/RegisterView";
+import RegisterSuccessView from "./app/components/RegisterSuccessView";
+import VerifyEmailView from "./app/components/VerifyEmailView";
 import AdminMembersView from "./app/components/AdminMembersView";
 import AdminPaymentsView from "./app/components/AdminPaymentsView";
 import AdminEventManageView from "./app/components/AdminEventManageView";
@@ -1008,6 +1011,9 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<PublicOnlyRoute><LoginView /></PublicOnlyRoute>} />
+      <Route path="/register" element={<PublicOnlyRoute><RegisterView /></PublicOnlyRoute>} />
+      <Route path="/register/success" element={<PublicOnlyRoute><RegisterSuccessView /></PublicOnlyRoute>} />
+      <Route path="/verify-email" element={<PublicOnlyRoute><VerifyEmailView /></PublicOnlyRoute>} />
       <Route element={<ProtectedRoute />}>
         <Route index element={<AppShell />} />
         <Route path="events" element={<AppShell initialTab="events" />} />
