@@ -15,6 +15,8 @@ export interface Member {
   accountCreated: string;
   accountUpdated: string;
   avatarColor: string;
+  role?: "GUEST" | "MEMBER" | "ADMIN" | "SUPER_ADMIN";
+  groups?: { id: string; membershipId: string; name: string; active: boolean }[];
 }
 
 export const MEMBERS: Member[] = [

@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Member, groupConfig, initials } from "./MemberTypes";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
+import { pb } from "../../../lib/pocketbase";
+import { useAuthUser } from "../../../features/auth/AuthProvider";
 
 function Icon({ d, size = 18, className = "" }: { d: string; size?: number; className?: string }) {
   return (
@@ -71,6 +73,35 @@ function Row({ icon, label, value, mono = false, action }: { icon: string; label
 
 export function MemberDetailPopup({ member, onClose }: { member: Member; onClose: () => void }) {
   const cfg = groupConfig[member.gruppe];
+  const { data: currentUser } = useAuthUser();
+  const [groups, setGroups] = useState(member.groups ?? []);
+  const [available, setAvailable] = useState<{ id: string; name: string }[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const canManageGroups = currentUser?.role === "ADMIN" || currentUser?.role === "SUPER_ADMIN";
+  const canManageRole = currentUser?.role === "SUPER_ADMIN" && (member.role === "ADMIN" || member.role === "GUEST" || member.role === "MEMBER");
+  useEffect(() => {
+    if (!canManageGroups) return;
+    void pb.send<{ groups: { id: string; name: string }[] }>("/api/bvhub/admin/groups", { method: "GET" }).then((result) => setAvailable(result.groups)).catch(() => setMessage("Gruppen konnten nicht geladen werden."));
+  }, [canManageGroups]);
+  async function saveGroups() {
+    setSaving(true); setMessage(null);
+    try {
+      await pb.send(`/api/bvhub/admin/users/${member.id}/groups`, { method: "PUT", body: { groups: groups.map((group) => group.id) } });
+      setMessage("Gruppen erfolgreich gespeichert.");
+    } catch (_) { setMessage("Gruppen konnten nicht gespeichert werden."); }
+    finally { setSaving(false); }
+  }
+  async function changeRole() {
+    const nextRole = member.role === "ADMIN" ? "MEMBER" : "ADMIN";
+    if (!window.confirm(`Rolle wirklich auf ${nextRole} ändern? Diese Aktion beendet die Sitzung des Benutzers.`)) return;
+    setSaving(true); setMessage(null);
+    try {
+      await pb.send(`/api/bvhub/admin/users/${member.id}/role`, { method: "PATCH", body: { role: nextRole, confirmation: "ROLE_CHANGE" } });
+      setMessage("Rolle erfolgreich geändert.");
+    } catch (_) { setMessage("Rolle konnte nicht geändert werden."); }
+    finally { setSaving(false); }
+  }
   return (
     <>
       <div className="fixed inset-0 z-[110] bg-black/50 backdrop-blur-sm" onClick={onClose} />
@@ -120,9 +151,26 @@ export function MemberDetailPopup({ member, onClose }: { member: Member; onClose
             </Section>
             <Separator />
             <Section title="Account">
+              <Row icon={ic.shield} label="Gruppen" value={member.groups?.map((group) => group.name).join(", ") || "-"} />
               <Row icon={ic.clock} label="Erstellt am"       value={member.accountCreated} />
               <Row icon={ic.clock} label="Zuletzt geändert"  value={member.accountUpdated} />
             </Section>
+            {canManageGroups && (
+              <>
+                <Separator />
+                <Section title="Verwaltung">
+                  <div className="flex flex-col gap-2">
+                    {available.map((group) => {
+                      const checked = groups.some((item) => item.id === group.id);
+                      return <label key={group.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={checked} onChange={() => setGroups((current) => checked ? current.filter((item) => item.id !== group.id) : [...current, { id: group.id, membershipId: "", name: group.name, active: true }])} />{group.name}</label>;
+                    })}
+                    <Button size="sm" onClick={() => void saveGroups()} disabled={saving}>{saving ? "Speichern …" : "Gruppen speichern"}</Button>
+                    {canManageRole && <Button size="sm" variant="outline" onClick={() => void changeRole()} disabled={saving}>{member.role === "ADMIN" ? "Auf Member zurückstufen" : "Zum Admin ernennen"}</Button>}
+                    {message && <p role="status" className="text-xs text-[var(--muted-foreground)]">{message}</p>}
+                  </div>
+                </Section>
+              </>
+            )}
           </div>
         </div>
 

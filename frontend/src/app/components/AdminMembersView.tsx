@@ -160,9 +160,7 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
                         <td className="px-4 py-3 text-sm">{m.vorname}</td>
                         <td className="px-4 py-3 text-sm">{m.nachname}</td>
                         <td className="px-4 py-3 text-xs text-[var(--muted-foreground)]">{m.email}</td>
-                        <td className="px-4 py-3">
-                          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-600" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
-                        </td>
+                        <td className="px-4 py-3"><div className="flex flex-wrap gap-1"><span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-600" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>{m.groups?.map((group) => <span key={group.id} className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-500 bg-[var(--muted)]">{group.name}</span>)}</div></td>
                         <td className="px-4 py-3 text-xs text-[var(--muted-foreground)]">{m.memberSince}</td>
                       </tr>
                     );
