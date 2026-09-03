@@ -130,6 +130,9 @@ const registeredUser = registeredUsers.items[0];
 assert.equal(registeredUser.displayName, registrationDisplayName, "registration stores one public name");
 assert.equal(registeredUser.role, "GUEST");
 assert.equal(registeredUser.active, false);
+assert.equal(registeredUser.emailVisibility, true, "registration forces email visibility");
+const forcedVisibility = expectStatus(await request("PATCH", `/api/collections/users/records/${registeredUser.id}`, { token: rootToken, body: { emailVisibility: false } }), 200, "force email visibility on update");
+assert.equal(forcedVisibility.emailVisibility, true);
 assert.equal(registeredUser.verified, false);
 
 const registeredProfiles = expectStatus(await request(
@@ -256,7 +259,7 @@ assert.deepEqual(concurrentResults.map((result) => result.status).sort((a, b) =>
 
 const tokenPayload = JSON.parse(Buffer.from(memberLoginToken.split(".")[1], "base64url").toString("utf8"));
 assert.equal(typeof tokenPayload.iat, "undefined", "PocketBase auth token does not include iat");
-assert.ok(Math.abs((tokenPayload.exp - Math.floor(Date.now() / 1000)) - 432000) <= 5, "fresh local auth token lasts five days");
+assert.ok(Math.abs((tokenPayload.exp - Math.floor(Date.now() / 1000)) - 43200) <= 5, "fresh local auth token lasts twelve hours");
 const stale = otpRequests[0];
 const secondBefore = smtpMessages.length;
 const secondOtp = expectStatus(await request("POST", "/api/collections/users/request-otp", { body: { email: stale.account.email } }), 200, "request replacement OTP");
@@ -302,24 +305,35 @@ expectStatus(await request("PATCH", `/api/collections/users/records/${managed.id
   token: adminLogin.token, body: { active: false },
 }), 200, "admin deactivates member");
 
-const groupA = expectStatus(await request("POST", "/api/collections/groups/records", {
-  token: adminLogin.token, body: { name: "Integration A", active: true },
-}), 200, "admin creates group");
-const groupB = expectStatus(await request("POST", "/api/collections/groups/records", {
-  token: superLogin.token, body: { name: "Integration B", active: true },
-}), 200, "superadmin creates group");
-expectStatus(await request("PATCH", `/api/collections/groups/records/${groupA.id}`, {
-  token: adminLogin.token, body: { active: false },
-}), 200, "groups active false");
+// Direct role mass-assignment is rejected; only the dedicated super-admin route may change roles.
+expectStatus(await request("PATCH", `/api/collections/users/records/${managed.id}`, {
+  token: superLogin.token, body: { role: "ADMIN" },
+}), 404, "direct role update rejected");
+expectStatus(await request("PATCH", `/api/bvhub/admin/users/${managed.id}/role`, {
+  token: superLogin.token, body: { role: "ADMIN", confirmation: "ROLE_CHANGE" },
+}), 200, "superadmin promotes member");
+expectStatus(await request("PATCH", `/api/bvhub/admin/users/${managed.id}/role`, {
+  token: adminLogin.token, body: { role: "MEMBER", confirmation: "ROLE_CHANGE" },
+}), 403, "admin cannot change roles");
+expectStatus(await request("PATCH", `/api/bvhub/admin/users/${managed.id}/role`, {
+  token: superLogin.token, body: { role: "MEMBER", confirmation: "ROLE_CHANGE" },
+}), 200, "superadmin demotes admin");
 
-for (const group of [groupA, groupB]) {
-  expectStatus(await request("POST", "/api/collections/user_groups/records", {
-    token: adminLogin.token, body: { user: member.id, group: group.id },
-  }), 200, "admin assigns member group");
-}
+const managementGroups = expectStatus(await request("GET", "/api/bvhub/admin/groups", { token: adminLogin.token }), 200, "admin reads canonical groups");
+assert.deepEqual(managementGroups.groups.map((group) => group.name).sort(), ["Guest", "Member ER", "Member NUE"]);
+const groupIds = managementGroups.groups.slice(0, 2).map((group) => group.id);
 expectStatus(await request("POST", "/api/collections/user_groups/records", {
-  token: adminLogin.token, body: { user: member.id, group: groupA.id },
-}), 400, "duplicate group relation");
+  token: adminLogin.token, body: { user: member.id, group: groupIds[0] },
+}), 403, "direct group relation rejected");
+expectStatus(await request("PUT", `/api/bvhub/admin/users/${member.id}/groups`, {
+  token: adminLogin.token, body: { groups: groupIds },
+}), 200, "admin assigns member groups");
+expectStatus(await request("PUT", `/api/bvhub/admin/users/${member.id}/groups`, {
+  token: adminLogin.token, body: { groups: [groupIds[0], groupIds[0]] },
+}), 400, "duplicate group ids rejected");
+expectStatus(await request("PUT", `/api/bvhub/admin/users/${admin.id}/groups`, {
+  token: adminLogin.token, body: { groups: groupIds },
+}), 403, "admin cannot assign groups to admin");
 const impersonation = expectStatus(await request("POST", `/api/collections/users/impersonate/${member.id}`, {
   token: rootToken, body: { duration: 300 },
 }), 200, "member impersonation for rule test");

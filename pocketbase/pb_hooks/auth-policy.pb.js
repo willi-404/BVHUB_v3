@@ -28,3 +28,25 @@ onRecordAuthRequest((e) => {
   if (!e.record || e.record.getBool("active") !== true) throw new BadRequestError("Invalid credentials");
   e.next();
 }, "users");
+
+// emailVisibility is a server-controlled privacy setting. Role changes are only
+// possible through the dedicated management route, never through mass assignment.
+onRecordCreateRequest((e) => {
+  e.record.set("emailVisibility", true);
+  e.next();
+}, "users");
+
+onRecordUpdateRequest((e) => {
+  e.record.set("emailVisibility", true);
+  // Role changes are handled only by the dedicated management endpoint. Reject
+  // attempts to change the role through the generic users records API while
+  // still allowing trusted server-side profile updates.
+  const path = String(e.request && e.request.url && e.request.url.path || "");
+  if (path.includes("/api/collections/users/records/")) {
+    const body = e.requestInfo().body || {};
+    const original = e.record.original();
+    const previousRole = original && typeof original.getString === "function" ? original.getString("role") : e.record.getString("role");
+    if (Object.hasOwn(body, "role") && body.role !== previousRole) throw new ForbiddenError("Rollenänderungen sind nur über die Verwaltungs-API erlaubt");
+  }
+  e.next();
+}, "users");

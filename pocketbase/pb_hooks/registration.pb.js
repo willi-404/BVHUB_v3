@@ -41,6 +41,7 @@ routerAdd("POST", "/api/bvhub/register", (e) => {
       user.set("lastName", value.lastName);
       user.set("role", "GUEST");
       user.set("active", false);
+      user.set("emailVisibility", true);
       user.setVerified(false);
       user.setRandomPassword();
       txApp.save(user);
