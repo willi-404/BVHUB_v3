@@ -1,8 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
-import { MEMBERS, Member, Group, groupConfig, initials } from "./shared/MemberTypes";
+import { Member, Group, groupConfig, initials } from "./shared/MemberTypes";
 import { MemberDetailPopup } from "./shared/MemberDetailPopup";
+import { useMembers } from "../../features/members/hooks/useMembers";
 
 function Icon({ d, size = 18, className = "" }: { d: string; size?: number; className?: string }) {
   return (
@@ -73,11 +74,8 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
   const [filterOpen, setFilterOpen] = useState(false);
   const [selected, setSelected] = useState<Member | null>(null);
 
-  const filtered = useMemo(() => MEMBERS.filter((m) => {
-    const matchGroup = filterGroups.length === 0 || filterGroups.includes(m.gruppe);
-    const q = search.toLowerCase();
-    return matchGroup && (!q || [m.vorname, m.nachname, m.username, m.id, m.email].some((s) => s.toLowerCase().includes(q)));
-  }), [search, filterGroups]);
+  const membersQuery = useMembers({ search, group: filterGroups[0], page: 1, perPage: 50 });
+  const filtered = membersQuery.data?.items ?? [];
 
   const hasFilter = filterGroups.length > 0;
 
@@ -91,7 +89,7 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
           </button>
           <div className="flex-1">
             <h1 className="font-700 text-base text-[var(--foreground)]">Members</h1>
-            <p className="text-[10px] text-[var(--muted-foreground)]">{filtered.length} von {MEMBERS.length} Mitglieder</p>
+            <p className="text-[10px] text-[var(--muted-foreground)]">{membersQuery.data?.totalItems ?? 0} Mitglieder</p>
           </div>
           <button onClick={() => setFilterOpen(true)}
             className={`relative h-9 w-9 rounded-full flex items-center justify-center transition-colors ${hasFilter ? "bg-[var(--primary)] text-white" : "hover:bg-[var(--muted)] text-[var(--muted-foreground)]"}`}>
@@ -128,7 +126,9 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
 
       {/* List */}
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "auto" }}>
-        {filtered.length === 0 ? (
+        {membersQuery.isLoading ? <div className="p-8 text-sm text-[var(--muted-foreground)]">Lade Mitglieder …</div> : membersQuery.isError ? (
+          <div className="flex flex-col items-center py-16"><p className="text-sm text-red-600">Mitglieder konnten nicht geladen werden.</p><Button variant="outline" className="mt-3" onClick={() => void membersQuery.refetch()}>Erneut versuchen</Button></div>
+        ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center py-16 text-[var(--muted-foreground)]">
             <Icon d={ic.user} size={32} />
             <p className="text-sm mt-3 font-500">Keine Mitglieder gefunden</p>
