@@ -19,7 +19,7 @@ async function request(method, path, { token, body } = {}) {
   const text = await response.text();
   let data = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-  return { status: response.status, data, text };
+  return { status: response.status, data, text, headers: response.headers };
 }
 
 function expectStatus(result, expected, label) {
@@ -183,9 +183,9 @@ const guest = expectStatus(await request("POST", "/api/collections/users/records
   token: rootToken, body: userBody("guest@example.test", "GUEST"),
 }), 200, "create guest");
 
-const inactiveGuest = expectStatus(await request("POST", "/api/collections/users/records", { token: rootToken, body: userBody("inactive-guest@example.test", "GUEST") }), 200, "create inactive test user");
+const inactiveGuest = expectStatus(await request("POST", "/api/collections/users/records", { token: rootToken, body: { ...userBody("inactive-guest@example.test", "GUEST"), displayName: "Inactive Guest" } }), 200, "create inactive test user");
 expectStatus(await request("PATCH", `/api/collections/users/records/${inactiveGuest.id}`, { token: rootToken, body: { active: false } }), 200, "deactivate guest");
-const unverifiedGuest = expectStatus(await request("POST", "/api/collections/users/records", { token: rootToken, body: { ...userBody("unverified-guest@example.test", "GUEST"), verified: false } }), 200, "create unverified test user");
+const unverifiedGuest = expectStatus(await request("POST", "/api/collections/users/records", { token: rootToken, body: { ...userBody("unverified-guest@example.test", "GUEST"), displayName: "Unverified Guest", verified: false } }), 200, "create unverified test user");
 
 for (const account of [inactiveGuest, unverifiedGuest]) {
   const result = await request("POST", "/api/collections/users/request-otp", { body: { email: account.email } });
@@ -194,6 +194,8 @@ for (const account of [inactiveGuest, unverifiedGuest]) {
 }
 
 const otpRequests = [];
+let memberLoginToken = "";
+let guestLoginToken = "";
 for (const account of [member, guest]) {
   const before = smtpMessages.length;
   const otp = expectStatus(await request("POST", "/api/collections/users/request-otp", { body: { email: account.email } }), 200, `request OTP for ${account.role}`);
@@ -206,7 +208,49 @@ for (const account of [member, guest]) {
   assert.equal(login.record.role, account.role);
   assert.equal(login.record.active, true);
   assert.equal(login.record.verified, true);
+  if (account === member) memberLoginToken = login.token;
+  if (account === guest) guestLoginToken = login.token;
 }
+
+const ownProfileResponse = await request("GET", "/api/bvhub/me/profile", { token: memberLoginToken });
+const ownProfile = expectStatus(ownProfileResponse, 200, "member reads own profile");
+assert.equal(ownProfileResponse.headers.get("cache-control"), "no-store", "profile response is not cacheable");
+assert.equal(ownProfile.user.id, member.id);
+assert.equal(ownProfile.profile, null, "missing profile is represented as null");
+assert.equal(Object.hasOwn(ownProfile.user, "password"), false, "profile response excludes password");
+const profilePatch = {
+  displayName: "Updated Member",
+  firstName: "Updated",
+  lastName: "Member",
+  street: "Teststrasse",
+  houseNumber: "12a",
+  postalCode: "91052",
+  city: "Erlangen",
+  birthDate: "2000-01-01",
+  phone: "+49 911 123456",
+  contactInfo: "Integration profile",
+};
+const savedProfile = expectStatus(await request("PATCH", "/api/bvhub/me/profile", { token: memberLoginToken, body: profilePatch }), 200, "member updates own profile");
+assert.equal(savedProfile.user.displayName, profilePatch.displayName);
+assert.equal(savedProfile.profile.birthDate, profilePatch.birthDate, "calendar date remains unchanged");
+expectStatus(await request("PATCH", "/api/bvhub/me/profile", { token: memberLoginToken, body: { birthDate: "2001-02-29" } }), 400, "invalid calendar date rejected");
+expectStatus(await request("PATCH", "/api/bvhub/me/profile", { token: memberLoginToken, body: { birthDate: "2999-01-01" } }), 400, "future birth date rejected");
+expectStatus(await request("PATCH", "/api/bvhub/me/profile", { token: memberLoginToken, body: { postalCode: "91A52" } }), 400, "invalid postal code rejected");
+expectStatus(await request("PATCH", "/api/bvhub/me/profile", { token: memberLoginToken, body: { displayName: "Rollback Candidate", postalCode: "invalid" } }), 400, "invalid transaction rejected");
+const afterRollback = expectStatus(await request("GET", "/api/bvhub/me/profile", { token: memberLoginToken }), 200, "read profile after rollback");
+assert.equal(afterRollback.user.displayName, profilePatch.displayName, "failed update changes no user fields");
+const duplicateProfile = await request("PATCH", "/api/bvhub/me/profile", { token: memberLoginToken, body: { displayName: "  test guest  " } });
+assert.equal(duplicateProfile.status, 409, "duplicate displayName returns conflict");
+const forbiddenFields = await request("PATCH", "/api/bvhub/me/profile", { token: memberLoginToken, body: { role: "ADMIN" } });
+assert.equal(forbiddenFields.status, 400, "privileged profile fields are rejected");
+const memberProfileRecord = expectStatus(await request("GET", `/api/collections/user_profiles/records?filter=${encodeURIComponent(`user = "${member.id}"`)}`, { token: rootToken }), 200, "find member profile");
+const relationAttempt = await request("PATCH", `/api/collections/user_profiles/records/${memberProfileRecord.items[0].id}`, { token: memberLoginToken, body: { user: guest.id } });
+assert.notEqual(relationAttempt.status, 200, "profile user relation cannot be rebound");
+assert.notEqual((await request("GET", "/api/bvhub/me/profile", { token: rootToken })).status, 200, "technical superuser cannot use application profile API");
+
+const tokenPayload = JSON.parse(Buffer.from(memberLoginToken.split(".")[1], "base64url").toString("utf8"));
+assert.equal(typeof tokenPayload.iat, "undefined", "PocketBase auth token does not include iat");
+assert.ok(Math.abs((tokenPayload.exp - Math.floor(Date.now() / 1000)) - 432000) <= 5, "fresh local auth token lasts five days");
 const stale = otpRequests[0];
 const secondBefore = smtpMessages.length;
 const secondOtp = expectStatus(await request("POST", "/api/collections/users/request-otp", { body: { email: stale.account.email } }), 200, "request replacement OTP");
@@ -237,7 +281,7 @@ for (const account of [admin, superAdmin]) {
   assert.deepEqual(Object.keys(result.data || {}).sort(), Object.keys(otpUnknown.data || {}).sort(), "privileged OTP response shape must not enumerate role");
 }
 const managed = expectStatus(await request("POST", "/api/collections/users/records", {
-  token: adminLogin.token, body: { ...userBody("managed@example.test", "MEMBER"), verified: undefined },
+  token: adminLogin.token, body: { ...userBody("managed@example.test", "MEMBER"), displayName: "Managed Member", verified: undefined },
 }), 200, "admin creates member");
 expectStatus(await request("POST", "/api/collections/users/records", {
   token: adminLogin.token, body: userBody("forbidden-admin@example.test", "ADMIN"),
