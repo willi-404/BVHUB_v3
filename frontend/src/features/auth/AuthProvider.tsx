@@ -1,9 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { pb } from "../../lib/pocketbase";
-import { clearAuthSession, loginWithPassword, refreshSession, requestOtp, verifyOtp } from "./authService";
+import { clearAuthSession, loginWithPassword, refreshSession, requestOtp, softLogout, verifyOtp } from "./authService";
 import { toAuthUser, type AuthUser } from "./policy";
-import { resolveSessionDecision } from "./session";
+import { getTokenExpiry, resolveSessionDecision } from "./session";
 
 export type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -33,16 +33,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    const unsubscribe = pb.authStore.onChange((_token, record) => {
+    let expiryTimer: ReturnType<typeof setTimeout> | undefined;
+    const expireLocally = () => {
+      if (expiryTimer) clearTimeout(expiryTimer);
+      softLogout(queryClient);
+      if (mounted) {
+        setUser(null);
+        setStatus("unauthenticated");
+      }
+    };
+    const unsubscribe = pb.authStore.onChange((token, record) => {
       if (!mounted) return;
+      if (!token) queryClient.clear();
       const nextUser = record && typeof record === "object" ? toAuthUser(record as unknown as Record<string, unknown>) : null;
       setUser(nextUser);
       queryClient.setQueryData(["auth", "user"], nextUser);
       setStatus(resolveSessionDecision(pb.authStore.isValid, nextUser));
+      if (expiryTimer) clearTimeout(expiryTimer);
+      if (!token) return;
+      const expiry = getTokenExpiry(token);
+      if (expiry === null || expiry <= Math.floor(Date.now() / 1000)) {
+        expireLocally();
+        return;
+      }
+      expiryTimer = setTimeout(expireLocally, Math.max(0, (expiry * 1000) - Date.now() + 5000));
     });
 
     async function bootstrap() {
-      if (!pb.authStore.isValid) {
+      const expiry = getTokenExpiry(pb.authStore.token);
+      if (!pb.authStore.isValid || expiry === null || expiry <= Math.floor(Date.now() / 1000)) {
         pb.authStore.clear();
         if (mounted) {
           setUser(null);
@@ -69,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void bootstrap();
     return () => {
       mounted = false;
+      if (expiryTimer) clearTimeout(expiryTimer);
       unsubscribe();
     };
   }, [queryClient]);

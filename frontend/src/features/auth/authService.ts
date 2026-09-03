@@ -73,7 +73,18 @@ export async function refreshSession(): Promise<AuthUser> {
 }
 
 export function clearAuthSession(authStore: { clear: () => void }, client: Pick<QueryClient, "clear">): void {
+  if (typeof window !== "undefined") {
+    try { window.sessionStorage.removeItem("bvhub.sessionExpired"); } catch { /* storage may be unavailable */ }
+  }
   authStore.clear();
+  client.clear();
+}
+
+export function softLogout(client: Pick<QueryClient, "clear">): void {
+  if (typeof window !== "undefined") {
+    try { window.sessionStorage.setItem("bvhub.sessionExpired", "1"); } catch { /* storage may be unavailable */ }
+  }
+  pb.authStore.clear();
   client.clear();
 }
 

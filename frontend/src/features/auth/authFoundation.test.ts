@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { clearAuthSession } from "./authService";
 import { canUseOtp, canUsePassword, isUsableUser, type AuthUser } from "./policy";
-import { resolveSessionDecision } from "./session";
+import { getTokenExpiry, resolveSessionDecision } from "./session";
 import { canAccessRole, protectedRouteDecision, publicRouteDecision, safeLoginRedirect } from "../../routes/guardLogic";
 
 const user = (role: AuthUser["role"], active = true): AuthUser => ({
@@ -67,5 +67,12 @@ describe("authentication foundation", () => {
     clearAuthSession({ clear: () => { authCleared = true; } }, { clear: () => { queryCleared = true; } });
     expect(authCleared).toBe(true);
     expect(queryCleared).toBe(true);
+  });
+
+  it("decodes only the JWT expiry for the session timer", () => {
+    const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
+    const token = `${encode({ alg: "none" })}.${encode({ exp: 432000 })}.signature`;
+    expect(getTokenExpiry(token)).toBe(432000);
+    expect(getTokenExpiry("not-a-token")).toBeNull();
   });
 });

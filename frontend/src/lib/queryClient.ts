@@ -1,13 +1,11 @@
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 import { ClientResponseError } from "pocketbase";
-import { pb } from "./pocketbase";
+import { softLogout } from "../features/auth/authService";
 
 function handleAuthError(error: unknown) {
   const status = error instanceof ClientResponseError ? error.status : (error as { status?: number })?.status;
-  if ((status === 401 || status === 403) && typeof window !== "undefined") {
-    pb.authStore.clear();
-    queryClient.clear();
-    if (window.location.pathname !== "/login") window.location.assign("/login");
+  if (status === 401) {
+    softLogout(queryClient);
   }
 }
 

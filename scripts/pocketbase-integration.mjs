@@ -248,6 +248,12 @@ const relationAttempt = await request("PATCH", `/api/collections/user_profiles/r
 assert.notEqual(relationAttempt.status, 200, "profile user relation cannot be rebound");
 assert.notEqual((await request("GET", "/api/bvhub/me/profile", { token: rootToken })).status, 200, "technical superuser cannot use application profile API");
 
+const concurrentResults = await Promise.all([
+  request("PATCH", "/api/bvhub/me/profile", { token: memberLoginToken, body: { displayName: "Concurrent Name" } }),
+  request("PATCH", "/api/bvhub/me/profile", { token: guestLoginToken, body: { displayName: "Concurrent Name" } }),
+]);
+assert.deepEqual(concurrentResults.map((result) => result.status).sort((a, b) => a - b), [200, 409], "concurrent identical names have exactly one winner");
+
 const tokenPayload = JSON.parse(Buffer.from(memberLoginToken.split(".")[1], "base64url").toString("utf8"));
 assert.equal(typeof tokenPayload.iat, "undefined", "PocketBase auth token does not include iat");
 assert.ok(Math.abs((tokenPayload.exp - Math.floor(Date.now() / 1000)) - 432000) <= 5, "fresh local auth token lasts five days");

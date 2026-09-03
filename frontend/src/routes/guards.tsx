@@ -18,7 +18,7 @@ export function ProtectedRoute() {
   const decision = protectedRouteDecision(status);
   if (decision === "loading") return <LoadingView />;
   if (decision === "login") {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}${location.hash}` }} />;
   }
   return <Outlet />;
 }

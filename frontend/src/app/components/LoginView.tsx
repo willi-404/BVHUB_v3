@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
 import logoSrc from "../../imports/logo1-high-resolution.png";
@@ -7,6 +7,7 @@ import { useI18n } from "../../i18n";
 
 interface LoginViewProps {
   onLogin?: () => void;
+  sessionExpired?: boolean;
 }
 
 function Icon({ d, size = 18 }: { d: string; size?: number }) {
@@ -25,7 +26,7 @@ const icons = {
   arrowRight: "M5 12h14M12 5l7 7-7 7",
 };
 
-export default function LoginView({ onLogin }: LoginViewProps) {
+export default function LoginView({ onLogin, sessionExpired = false }: LoginViewProps) {
   const { requestOtp, verifyOtp, loginWithPassword } = useAuth();
   const { t } = useI18n();
   const [mode, setMode] = useState<"otp" | "password">("otp");
@@ -37,6 +38,10 @@ export default function LoginView({ onLogin }: LoginViewProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    if (sessionExpired) setNotice("Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.");
+  }, [sessionExpired]);
 
   function switchMode(nextMode: "otp" | "password") {
     setMode(nextMode);
