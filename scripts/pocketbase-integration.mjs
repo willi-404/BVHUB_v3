@@ -35,10 +35,9 @@ const auth = expectStatus(await request("POST", "/api/collections/_superusers/au
   body: { identity: superuserEmail, password: superuserPassword },
 }), 200, "superuser login");
 const rootToken = auth.token;
-
 const registrationEmail = "new-registration@example.test";
 const registrationDisplayName = "New Registration";
-const registration = expectStatus(await request("POST", "/api/bvhub/register", {
+const registrationResult = await request("POST", "/api/bvhub/register", {
   body: {
     displayName: registrationDisplayName,
     firstName: "New",
@@ -56,8 +55,8 @@ const registration = expectStatus(await request("POST", "/api/bvhub/register", {
     verified: true,
     groups: ["forbidden"],
   },
-}), 201, "guest registration");
-assert.equal(registration.email, "ne***@example.test", "registration response masks email");
+});
+assert.equal(registrationResult.status, 503, "mail failure is not reported as success");
 
 const registeredUsers = expectStatus(await request(
   "GET",
@@ -78,6 +77,11 @@ const registeredProfiles = expectStatus(await request(
 ), 200, "find registered profile");
 assert.equal(registeredProfiles.items.length, 1, "registration creates one profile");
 assert.equal(registeredProfiles.items[0].postalCode, "91052");
+for (const [firstName, lastName] of [["É", "O'Neil"], ["张", "李"], ["Märie", "D'Angelo"]]) {
+  const unicodeEmail = `${firstName.codePointAt(0)}-${Date.now()}@example.test`;
+  const result = await request("POST", "/api/bvhub/register", { body: { displayName: `${firstName} ${lastName}`, firstName, lastName, email: unicodeEmail, street: "Teststrasse", houseNumber: "12-14", postalCode: "91052", city: "Erlangen", birthDate: "2000-01-01" } });
+  assert.equal(result.status, 503, `unicode registration ${firstName} reaches mail failure after validation`);
+}
 
 expectStatus(await request("POST", "/api/bvhub/register", {
   body: {

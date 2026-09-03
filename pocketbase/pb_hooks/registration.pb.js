@@ -1,6 +1,7 @@
 routerAdd("POST", "/api/bvhub/register", (e) => {
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const NAME_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ\s'’-]{1,79}$/;
+  // Unicode-safe name guard: no digits or control/underscore characters.
+  const NAME_RE = /^(?!.*\d)(?!.*[_\x00-\x1f])\S(?:.{0,79}\S)?$/u;
   const POSTAL_RE = /^\d{5}$/;
   const HOUSE_RE = /^\d+[a-zA-Z]?(?:[–-]\d+[a-zA-Z]?)?$/;
   const PHONE_RE = /^[+()\d][+()\d\s./-]{5,39}$/;
@@ -69,7 +70,13 @@ routerAdd("POST", "/api/bvhub/register", (e) => {
     subject: "bvHub Registrierung bestätigen",
     html: `<p>Hallo,</p><p>bitte bestätige deine Registrierung:</p><p><a href="${link}">E-Mail-Adresse bestätigen</a></p><p>Falls du keine Registrierung angefordert hast, ignoriere diese Nachricht.</p>`,
   });
-  try { $app.newMailClient().send(message); } catch (_) { /* account remains inactive; resend can be added later */ }
+  try {
+    $app.newMailClient().send(message);
+  } catch (_) {
+    // Never report success when the confirmation mail was not accepted.
+    console.error("[bvhub registration] confirmation mail delivery failed");
+    return e.json(503, { success: false, message: "Registrierung derzeit nicht möglich", code: 503, data: {} });
+  }
 
   const [local, domain] = value.email.split("@");
   return e.json(201, { success: true, email: `${local.slice(0, 2)}***@${domain}` });

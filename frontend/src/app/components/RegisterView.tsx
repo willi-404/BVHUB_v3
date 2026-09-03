@@ -12,8 +12,8 @@ function validate(values: RegistrationInput, t: (key: MessageKey) => string): Pa
   const errors: Partial<Record<Field, string>> = {};
   for (const field of required) if (!String(values[field] ?? "").trim()) errors[field] = t("register.required");
   if (!errors.email && !/^\S+@\S+\.\S+$/.test(values.email)) errors.email = t("register.invalidEmail");
-  if (!errors.firstName && !/^[\p{L}][\p{L}\s'’-]{1,79}$/u.test(values.firstName)) errors.firstName = t("register.invalidName");
-  if (!errors.lastName && !/^[\p{L}][\p{L}\s'’-]{1,79}$/u.test(values.lastName)) errors.lastName = t("register.invalidName");
+  if (!errors.firstName && !/^[\p{L}][\p{L}\p{M}\s'’-]{0,79}$/u.test(values.firstName)) errors.firstName = t("register.invalidName");
+  if (!errors.lastName && !/^[\p{L}][\p{L}\p{M}\s'’-]{0,79}$/u.test(values.lastName)) errors.lastName = t("register.invalidName");
   if (!errors.postalCode && !/^\d{5}$/.test(values.postalCode)) errors.postalCode = t("register.invalidPostal");
   if (!errors.houseNumber && !/^\d+[a-zA-Z]?(?:[-–]\d+[a-zA-Z]?)?$/.test(values.houseNumber)) errors.houseNumber = t("register.invalidHouse");
   if (!errors.birthDate || values.birthDate) {
