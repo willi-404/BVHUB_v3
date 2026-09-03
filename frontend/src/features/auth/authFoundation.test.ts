@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { clearAuthSession } from "./authService";
 import { canUseOtp, canUsePassword, isUsableUser, type AuthUser } from "./policy";
 import { resolveSessionDecision } from "./session";
-import { canAccessRole, protectedRouteDecision } from "../../routes/guardLogic";
+import { canAccessRole, protectedRouteDecision, publicRouteDecision, safeLoginRedirect } from "../../routes/guardLogic";
 
 const user = (role: AuthUser["role"], active = true): AuthUser => ({
   id: "user-1",
@@ -22,10 +22,27 @@ describe("authentication foundation", () => {
     expect(resolveSessionDecision(true, user("MEMBER"))).toBe("authenticated");
   });
 
+  it("accepts only internal login redirect paths", () => {
+    expect(safeLoginRedirect("/events")).toBe("/events");
+    expect(safeLoginRedirect("/")).toBe("/");
+    expect(safeLoginRedirect("//evil.example")).toBe("/dashboard");
+    expect(safeLoginRedirect("https://evil.example/login")).toBe("/dashboard");
+    expect(safeLoginRedirect("/\\\\evil.example")).toBe("/dashboard");
+    expect(safeLoginRedirect(undefined)).toBe("/dashboard");
+  });
+
+  it("uses dashboard for authenticated public routes", () => {
+    expect(publicRouteDecision("loading")).toBe("loading");
+    expect(publicRouteDecision("unauthenticated")).toBe("login");
+    expect(publicRouteDecision("authenticated")).toBe("dashboard");
+  });
+
   it("clears invalid or deactivated sessions", () => {
     expect(resolveSessionDecision(false, user("MEMBER"))).toBe("unauthenticated");
     expect(isUsableUser(user("MEMBER", false))).toBe(false);
     expect(isUsableUser({ ...user("MEMBER"), verified: false })).toBe(false);
+    expect(isUsableUser({ ...user("ADMIN"), active: false })).toBe(false);
+    expect(isUsableUser({ ...user("MEMBER"), role: "UNKNOWN" as AuthUser["role"] })).toBe(false);
   });
 
   it("keeps OTP and password methods separated by role", () => {

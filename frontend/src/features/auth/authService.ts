@@ -1,7 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { ClientResponseError } from "pocketbase";
 import { pb } from "../../lib/pocketbase";
-import { toAuthUser, type AuthUser } from "./policy";
+import { isUsableUser, toAuthUser, type AuthUser } from "./policy";
 import { mapPBError } from "../../lib/errorMapper";
 
 export class AuthServiceError extends Error {
@@ -24,9 +24,9 @@ function normalizeError(error: unknown): AuthServiceError {
   return new AuthServiceError(mapPBError(error));
 }
 
-function currentUser(): AuthUser {
+export function currentUser(): AuthUser {
   const user = toAuthUser(pb.authStore.record as Record<string, unknown> | null);
-  if (!user || !user.active) throw new AuthServiceError(GENERIC_AUTH_ERROR);
+  if (!isUsableUser(user)) throw new AuthServiceError(GENERIC_AUTH_ERROR);
   return user;
 }
 

@@ -1,7 +1,7 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth, useAuthUser } from "../features/auth/AuthProvider";
 import { isAdminRole, type Role } from "../features/auth/policy";
-import { canAccessRole, protectedRouteDecision } from "./guardLogic";
+import { canAccessRole, publicRouteDecision, protectedRouteDecision } from "./guardLogic";
 
 function LoadingView() {
   return (
@@ -25,8 +25,9 @@ export function ProtectedRoute() {
 
 export function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
   const { status } = useAuth();
-  if (status === "loading") return <LoadingView />;
-  if (status === "authenticated") return <Navigate to="/" replace />;
+  const decision = publicRouteDecision(status);
+  if (decision === "loading") return <LoadingView />;
+  if (decision === "dashboard") return <Navigate to="/dashboard" replace />;
   return children;
 }
 
