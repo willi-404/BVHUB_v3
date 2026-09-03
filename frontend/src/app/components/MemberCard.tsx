@@ -4,7 +4,7 @@ interface MemberCardProps {
   name: string;
   memberId: string;
   activeSince: string;
-  group: "MemberER" | "MemberNUE" | "guest";
+  group: string;
 }
 
 type GroupConfig = {
@@ -81,7 +81,7 @@ function ShuttlecockSVG({ opacity = 0.12 }: { opacity?: number }) {
 }
 
 export function MemberCard({ name, memberId, activeSince, group }: MemberCardProps) {
-  const cfg = GROUP[group];
+  const cfg = GROUP[group as keyof typeof GROUP] || GROUP.guest;
 
   return (
     <div

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Badge } from "../app/components/ui/badge";
@@ -21,6 +21,9 @@ import { isAdminRole } from "../features/auth/policy";
 import { queryClient } from "../lib/queryClient";
 import { I18nProvider } from "../i18n";
 import { AdminGuard, ProtectedRoute, PublicOnlyRoute } from "../routes/guards";
+import { useMyProfile, useUpdateMyProfile } from "../features/profile/hooks/useProfile";
+import { profileErrorStatus } from "../features/profile/api/profileApi";
+import type { ProfileDto, ProfilePatch } from "../features/profile/types";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -176,6 +179,11 @@ const typeLabels: Record<Event["type"], string> = {
 // ─── Full-screen Member Card overlay ──────────────────────────────────────────
 
 function MemberCardOverlay({ onClose }: { onClose: () => void }) {
+  const { data: profile } = useMyProfile();
+  const displayName = profile?.user.displayName || "Profil";
+  const memberId = profile?.user.id || "-";
+  const group = profile?.groups[0]?.name || "-";
+  const activeSince = profile?.user.created ? profile.user.created.slice(0, 10) : "-";
   return (
     <div
       className="fixed inset-0 z-[100] flex flex-col overflow-y-auto"
@@ -205,7 +213,7 @@ function MemberCardOverlay({ onClose }: { onClose: () => void }) {
       {/* Card */}
       <div className="flex justify-center px-6 shrink-0">
         <div style={{ width: "100%", maxWidth: "380px" }}>
-          <MemberCard name="Sarah Chen" memberId="BWC-ER-0312" activeSince="Jan 2022" group="MemberER" />
+          <MemberCard name={displayName} memberId={memberId} activeSince={activeSince} group={group} />
         </div>
       </div>
 
@@ -226,7 +234,7 @@ function MemberCardOverlay({ onClose }: { onClose: () => void }) {
           </div>
           <p className="text-[10px] text-gray-400 font-500 text-center leading-snug">Scan zur Verifikation</p>
         </div>
-        <p className="text-white/35 text-[10px] mt-4 text-center">BWC-ER-0312 · Gültig bis 31. Dez. 2026</p>
+        <p className="text-white/35 text-[10px] mt-4 text-center">{memberId}</p>
       </div>
     </div>
   );
@@ -235,92 +243,77 @@ function MemberCardOverlay({ onClose }: { onClose: () => void }) {
 // ─── Edit Profile overlay ──────────────────────────────────────────────────────
 
 function EditProfileOverlay({ onClose }: { onClose: () => void }) {
-  const [username, setUsername] = useState("sarah.chen");
-  const [displayName, setDisplayName] = useState("Sarah Chen");
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const { data, isLoading } = useMyProfile();
+  const mutation = useUpdateMyProfile();
+  const [values, setValues] = useState<ProfilePatch>({});
+  const [initialized, setInitialized] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    if (!data || initialized) return;
+    setValues({
+      displayName: data.user.displayName,
+      firstName: data.user.firstName,
+      lastName: data.user.lastName,
+      ...(data.profile || { street: "", houseNumber: "", postalCode: "", city: "", birthDate: "", phone: "", contactInfo: "" }),
+    });
+    setInitialized(true);
+  }, [data, initialized]);
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    setAvatarPreview(url);
+  function close() {
+    if (mutation.isPending || saved || Object.keys(values).length === 0 || window.confirm("Ungespeicherte Änderungen verwerfen?")) onClose();
   }
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    setError("");
+    try { await mutation.mutateAsync(values); setSaved(true); setTimeout(onClose, 500); }
+    catch (cause) {
+      const status = profileErrorStatus(cause);
+      setError(status === 409 ? "Anzeigename bereits vergeben" : status === 401 ? "Deine Sitzung ist abgelaufen." : status === 403 ? "Profiländerung nicht erlaubt." : status === 400 ? "Bitte prüfe deine Eingaben." : "Netzwerkfehler. Bitte versuche es erneut.");
+    }
+  }
+  const field = (key: keyof ProfilePatch, label: string, type = "text") => (
+    <label className="flex flex-col gap-1.5" key={key}>
+      <span className="text-xs font-600 text-[var(--muted-foreground)] uppercase tracking-wide">{label}</span>
+      <input type={type} value={String(values[key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))} className="w-full h-11 px-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 transition-all" />
+    </label>
+  );
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-[var(--background)]">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-4 border-b border-[var(--border)] bg-[var(--card)]">
-        <button onClick={onClose} className="h-9 w-9 flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
+        <button onClick={close} className="h-9 w-9 flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)]" aria-label="Schließen">
           <Icon d={icons.x} size={18} />
         </button>
         <span className="text-sm font-600">Edit Profile</span>
         <button
-          onClick={onClose}
+          onClick={save}
+          disabled={mutation.isPending || isLoading || !initialized}
           className="text-sm font-600 text-[var(--primary)] px-2 py-1 rounded hover:bg-[var(--secondary)] transition-colors"
         >
-          Save
+          {mutation.isPending ? "Speichert …" : saved ? "Gespeichert" : "Speichern"}
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-6">
-        {/* Avatar */}
-        <div className="flex flex-col items-center gap-3">
-          <div className="relative">
-            <div className="h-24 w-24 rounded-full overflow-hidden bg-[var(--secondary)] flex items-center justify-center text-2xl font-700 text-[var(--primary)]">
-              {avatarPreview
-                ? <img src={avatarPreview} alt="Avatar" className="h-full w-full object-cover" />
-                : <span>SC</span>
-              }
-            </div>
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="absolute bottom-0 right-0 h-8 w-8 rounded-full bg-[var(--primary)] text-white flex items-center justify-center border-2 border-[var(--background)] hover:opacity-90 transition-opacity"
-            >
-              <Icon d={icons.camera} size={14} />
-            </button>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+      <form onSubmit={save} className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-6">
+        {error && <p role="alert" className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-3">{error}</p>}
+        {saved && <p role="status" className="text-sm text-green-700 bg-green-50 border border-green-200 rounded p-3">Profil erfolgreich gespeichert.</p>}
+        {!data && !isLoading && <p className="text-sm text-[var(--muted-foreground)]">Profil noch nicht vollständig.</p>}
+        {data && <>
+          <div className="flex flex-col gap-4">
+            {field("displayName", "Benutzername / Anzeigename")}
+            <div className="grid md:grid-cols-2 gap-4">{field("firstName", "Vorname")}{field("lastName", "Nachname")}</div>
+            <div className="grid md:grid-cols-2 gap-4">{field("street", "Straße")}{field("houseNumber", "Hausnummer")}{field("postalCode", "Postleitzahl")}{field("city", "Ort")}</div>
+            <div className="grid md:grid-cols-2 gap-4">{field("birthDate", "Geburtsdatum", "date")}{field("phone", "Telefon")}</div>
+            {field("contactInfo", "Kontaktinfo")}
           </div>
-          <button onClick={() => fileRef.current?.click()} className="text-xs text-[var(--primary)] font-500">
-            Change photo
-          </button>
-        </div>
-
-        {/* Fields */}
-        <div className="flex flex-col gap-4">
-          <div>
-            <label className="text-xs font-600 text-[var(--muted-foreground)] uppercase tracking-wide block mb-1.5">
-              Display Name
-            </label>
-            <input
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full h-11 px-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 transition-all"
-              placeholder="Your display name"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-600 text-[var(--muted-foreground)] uppercase tracking-wide block mb-1.5">
-              Username
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--muted-foreground)]">@</span>
-              <input
-                value={username}
-                onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s+/g, "."))}
-                className="w-full h-11 pl-7 pr-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 transition-all"
-                placeholder="username"
-              />
-            </div>
-            <p className="text-[10px] text-[var(--muted-foreground)] mt-1.5">Used to identify you in the club system</p>
-          </div>
-
-          {/* Read-only info */}
           <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] divide-y divide-[var(--border)]">
             {[
-              { label: "Member ID", value: "BWC-ER-0312" },
-              { label: "Membership", value: "MemberER" },
-              { label: "Email", value: "sarah.chen@email.com" },
+              { label: "Benutzer-ID", value: data.user.id },
+              { label: "E-Mail", value: data.user.email },
+              { label: "Rolle", value: data.user.role },
+              { label: "Verifiziert", value: data.user.verified ? "Ja" : "Nein" },
             ].map(({ label, value }) => (
               <div key={label} className="flex items-center justify-between px-3 py-2.5">
                 <span className="text-xs text-[var(--muted-foreground)]">{label}</span>
@@ -328,9 +321,8 @@ function EditProfileOverlay({ onClose }: { onClose: () => void }) {
               </div>
             ))}
           </div>
-          <p className="text-[10px] text-[var(--muted-foreground)] -mt-2">These fields are managed by the club administrator.</p>
-        </div>
-      </div>
+        </>}
+      </form>
     </div>
   );
 }
@@ -520,26 +512,30 @@ function ActivityFeed() {
 
 // ─── Page views ────────────────────────────────────────────────────────────────
 
-function DashboardView({ events, onToggle, onOpenCard }: { events: Event[]; onToggle: (id: number) => void; onOpenCard: () => void }) {
+function DashboardView({ events, onToggle, onOpenCard, profile }: { events: Event[]; onToggle: (id: number) => void; onOpenCard: () => void; profile: ProfileDto | null }) {
+  const displayName = profile?.user.displayName || "Profil";
+  const memberId = profile?.user.id || "-";
+  const group = profile?.groups[0]?.name || "-";
+  const activeSince = profile?.user.created ? profile.user.created.slice(0, 10) : "-";
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs text-[var(--muted-foreground)]">Willkommen,</p>
-          <h1 className="text-xl font-700 text-[var(--foreground)]">Sarah Chen</h1>
+          <h1 className="text-xl font-700 text-[var(--foreground)]">{displayName}</h1>
         </div>
         <div className="flex items-center gap-2">
           <button className="relative h-9 w-9 rounded-full flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
             <Icon d={icons.bell} size={18} />
             <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 border-2 border-[var(--background)]" />
           </button>
-          <Avatar fallback="SC" size="md" />
+          <Avatar fallback={displayName.slice(0, 2).toUpperCase()} size="md" />
         </div>
       </div>
 
       {/* Tappable card */}
       <button onClick={onOpenCard} className="text-left w-full active:scale-[0.98] transition-transform duration-150 cursor-pointer" aria-label="Open member card">
-        <MemberCard name="Sarah Chen" memberId="BWC-ER-0312" activeSince="Jan 2022" group="MemberER" />
+        <MemberCard name={displayName} memberId={memberId} activeSince={activeSince} group={group} />
         <p className="text-[10px] text-[var(--muted-foreground)] text-center mt-2 flex items-center justify-center gap-1">
           <Icon d={icons.qrCode} size={10} /> Tippen für vollständigen Ausweis & QR-Code
         </p>
@@ -685,29 +681,24 @@ function AdminDrawer({ onClose, onAdminMembers, onAdminPayments, onAdminEvents }
   );
 }
 
-function ProfileView({ onEditProfile, onLogout, onAdminMembers, onAdminPayments, onAdminEvents, canAccessAdmin }: { onEditProfile: () => void; onLogout: () => void; onAdminMembers: () => void; onAdminPayments: () => void; onAdminEvents: () => void; canAccessAdmin: boolean }) {
+function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, onAdminPayments, onAdminEvents, canAccessAdmin }: { profile: ProfileDto | null; onEditProfile: () => void; onLogout: () => void; onAdminMembers: () => void; onAdminPayments: () => void; onAdminEvents: () => void; canAccessAdmin: boolean }) {
   const [adminOpen, setAdminOpen] = useState(false);
+
+  if (!profile) return <div className="flex flex-col gap-4"><Card><CardContent className="p-5"><h1 className="text-lg font-700">Profil</h1><p className="text-sm text-[var(--muted-foreground)] mt-2">Profil noch nicht vollständig. Ergänze deine Angaben, um dein Profil zu vervollständigen.</p><Button className="mt-4" onClick={onEditProfile}>Profil bearbeiten</Button></CardContent></Card><Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 gap-2" onClick={onLogout}><Icon d={icons.logout} size={15} /> Abmelden</Button></div>;
+  const initials = `${profile.user.firstName[0] || ""}${profile.user.lastName[0] || ""}`.toUpperCase() || "?";
+  const address = profile.profile ? `${profile.profile.street} ${profile.profile.houseNumber}, ${profile.profile.postalCode} ${profile.profile.city}` : "Profil noch nicht vollständig";
+  const localizedBirthDate = profile.profile?.birthDate ? new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(new Date(`${profile.profile.birthDate}T12:00:00Z`)) : "-";
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col items-center pt-4 pb-2">
-        <Avatar fallback="SC" size="lg" className="h-16 w-16 text-lg mb-3" />
-        <h1 className="text-lg font-700">Sarah Chen</h1>
-        <p className="text-xs text-[var(--muted-foreground)]">sarah.chen@email.com</p>
-        <Badge variant="success" className="mt-2">MemberER</Badge>
+        <Avatar fallback={initials} size="lg" className="h-16 w-16 text-lg mb-3" />
+        <h1 className="text-lg font-700">{profile.user.displayName}</h1>
+        <p className="text-xs text-[var(--muted-foreground)]">{profile.user.email}</p>
+        <Badge variant={profile.user.active ? "success" : "outline"} className="mt-2">{profile.user.role}</Badge>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 text-center">
-        {[
-          { label: "Events Attended", value: "34" },
-          { label: "Member Since", value: "2022" },
-        ].map((s) => (
-          <Card key={s.label} className="py-3 px-2">
-            <div className="text-xl font-700 text-[var(--primary)]">{s.value}</div>
-            <div className="text-[10px] text-[var(--muted-foreground)] mt-0.5 leading-tight">{s.label}</div>
-          </Card>
-        ))}
-      </div>
+      <Card><CardContent className="p-4 flex flex-col gap-2 text-sm"><div><span className="text-[var(--muted-foreground)]">Name: </span>{profile.user.firstName} {profile.user.lastName}</div><div><span className="text-[var(--muted-foreground)]">Adresse: </span>{address}</div><div><span className="text-[var(--muted-foreground)]">Geburtsdatum: </span>{localizedBirthDate}</div><div><span className="text-[var(--muted-foreground)]">Telefon: </span>{profile.profile?.phone || "-"}</div><div><span className="text-[var(--muted-foreground)]">Kontaktinfo: </span>{profile.profile?.contactInfo || "-"}</div><div><span className="text-[var(--muted-foreground)]">Gruppen: </span>{profile.groups.length ? profile.groups.map((group) => group.name).join(", ") : "-"}</div><div><span className="text-[var(--muted-foreground)]">Benutzer-ID: </span>{profile.user.id}</div><div><span className="text-[var(--muted-foreground)]">Status: </span>{profile.user.active ? "Aktiv" : "Inaktiv"} / {profile.user.verified ? "Verifiziert" : "Nicht verifiziert"}</div><div><span className="text-[var(--muted-foreground)]">Erstellt: </span>{profile.user.created}</div><div><span className="text-[var(--muted-foreground)]">Geändert: </span>{profile.user.updated}</div></CardContent></Card>
 
       <Card>
         <CardContent className="p-0">
@@ -807,6 +798,7 @@ function Sidebar({
   onAdminPayments,
   onAdminEvents,
   canAccessAdmin,
+  profile,
 }: {
   active: NavTab;
   onChange: (t: NavTab) => void;
@@ -816,7 +808,10 @@ function Sidebar({
   onAdminPayments: () => void;
   onAdminEvents: () => void;
   canAccessAdmin: boolean;
+  profile: ProfileDto | null;
 }) {
+  const displayName = profile?.user.displayName || "Profil";
+  const group = profile?.groups[0]?.name || "-";
   return (
     <aside className="hidden lg:flex flex-col w-[var(--sidebar-width)] shrink-0 bg-[var(--card)] border-r border-[var(--border)] h-full">
       {/* Logo */}
@@ -835,10 +830,10 @@ function Sidebar({
       {/* User */}
       <div className="p-4 border-b border-[var(--border)]">
         <div className="flex items-center gap-3">
-          <Avatar fallback="SC" size="md" />
+          <Avatar fallback={displayName.slice(0, 2).toUpperCase()} size="md" />
           <div className="min-w-0">
-            <p className="text-sm font-600 truncate">Sarah Chen</p>
-            <p className="text-[10px] text-[var(--muted-foreground)]">MemberER</p>
+            <p className="text-sm font-600 truncate">{displayName}</p>
+            <p className="text-[10px] text-[var(--muted-foreground)]">{group}</p>
           </div>
           <button className="ml-auto text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
             <Icon d={icons.bell} size={16} />
@@ -907,6 +902,7 @@ function Sidebar({
 export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: NavTab; onLogout?: () => void }) {
   const { logout: authLogout } = useAuth();
   const { data: user } = useAuthUser();
+  const { data: profile, isLoading: profileLoading, isError: profileError, refetch: refetchProfile } = useMyProfile();
   const canAccessAdmin = isAdminRole(user?.role);
   const [tab, setTab] = useState<NavTab>(initialTab);
   const [events, setEvents] = useState<Event[]>(EVENTS);
@@ -939,19 +935,21 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
   function renderView() {
     switch (tab) {
       case "dashboard":
-        return <DashboardView events={events} onToggle={toggleRegistration} onOpenCard={() => setCardOpen(true)} />;
+        return <DashboardView events={events} onToggle={toggleRegistration} onOpenCard={() => setCardOpen(true)} profile={profile || null} />;
       case "events":
         return <EventsView events={events} onToggle={toggleRegistration} />;
       case "payments":
         return <PaymentsView payments={payments} onPay={handlePay} />;
       case "profile":
-        return <ProfileView onEditProfile={() => setEditProfileOpen(true)} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} canAccessAdmin={canAccessAdmin} />;
+        if (profileLoading) return <div className="text-sm text-[var(--muted-foreground)]">Profil wird geladen …</div>;
+        if (profileError) return <Card><CardContent className="p-5"><p role="alert" className="text-sm text-red-600">Profil konnte nicht geladen werden.</p><Button className="mt-4" onClick={() => void refetchProfile()}>Erneut versuchen</Button></CardContent></Card>;
+        return <ProfileView profile={profile || null} onEditProfile={() => setEditProfileOpen(true)} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} canAccessAdmin={canAccessAdmin} />;
     }
   }
 
   return (
     <div className="h-full flex bg-[var(--background)]" style={{ fontFamily: "'Outfit', system-ui, sans-serif" }}>
-      <Sidebar active={tab} onChange={setTab} unpaidCount={unpaidCount} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} canAccessAdmin={canAccessAdmin} />
+      <Sidebar active={tab} onChange={setTab} unpaidCount={unpaidCount} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} canAccessAdmin={canAccessAdmin} profile={profile || null} />
 
       <main className="flex-1 overflow-y-auto">
         <div className="hidden lg:flex items-center justify-between px-8 py-5 border-b border-[var(--border)] bg-[var(--card)] sticky top-0 z-10">
@@ -961,7 +959,7 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
               <Icon d={icons.bell} size={18} />
               <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 border-2 border-[var(--card)]" />
             </button>
-            <Avatar fallback="SC" size="md" />
+            <Avatar fallback={(profile?.user.displayName || "?").slice(0, 2).toUpperCase()} size="md" />
           </div>
         </div>
 
