@@ -25,6 +25,7 @@ describe("authentication foundation", () => {
   it("clears invalid or deactivated sessions", () => {
     expect(resolveSessionDecision(false, user("MEMBER"))).toBe("unauthenticated");
     expect(isUsableUser(user("MEMBER", false))).toBe(false);
+    expect(isUsableUser({ ...user("MEMBER"), verified: false })).toBe(false);
   });
 
   it("keeps OTP and password methods separated by role", () => {

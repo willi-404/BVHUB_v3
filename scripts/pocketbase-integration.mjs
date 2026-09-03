@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import net from "node:net";
 
 const baseUrl = process.env.PB_TEST_URL;
 const superuserEmail = process.env.PB_TEST_SUPERUSER_EMAIL;
@@ -35,9 +36,69 @@ const auth = expectStatus(await request("POST", "/api/collections/_superusers/au
   body: { identity: superuserEmail, password: superuserPassword },
 }), 200, "superuser login");
 const rootToken = auth.token;
+
+const smtpMessages = [];
+const smtpServer = net.createServer((socket) => {
+  socket.setEncoding("utf8");
+  let smtpBuffer = "";
+  let smtpDataMode = false;
+  let smtpMessage = "";
+  socket.write("220 bvhub-integration.test ESMTP\r\n");
+  socket.on("data", (chunk) => {
+    smtpBuffer += chunk;
+    const lines = smtpBuffer.split(/\r?\n/);
+    smtpBuffer = lines.pop() || "";
+    for (const line of lines) {
+      if (smtpDataMode) {
+        if (line === ".") {
+          smtpMessages.push(smtpMessage);
+          smtpMessage = "";
+          smtpDataMode = false;
+          socket.write("250 2.0.0 Accepted\r\n");
+        } else {
+          smtpMessage += `${line}\n`;
+        }
+        continue;
+      }
+      const command = line.toUpperCase();
+      if (command.startsWith("DATA")) socket.write("354 End data with <CRLF>.<CRLF>\r\n");
+      else if (command.startsWith("QUIT")) socket.write("221 2.0.0 Bye\r\n");
+      else if (command.startsWith("EHLO") || command.startsWith("HELO")) socket.write("250-bvhub-integration.test\r\n250 OK\r\n");
+      else socket.write("250 2.0.0 OK\r\n");
+      if (command.startsWith("DATA")) smtpDataMode = true;
+    }
+  });
+});
+await new Promise((resolve) => smtpServer.listen(0, "127.0.0.1", resolve));
+const smtpPort = smtpServer.address().port;
+const settings = expectStatus(await request("GET", "/api/settings", { token: rootToken }), 200, "read settings");
+expectStatus(await request("PATCH", "/api/settings", {
+  token: rootToken,
+  body: {
+    ...settings,
+    smtp: { ...settings.smtp, enabled: true, host: "127.0.0.1", port: smtpPort, username: "", password: "", authMethod: "", tls: false, localName: "bvhub-integration.test" },
+    meta: { ...settings.meta, appURL: "https://v2.bv-erlangen2025.de", senderName: "bvHub Test", senderAddress: "test@example.test" },
+  },
+}), 200, "configure isolated SMTP sink");
+
+async function waitForMail(previousCount) {
+  for (let i = 0; i < 40; i += 1) {
+    if (smtpMessages.length > previousCount) return smtpMessages.at(-1);
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error("SMTP sink did not receive the expected message");
+}
+
+function otpCode(message) {
+  const code = message.match(/\b\d{6}\b/);
+  assert.ok(code, "OTP mail contains a six-digit code");
+  return code[0];
+}
+
 const registrationEmail = "new-registration@example.test";
 const registrationDisplayName = "New Registration";
-const registrationResult = await request("POST", "/api/bvhub/register", {
+const registrationBeforeMail = smtpMessages.length;
+const registration = expectStatus(await request("POST", "/api/bvhub/register", {
   body: {
     displayName: registrationDisplayName,
     firstName: "New",
@@ -55,8 +116,9 @@ const registrationResult = await request("POST", "/api/bvhub/register", {
     verified: true,
     groups: ["forbidden"],
   },
-});
-assert.equal(registrationResult.status, 503, "mail failure is not reported as success");
+}), 201, "guest registration");
+assert.equal(registration.email, "ne***@example.test", "registration response masks email");
+await waitForMail(registrationBeforeMail);
 
 const registeredUsers = expectStatus(await request(
   "GET",
@@ -79,8 +141,10 @@ assert.equal(registeredProfiles.items.length, 1, "registration creates one profi
 assert.equal(registeredProfiles.items[0].postalCode, "91052");
 for (const [firstName, lastName] of [["É", "O'Neil"], ["张", "李"], ["Märie", "D'Angelo"]]) {
   const unicodeEmail = `${firstName.codePointAt(0)}-${Date.now()}@example.test`;
-  const result = await request("POST", "/api/bvhub/register", { body: { displayName: `${firstName} ${lastName}`, firstName, lastName, email: unicodeEmail, street: "Teststrasse", houseNumber: "12-14", postalCode: "91052", city: "Erlangen", birthDate: "2000-01-01" } });
-  assert.equal(result.status, 503, `unicode registration ${firstName} reaches mail failure after validation`);
+  const before = smtpMessages.length;
+  const result = expectStatus(await request("POST", "/api/bvhub/register", { body: { displayName: `${firstName} ${lastName}`, firstName, lastName, email: unicodeEmail, street: "Teststrasse", houseNumber: "12-14", postalCode: "91052", city: "Erlangen", birthDate: "2000-01-01" } }), 201, `unicode registration ${firstName}`);
+  await waitForMail(before);
+  assert.equal(result.success, true);
 }
 
 expectStatus(await request("POST", "/api/bvhub/register", {
@@ -97,9 +161,7 @@ expectStatus(await request("POST", "/api/bvhub/register", {
   },
 }), 400, "invalid registration");
 
-expectStatus(await request("POST", "/api/bvhub/verify-email", {
-  body: { token: "invalid-token" },
-}), 400, "invalid verification token");
+expectStatus(await request("POST", "/api/bvhub/verify-email", { body: { token: "invalid-token" } }), 400, "invalid verification token");
 
 for (const length of [8, 11]) {
   const password = "x".repeat(length);
@@ -120,6 +182,47 @@ const member = expectStatus(await request("POST", "/api/collections/users/record
 const guest = expectStatus(await request("POST", "/api/collections/users/records", {
   token: rootToken, body: userBody("guest@example.test", "GUEST"),
 }), 200, "create guest");
+
+const inactiveGuest = expectStatus(await request("POST", "/api/collections/users/records", { token: rootToken, body: userBody("inactive-guest@example.test", "GUEST") }), 200, "create inactive test user");
+expectStatus(await request("PATCH", `/api/collections/users/records/${inactiveGuest.id}`, { token: rootToken, body: { active: false } }), 200, "deactivate guest");
+const unverifiedGuest = expectStatus(await request("POST", "/api/collections/users/records", { token: rootToken, body: { ...userBody("unverified-guest@example.test", "GUEST"), verified: false } }), 200, "create unverified test user");
+
+for (const account of [inactiveGuest, unverifiedGuest]) {
+  const result = await request("POST", "/api/collections/users/request-otp", { body: { email: account.email } });
+  assert.equal(result.status, 400, "inactive or unverified OTP request is rejected");
+  assert.deepEqual(Object.keys(result.data || {}).sort(), ["data", "message", "status"]);
+}
+
+const otpRequests = [];
+for (const account of [member, guest]) {
+  const before = smtpMessages.length;
+  const otp = expectStatus(await request("POST", "/api/collections/users/request-otp", { body: { email: account.email } }), 200, `request OTP for ${account.role}`);
+  assert.equal(typeof otp.otpId, "string");
+  const message = await waitForMail(before);
+  const code = otpCode(message);
+  otpRequests.push({ account, otpId: otp.otpId, code });
+  const login = expectStatus(await request("POST", "/api/collections/users/auth-with-otp", { body: { otpId: otp.otpId, password: code } }), 200, `authenticate ${account.role} with OTP`);
+  assert.equal(typeof login.token, "string");
+  assert.equal(login.record.role, account.role);
+  assert.equal(login.record.active, true);
+  assert.equal(login.record.verified, true);
+}
+const stale = otpRequests[0];
+const secondBefore = smtpMessages.length;
+const secondOtp = expectStatus(await request("POST", "/api/collections/users/request-otp", { body: { email: stale.account.email } }), 200, "request replacement OTP");
+const secondCode = otpCode(await waitForMail(secondBefore));
+expectStatus(await request("POST", "/api/collections/users/auth-with-otp", { body: { otpId: stale.otpId, password: secondCode } }), 400, "mismatched OTP id and code rejected");
+expectStatus(await request("POST", "/api/collections/users/auth-with-otp", { body: { otpId: stale.otpId, password: stale.code } }), 400, "reused OTP rejected");
+
+const rateLimitSettings = expectStatus(await request("GET", "/api/settings", { token: rootToken }), 200, "read rate limit settings");
+expectStatus(await request("PATCH", "/api/settings", {
+  token: rootToken,
+  body: { ...rateLimitSettings, rateLimits: { ...rateLimitSettings.rateLimits, enabled: true, rules: [{ label: "users:requestOTP", duration: 60, maxRequests: 1 }] } },
+}), 200, "configure OTP rate limit test");
+await request("POST", "/api/collections/users/request-otp", { body: { email: member.email } });
+const rateLimited = await request("POST", "/api/collections/users/request-otp", { body: { email: member.email } });
+assert.equal(rateLimited.status, 429, "OTP request rate limit is enforced");
+assert.deepEqual(Object.keys(rateLimited.data || {}).sort(), ["data", "message", "status"]);
 
 const superLogin = expectStatus(await request("POST", "/api/collections/users/auth-with-password", {
   body: { identity: superAdmin.email, password: "Synthetic-password-12!" },
@@ -187,3 +290,4 @@ assert.equal(inactiveRead.status, 200, "list rules return an empty result when d
 assert.equal(inactiveRead.data.items.length, 0, "inactive token must not read protected data");
 
 fs.writeSync(process.stdout.fd, "PocketBase RBAC integration matrix passed\n");
+smtpServer.close();

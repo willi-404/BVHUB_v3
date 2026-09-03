@@ -32,8 +32,8 @@ export function canUseOtp(role: Role | undefined): boolean {
   return role !== undefined && OTP_ROLES.includes(role);
 }
 
-export function isUsableUser(user: Pick<AuthUser, "role" | "active"> | null | undefined): user is AuthUser {
-  return Boolean(user?.active && isRole(user.role));
+export function isUsableUser(user: Pick<AuthUser, "role" | "active" | "verified"> | null | undefined): user is AuthUser {
+  return Boolean(user?.active && user?.verified && isRole(user.role));
 }
 
 export function toAuthUser(record: Record<string, unknown> | null | undefined): AuthUser | null {
