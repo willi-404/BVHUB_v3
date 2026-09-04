@@ -35,14 +35,12 @@ function listVenues(admin) {
     totalItems: records.length,
   };
 }
-function canRead(e) { return e.auth && e.auth.getBool("active") === true && e.auth.getBool("verified") === true; }
-
 routerAdd(
   "GET",
   "/api/bvhub/venues",
   (e) => {
-    if (!canRead(e)) return e.json(403, { message: "forbidden" });
-    return e.json(200, { items: [], totalItems: 0 });
+    service.user(e);
+    return e.json(200, listVenues(false));
   },
   $apis.requireAuth("users"),
 );
@@ -50,7 +48,7 @@ routerAdd(
   "GET",
   "/api/bvhub/admin/venues",
   (e) => {
-    if (!canRead(e) || !["ADMIN", "SUPER_ADMIN"].includes(e.auth.getString("role"))) return e.json(403, { message: "forbidden" });
+    service.actor(e);
     return e.json(200, listVenues(true));
   },
   $apis.requireAuth("users"),
@@ -59,7 +57,7 @@ routerAdd(
   "POST",
   "/api/bvhub/admin/venues",
   (e) => {
-  if (!canRead(e) || !["ADMIN", "SUPER_ADMIN"].includes(e.auth.getString("role"))) return e.json(403, { message: "forbidden" });
+  service.actor(e);
     const data = venueInput(e);
     const record = new Record($app.findCollectionByNameOrId("venues"));
     Object.keys(data).forEach((key) => record.set(key, data[key]));
@@ -76,7 +74,7 @@ routerAdd(
   "PATCH",
   "/api/bvhub/admin/venues/{id}",
   (e) => {
-    if (!canRead(e) || !["ADMIN", "SUPER_ADMIN"].includes(e.auth.getString("role"))) return e.json(403, { message: "forbidden" });
+    service.actor(e);
     const record = service.venue($app, idOf(e));
     const data = service.parseVenue(
       service.payload(e, ["name", "address", "description", "active"]),
@@ -96,7 +94,7 @@ routerAdd(
   "DELETE",
   "/api/bvhub/admin/venues/{id}",
   (e) => {
-    if (!canRead(e) || !["ADMIN", "SUPER_ADMIN"].includes(e.auth.getString("role"))) return e.json(403, { message: "forbidden" });
+    service.actor(e);
     const record = service.venue($app, idOf(e));
     const used = $app.findRecordsByFilter(
       "events",
@@ -114,7 +112,7 @@ routerAdd(
 );
 
 function publicEvents(e, detailId) {
-  if (!canRead(e)) return { forbidden: true };
+  service.user(e);
   if (detailId) {
     const record = service.event($app, detailId);
     if (
@@ -156,7 +154,7 @@ routerAdd(
   "GET",
   "/api/bvhub/admin/events",
   (e) => {
-    if (!canRead(e) || !["ADMIN", "SUPER_ADMIN"].includes(e.auth.getString("role"))) return e.json(403, { message: "forbidden" });
+    service.actor(e);
     const records = $app.findRecordsByFilter("events", "", "start", 500, 0);
     return e.json(200, {
       items: records.map((record) => service.eventDto($app, record)),
@@ -169,7 +167,7 @@ routerAdd(
   "POST",
   "/api/bvhub/admin/events",
   (e) => {
-    if (!canRead(e) || !["ADMIN", "SUPER_ADMIN"].includes(e.auth.getString("role"))) return e.json(403, { message: "forbidden" });
+    service.actor(e);
     const current = e.auth;
     const data = service.parseEvent(
       service.payload(e, [
@@ -198,7 +196,7 @@ routerAdd(
   "PATCH",
   "/api/bvhub/admin/events/{id}",
   (e) => {
-    if (!canRead(e) || !["ADMIN", "SUPER_ADMIN"].includes(e.auth.getString("role"))) return e.json(403, { message: "forbidden" });
+    service.actor(e);
     const record = service.event($app, idOf(e));
     const data = service.parseEvent(
       service.payload(e, [
