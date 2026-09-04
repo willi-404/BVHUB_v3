@@ -1,4 +1,15 @@
+function requireCsrf(e) {
+  const info = e.requestInfo();
+  const headers = info && info.headers || {};
+  const header = headers["X-CSRF-Token"] || headers["x-csrf-token"] || "";
+  const cookieHeader = headers.Cookie || headers.cookie || "";
+  const cookie = String(cookieHeader).split(";").map((part) => part.trim()).find((part) => part.startsWith("csrf-token="));
+  const cookieToken = cookie ? decodeURIComponent(cookie.slice("csrf-token=".length)) : "";
+  if (typeof header !== "string" || !header || header !== cookieToken) throw new ForbiddenError("CSRF validation failed");
+}
+
 routerAdd("POST", "/api/bvhub/register", (e) => {
+  requireCsrf(e);
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   // Unicode-safe name guard: no digits or control/underscore characters.
   const NAME_RE = /^(?!.*\d)(?!.*[_\x00-\x1f])\S(?:.{0,79}\S)?$/u;
@@ -97,6 +108,7 @@ routerAdd("POST", "/api/bvhub/register", (e) => {
 }, $apis.requireGuestOnly());
 
 routerAdd("POST", "/api/bvhub/verify-email", (e) => {
+  requireCsrf(e);
   const body = e.requestInfo().body;
   const token = typeof body.token === "string" ? body.token.trim() : "";
   if (!token || token.length > 4096) throw new BadRequestError("Ungültiger oder abgelaufener Link");

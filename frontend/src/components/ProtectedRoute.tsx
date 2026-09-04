@@ -1,12 +1,36 @@
+import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth, useAuthUser } from "../features/auth/AuthProvider";
-import { isSuperAdmin } from "../lib/policy";
+import { isAdminRole } from "../features/auth/policy";
+import { pb } from "../lib/pocketbase";
 export default function ProtectedRoute({ admin = false }: { admin?: boolean }) {
   const { status } = useAuth();
   const { data: user } = useAuthUser();
   const location = useLocation();
+  const serverSession = useQuery({
+    queryKey: ["auth", "server-session"],
+    queryFn: async () => {
+      const id = pb.authStore.record?.id;
+      if (typeof id !== "string" || !id) throw new Error("Missing authenticated user");
+      return pb.collection("users").getOne(id, { fields: "id" });
+    },
+    enabled: status === "authenticated" && pb.authStore.isValid,
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    if (serverSession.isError) pb.authStore.clear();
+  }, [serverSession.isError]);
+
   if (status === "loading") return <div className="min-h-full flex items-center justify-center">Loading…</div>;
   if (status !== "authenticated") return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}${location.hash}` }} />;
-  if (admin && !isSuperAdmin(user as unknown as Record<string, unknown>)) return <Navigate to="/dashboard" replace />;
+  if (serverSession.isPending) return <div className="min-h-full flex items-center justify-center">Loading…</div>;
+  if (serverSession.isError) return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}${location.hash}` }} />;
+  if (admin && !isAdminRole(user?.role)) return <Navigate to="/dashboard" replace />;
   return <Outlet />;
 }

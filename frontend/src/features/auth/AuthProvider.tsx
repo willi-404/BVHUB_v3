@@ -4,6 +4,7 @@ import { pb } from "../../lib/pocketbase";
 import { clearAuthSession, loginWithPassword, refreshSession, requestOtp, softLogout, verifyOtp } from "./authService";
 import { toAuthUser, type AuthUser } from "./policy";
 import { getTokenExpiry, resolveSessionDecision } from "./session";
+import { initializeCsrfToken } from "../../lib/csrf";
 
 export type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -33,6 +34,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
+    initializeCsrfToken();
+
     let expiryTimer: ReturnType<typeof setTimeout> | undefined;
     const expireLocally = () => {
       if (expiryTimer) clearTimeout(expiryTimer);
@@ -60,8 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     async function bootstrap() {
-      const expiry = getTokenExpiry(pb.authStore.token);
-      if (!pb.authStore.isValid || expiry === null || expiry <= Math.floor(Date.now() / 1000)) {
+      if (!pb.authStore.isValid) {
         pb.authStore.clear();
         if (mounted) {
           setUser(null);
