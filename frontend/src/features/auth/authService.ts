@@ -4,7 +4,6 @@ import { pb } from "../../lib/pocketbase";
 import { isUsableUser, toAuthUser, type AuthUser } from "./policy";
 import { mapPBError } from "../../lib/errorMapper";
 import { OtpPayload, PocketBaseUserResponse } from "../../lib/validation/authSchemas";
-import { getCsrfToken } from "../../lib/csrf";
 import { logInfo, logWarn, redactEmail } from "../../lib/logger";
 
 export class AuthServiceError extends Error {
@@ -39,12 +38,6 @@ function parseUser(record: unknown): AuthUser {
   const user = toAuthUser(parsed.data as Record<string, unknown>);
   if (!user || !isUsableUser(user)) throw invalidResponse();
   return user;
-}
-
-function requireCsrfToken(): string {
-  const token = getCsrfToken();
-  if (!token) throw new AuthServiceError("CSRF_Error", undefined, "CSRF_ERROR");
-  return token;
 }
 
 export function currentUser(): AuthUser {

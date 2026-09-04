@@ -1,12 +1,18 @@
 # Security Configuration
 
-These settings must be applied manually in the PocketBase Admin UI or through
-an operator-owned migration script. The deployment scripts intentionally do
-not change them.
+Most settings must be applied manually in the PocketBase Admin UI or through
+an operator-owned migration. The registration rate limit is versioned in the
+repository because it is part of the public endpoint's security boundary.
 
 ## Rate limiting
 
-Configure a rate limit of at most **5 requests per minute per source IP** for:
+`1788523951_rate_limit_registration.js` enables PocketBase rate limiting and
+enforces at most **5 guest requests per minute per source IP** for:
+
+- `POST /api/bvhub/register`
+
+Additionally configure a rate limit of at most **5 requests per minute per
+source IP** for:
 
 - `/api/collections/users/request-otp`
 - `/api/collections/users/auth-with-password`
@@ -26,13 +32,13 @@ that an untrusted `X-Forwarded-For` header cannot bypass the limiter.
   `ADMIN`/`SUPER_ADMIN` through the dedicated server routes.
 - Keep `_superusers` API access disabled from the browser.
 
-## CSRF hook
+## CSRF boundary
 
-The frontend creates a per-tab `csrf-token` value in `sessionStorage` and a
-JavaScript-readable `SameSite=Strict` cookie. Registration and email
-verification send the same value as `X-CSRF-Token`. The
-`pocketbase/pb_hooks/registration.pb.js` hook compares the header with the
-`csrf-token` cookie and rejects a mismatch with HTTP 403. If the frontend and
-PocketBase use different origins, deploy them behind the same origin (or add a
-server-issued CSRF endpoint that sets the cookie on the PocketBase origin),
-otherwise the browser will not send the cookie.
+Registration and email verification do not use cookie authentication or any
+other ambient browser credential. They are guest-only `POST` routes, so a
+cross-origin site cannot exercise existing user authority through them. Keep
+authenticated API calls on PocketBase bearer tokens and do not add a
+frontend-origin double-submit cookie to the separate PocketBase origin; the
+browser cannot send that cookie to the backend. If cookie authentication is
+introduced later, add server-issued CSRF tokens on the PocketBase origin at
+the same time.

@@ -4,7 +4,6 @@ import { pb } from "../../lib/pocketbase";
 import { clearAuthSession, loginWithPassword, refreshSession, requestOtp, softLogout, verifyOtp } from "./authService";
 import { toAuthUser, type AuthUser } from "./policy";
 import { getTokenExpiry, resolveSessionDecision } from "./session";
-import { initializeCsrfToken } from "../../lib/csrf";
 
 export type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -33,8 +32,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
-
-    initializeCsrfToken();
 
     let expiryTimer: ReturnType<typeof setTimeout> | undefined;
     const expireLocally = () => {

@@ -37,6 +37,20 @@ const auth = expectStatus(await request("POST", "/api/collections/_superusers/au
 }), 200, "superuser login");
 const rootToken = auth.token;
 
+const initialSettings = expectStatus(await request("GET", "/api/settings", { token: rootToken }), 200, "read initial settings");
+const registrationRateLimit = initialSettings.rateLimits.rules.find((rule) => rule.label === "POST /api/bvhub/register");
+assert.equal(initialSettings.rateLimits.enabled, true, "rate limiting is enabled");
+assert.deepEqual(registrationRateLimit, {
+  label: "POST /api/bvhub/register",
+  audience: "@guest",
+  duration: 60,
+  maxRequests: 5,
+}, "guest registration has a dedicated rate limit");
+expectStatus(await request("PATCH", "/api/settings", {
+  token: rootToken,
+  body: { ...initialSettings, rateLimits: { ...initialSettings.rateLimits, rules: [registrationRateLimit] } },
+}), 200, "isolate registration rate limit test");
+
 const smtpMessages = [];
 const smtpServer = net.createServer((socket) => {
   socket.setEncoding("utf8");
@@ -167,6 +181,19 @@ expectStatus(await request("POST", "/api/bvhub/register", {
     birthDate: "2000-01-01",
   },
 }), 400, "invalid registration");
+expectStatus(await request("POST", "/api/bvhub/register", {
+  body: {
+    displayName: "Rate Limited Registration",
+    firstName: "Rate",
+    lastName: "Limited",
+    email: "rate-limited@example.test",
+    street: "Teststrasse",
+    houseNumber: "12a",
+    postalCode: "91052",
+    city: "Erlangen",
+    birthDate: "2000-01-01",
+  },
+}), 429, "registration rate limit");
 
 expectStatus(await request("POST", "/api/bvhub/verify-email", { body: { token: "invalid-token" } }), 400, "invalid verification token");
 
