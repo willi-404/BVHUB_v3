@@ -23,6 +23,7 @@ import { I18nProvider } from "../i18n";
 import { AdminGuard, ProtectedRoute, PublicOnlyRoute } from "../routes/guards";
 import { useMyProfile, useUpdateMyProfile } from "../features/profile/hooks/useProfile";
 import { profileErrorStatus } from "../features/profile/api/profileApi";
+import { profilePatchFromDto } from "../features/profile/profilePatch";
 import type { ProfileDto, ProfilePatch } from "../features/profile/types";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -251,12 +252,7 @@ function EditProfileOverlay({ onClose }: { onClose: () => void }) {
   const [saved, setSaved] = useState(false);
   useEffect(() => {
     if (!data || initialized) return;
-    setValues({
-      displayName: data.user.displayName,
-      firstName: data.user.firstName,
-      lastName: data.user.lastName,
-      ...(data.profile || { street: "", houseNumber: "", postalCode: "", city: "", birthDate: "", phone: "", contactInfo: "" }),
-    });
+    setValues(profilePatchFromDto(data));
     setInitialized(true);
   }, [data, initialized]);
 

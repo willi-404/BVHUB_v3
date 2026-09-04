@@ -250,6 +250,11 @@ const duplicateProfile = await request("PATCH", "/api/bvhub/me/profile", { token
 assert.equal(duplicateProfile.status, 409, "duplicate displayName returns conflict");
 const forbiddenFields = await request("PATCH", "/api/bvhub/me/profile", { token: memberLoginToken, body: { role: "ADMIN" } });
 assert.equal(forbiddenFields.status, 400, "privileged profile fields are rejected");
+const guestProfile = expectStatus(await request("PATCH", "/api/bvhub/me/profile", { token: guestLoginToken, body: { displayName: "Updated Guest" } }), 200, "guest updates own profile");
+assert.equal(guestProfile.user.displayName, "Updated Guest");
+const refreshedGuestProfile = expectStatus(await request("GET", "/api/bvhub/me/profile", { token: guestLoginToken }), 200, "guest reloads updated profile");
+assert.equal(refreshedGuestProfile.user.displayName, "Updated Guest");
+expectStatus(await request("PATCH", "/api/bvhub/me/profile", { token: guestLoginToken, body: { displayName: "Updated Guest", created: "forged" } }), 400, "profile metadata mass assignment rejected");
 const memberProfileRecord = expectStatus(await request("GET", `/api/collections/user_profiles/records?filter=${encodeURIComponent(`user = "${member.id}"`)}`, { token: rootToken }), 200, "find member profile");
 const relationAttempt = await request("PATCH", `/api/collections/user_profiles/records/${memberProfileRecord.items[0].id}`, { token: memberLoginToken, body: { user: guest.id } });
 assert.notEqual(relationAttempt.status, 200, "profile user relation cannot be rebound");
@@ -287,6 +292,12 @@ const superLogin = expectStatus(await request("POST", "/api/collections/users/au
 const adminLogin = expectStatus(await request("POST", "/api/collections/users/auth-with-password", {
   body: { identity: admin.email, password: "Synthetic-password-12!" },
 }), 200, "admin password login");
+for (const [label, token, displayName] of [["admin", adminLogin.token, "Updated Admin"], ["superadmin", superLogin.token, "Updated Superadmin"]]) {
+  const updated = expectStatus(await request("PATCH", "/api/bvhub/me/profile", { token, body: { displayName } }), 200, `${label} updates own profile`);
+  assert.equal(updated.user.displayName, displayName, `${label} profile response contains updated name`);
+  const reloaded = expectStatus(await request("GET", "/api/bvhub/me/profile", { token }), 200, `${label} reloads updated profile`);
+  assert.equal(reloaded.user.displayName, displayName, `${label} profile reload contains updated name`);
+}
 expectStatus(await request("GET", "/api/bvhub/admin/users", { token: adminLogin.token }), 200, "admin lists users with legacy user_groups schema");
 expectStatus(await request("GET", "/api/bvhub/admin/users", { token: superLogin.token }), 200, "superadmin lists users");
 expectStatus(await request("GET", "/api/bvhub/admin/users", { token: memberLoginToken }), 403, "member cannot list users");
