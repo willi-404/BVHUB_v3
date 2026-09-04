@@ -14,7 +14,7 @@ import RegisterSuccessView from "../app/components/RegisterSuccessView";
 import VerifyEmailView from "../app/components/VerifyEmailView";
 import AdminMembersView from "../app/components/AdminMembersView";
 import AdminPaymentsView from "../app/components/AdminPaymentsView";
-import AdminEventManageView from "../app/components/AdminEventManageView";
+import AdminEventManageView from "../app/components/AdminEventsView";
 import logoSrc from "../imports/logo1-high-resolution.png";
 import { AuthProvider, useAuth, useAuthUser } from "../features/auth/AuthProvider";
 import { isAdminRole } from "../features/auth/policy";
