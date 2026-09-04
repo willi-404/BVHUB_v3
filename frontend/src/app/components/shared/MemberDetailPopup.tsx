@@ -185,9 +185,9 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
                     {canManageRole && <>
                       <label className="text-xs font-600" htmlFor="member-role">{t("profile.role")}</label>
                       <select id="member-role" value={roleDraft} onChange={(event) => setRoleDraft(event.target.value as Role)} disabled={saving} className="h-9 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-2 text-sm">
-                        <option value="GUEST">Guest</option>
-                        <option value="MEMBER">Member</option>
-                        {currentUser?.role === "SUPER_ADMIN" && <option value="ADMIN">Admin</option>}
+                        <option value="GUEST">{t("roles.guest")}</option>
+                        <option value="MEMBER">{t("roles.member")}</option>
+                        {currentUser?.role === "SUPER_ADMIN" && <option value="ADMIN">{t("roles.admin")}</option>}
                       </select>
                       <Button size="sm" variant="outline" onClick={() => void saveRole()} disabled={saving || roleDraft === role}>{saving ? t("common.saving") : t("admin.role.save")}</Button>
                     </>}
