@@ -6,6 +6,7 @@ import { pb } from "../../../lib/pocketbase";
 import { useAuthUser } from "../../../features/auth/AuthProvider";
 import { canManageMemberGroups, canManageMemberRole } from "../../../features/members/policy";
 import type { Role } from "../../../features/auth/policy";
+import { useI18n } from "../../../i18n";
 
 function Icon({ d, size = 18, className = "" }: { d: string; size?: number; className?: string }) {
   return (
@@ -30,6 +31,7 @@ const ic = {
 };
 
 function CopyButton({ text }: { text: string }) {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   function handleCopy() {
     navigator.clipboard.writeText(text).then(() => {
@@ -40,7 +42,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      title="E-Mail kopieren"
+      title={t("common.copyEmail")}
       className="shrink-0 h-6 w-6 flex items-center justify-center rounded-md hover:bg-[var(--muted)] transition-colors"
       style={{ color: copied ? "#15803d" : "var(--muted-foreground)" }}
     >
@@ -74,6 +76,7 @@ function Row({ icon, label, value, mono = false, action }: { icon: string; label
 }
 
 export function MemberDetailPopup({ member, onClose, onReload }: { member: Member; onClose: () => void; onReload?: () => Promise<void> }) {
+  const { t } = useI18n();
   const cfg = groupConfig[member.gruppe];
   const initialRole = member.role ?? "GUEST";
   const { data: currentUser } = useAuthUser();
@@ -92,27 +95,27 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
   }, [member]);
   useEffect(() => {
     if (!canManageGroups) return;
-    void pb.send<{ groups: { id: string; name: string }[] }>("/api/bvhub/admin/groups", { method: "GET" }).then((result) => setAvailable(result.groups)).catch(() => setMessage("Gruppen konnten nicht geladen werden."));
-  }, [canManageGroups]);
+    void pb.send<{ groups: { id: string; name: string }[] }>("/api/bvhub/admin/groups", { method: "GET" }).then((result) => setAvailable(result.groups)).catch(() => setMessage(t("admin.groups.loadError")));
+  }, [canManageGroups, t]);
   async function saveGroups() {
     setSaving(true); setMessage(null);
     try {
       await pb.send(`/api/bvhub/admin/users/${member.id}/groups`, { method: "PUT", body: { groups: groups.map((group) => group.id) } });
       await onReload?.();
-      setMessage("Gruppen erfolgreich gespeichert.");
-    } catch (_) { setMessage("Gruppen konnten nicht gespeichert werden."); }
+      setMessage(t("admin.groups.saved"));
+    } catch (_) { setMessage(t("admin.groups.saveError")); }
     finally { setSaving(false); }
   }
   async function saveRole() {
     if (roleDraft === role) return;
-    if (!window.confirm(`Rolle wirklich auf ${roleDraft} ändern? Diese Aktion beendet die Sitzung des Benutzers.`)) return;
+    if (!window.confirm(`${t("admin.role.confirm")} ${roleDraft}?`)) return;
     setSaving(true); setMessage(null);
     try {
       await pb.send(`/api/bvhub/admin/users/${member.id}/role`, { method: "PATCH", body: { role: roleDraft, confirmation: "ROLE_CHANGE" } });
       setRole(roleDraft);
       await onReload?.();
-      setMessage("Rolle erfolgreich geändert.");
-    } catch (_) { setMessage("Rolle konnte nicht geändert werden."); }
+      setMessage(t("admin.role.saved"));
+    } catch (_) { setMessage(t("admin.role.saveError")); }
     finally { setSaving(false); }
   }
   return (
@@ -141,7 +144,7 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
               className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-600 mt-1.5"
               style={{ background: cfg.bg, color: cfg.color }}
             >
-              Rolle: {role === "SUPER_ADMIN" ? "Super Admin" : role === "ADMIN" ? "Admin" : role === "MEMBER" ? "Member" : "Guest"}
+              {t("profile.role")}: {role}
             </span>
           </div>
         </div>
@@ -149,44 +152,44 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
         {/* Body */}
         <div className="overflow-y-auto flex-1 px-5 py-4">
           <div className="flex flex-col gap-4">
-            <Section title="Identität">
-              <Row icon={ic.shield}   label="Member ID"   value={member.id} mono />
-              <Row icon={ic.user}     label="Username"    value={`@${member.username}`} />
-              <Row icon={ic.calendar} label="Member seit" value={member.memberSince} />
-              <Row icon={ic.calendar} label="Geburtstag"  value={member.geburtstag} />
+            <Section title={t("profile.identity")}>
+              <Row icon={ic.shield}   label={t("admin.members.memberId")}   value={member.id} mono />
+              <Row icon={ic.user}     label={t("admin.members.username")}    value={`@${member.username}`} />
+              <Row icon={ic.calendar} label={t("admin.members.memberSince")} value={member.memberSince} />
+              <Row icon={ic.calendar} label={t("profile.birthDate")}  value={member.geburtstag} />
             </Section>
             <Separator />
-            <Section title="Kontakt">
-              <Row icon={ic.mail}   label="E-Mail"   value={member.email} action={<CopyButton text={member.email} />} />
-              <Row icon={ic.phone}  label="Telefon"  value={member.phone} />
-              <Row icon={ic.mapPin} label="Adresse"  value={member.adresse} />
-              {member.instagram && <Row icon={ic.instagram} label="Instagram" value={member.instagram} />}
+            <Section title={t("profile.contact")}>
+              <Row icon={ic.mail}   label={t("auth.email")}   value={member.email} action={<CopyButton text={member.email} />} />
+              <Row icon={ic.phone}  label={t("profile.phone")}  value={member.phone} />
+              <Row icon={ic.mapPin} label={t("profile.address")}  value={member.adresse} />
+              {member.instagram && <Row icon={ic.instagram} label={t("profile.instagram")} value={member.instagram} />}
             </Section>
             <Separator />
-            <Section title="Account">
-              <Row icon={ic.shield} label="Rolle" value={role === "SUPER_ADMIN" ? "Super Admin" : role === "ADMIN" ? "Admin" : role === "MEMBER" ? "Member" : "Guest"} />
-              <Row icon={ic.shield} label="Gruppen" value={member.groups?.map((group) => group.name).join(", ") || "-"} />
-              <Row icon={ic.clock} label="Erstellt am"       value={member.accountCreated} />
-              <Row icon={ic.clock} label="Zuletzt geändert"  value={member.accountUpdated} />
+            <Section title={t("profile.account")}>
+              <Row icon={ic.shield} label={t("profile.role")} value={role} />
+              <Row icon={ic.shield} label={t("profile.groups")} value={member.groups?.map((group) => group.name).join(", ") || "-"} />
+              <Row icon={ic.clock} label={t("profile.createdAt")} value={member.accountCreated} />
+              <Row icon={ic.clock} label={t("profile.updatedAt")} value={member.accountUpdated} />
             </Section>
             {(canManageGroups || canManageRole) && (
               <>
                 <Separator />
-                <Section title="Verwaltung">
+                <Section title={t("admin.management")}>
                   <div className="flex flex-col gap-2">
                     {canManageGroups && available.map((group) => {
                       const checked = groups.some((item) => item.id === group.id);
                       return <label key={group.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={checked} onChange={() => setGroups((current) => checked ? current.filter((item) => item.id !== group.id) : [...current, { id: group.id, membershipId: "", name: group.name, active: true }])} />{group.name}</label>;
                     })}
-                    {canManageGroups && <Button size="sm" onClick={() => void saveGroups()} disabled={saving}>{saving ? "Speichern …" : "Gruppen speichern"}</Button>}
+                    {canManageGroups && <Button size="sm" onClick={() => void saveGroups()} disabled={saving}>{saving ? t("common.saving") : t("admin.groups.save")}</Button>}
                     {canManageRole && <>
-                      <label className="text-xs font-600" htmlFor="member-role">Rolle</label>
+                      <label className="text-xs font-600" htmlFor="member-role">{t("profile.role")}</label>
                       <select id="member-role" value={roleDraft} onChange={(event) => setRoleDraft(event.target.value as Role)} disabled={saving} className="h-9 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-2 text-sm">
                         <option value="GUEST">Guest</option>
                         <option value="MEMBER">Member</option>
                         {currentUser?.role === "SUPER_ADMIN" && <option value="ADMIN">Admin</option>}
                       </select>
-                      <Button size="sm" variant="outline" onClick={() => void saveRole()} disabled={saving || roleDraft === role}>{saving ? "Speichern …" : "Rolle speichern"}</Button>
+                      <Button size="sm" variant="outline" onClick={() => void saveRole()} disabled={saving || roleDraft === role}>{saving ? t("common.saving") : t("admin.role.save")}</Button>
                     </>}
                     {message && <p role="status" className="text-xs text-[var(--muted-foreground)]">{message}</p>}
                   </div>
@@ -197,7 +200,7 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
         </div>
 
         <div className="px-5 py-3 border-t border-[var(--border)] shrink-0">
-          <Button variant="outline" className="w-full" onClick={onClose}>Schließen</Button>
+          <Button variant="outline" className="w-full" onClick={onClose}>{t("common.close")}</Button>
         </div>
       </div>
     </>

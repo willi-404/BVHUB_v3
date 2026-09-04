@@ -1,4 +1,6 @@
 import { ClientResponseError } from "pocketbase";
+
+/** Maps PocketBase failures to stable translation keys for the UI layer. */
 export function mapPBError(error: unknown): string {
   const status = error instanceof ClientResponseError ? error.status : (error as { status?: number })?.status;
   if (status === 400) return "errors.invalid_request";

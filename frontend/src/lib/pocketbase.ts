@@ -5,13 +5,14 @@ const pocketbaseUrl = import.meta.env.VITE_POCKETBASE_URL || (import.meta.env.DE
 if (!pocketbaseUrl) throw new Error("VITE_POCKETBASE_URL must be configured in production");
 
 /**
- * PocketBase's default LocalAuthStore survives browser restarts. Auth tokens
- * are intentionally scoped to the current tab instead.
+ * Stores PocketBase auth state in sessionStorage so credentials stay scoped to
+ * the current browser tab instead of surviving browser restarts.
  */
 export class SessionAuthStore extends BaseAuthStore {
   private readonly storageKey: string;
   private memoryState: { token: string; record: AuthRecord } = { token: "", record: null };
 
+  /** Creates a session-scoped auth store. @param {string} storageKey The sessionStorage key. */
   constructor(storageKey = "pb_auth") {
     super();
     this.storageKey = storageKey;
@@ -22,14 +23,18 @@ export class SessionAuthStore extends BaseAuthStore {
     }
   }
 
+  /** Returns the current auth token. @returns {string} The token or an empty string. */
   get token(): string { return this.baseToken; }
+  /** Returns the current auth record. @returns {AuthRecord} The stored record or null. */
   get record(): AuthRecord { return this.baseModel; }
 
+  /** Persists a new auth state in memory and sessionStorage. @param {string} token The auth token. @param {AuthRecord} [record] The associated auth record. @returns {void} Nothing. */
   save(token: string, record?: AuthRecord): void {
     super.save(token, record);
     this.persist();
   }
 
+  /** Clears the auth state from memory and sessionStorage. @returns {void} Nothing. */
   clear(): void {
     super.clear();
     this.remove();
@@ -59,5 +64,34 @@ export class SessionAuthStore extends BaseAuthStore {
 
 export const pb = new PocketBase(pocketbaseUrl, new SessionAuthStore());
 
-// Multiple queries can run in parallel during auth/bootstrap.
+/**
+ * Multiple auth/bootstrap queries intentionally run in parallel. Disabling
+ * PocketBase auto-cancellation prevents one request from aborting another
+ * request that shares a URL; callers still own cleanup for unmounted work.
+ */
 pb.autoCancellation(false);
+
+function csrfTokenFromCookie(): string {
+  if (typeof document === "undefined") return "";
+  const cookie = document.cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith("csrf-token="));
+  return cookie ? decodeURIComponent(cookie.slice("csrf-token=".length)) : "";
+}
+
+/**
+ * Adds a CSRF header to mutating requests when a server-issued session cookie
+ * exists, falling back to the current auth token for token-authenticated APIs.
+ * Guest endpoints do not receive ambient credentials, so an empty header is
+ * harmless and does not recreate the previous cross-origin cookie dependency.
+ */
+pb.beforeSend = (url, options) => {
+  const method = String(options.method || "GET").toUpperCase();
+  if (!["POST", "PUT", "PATCH", "DELETE"].includes(method)) return { url, options };
+  const token = csrfTokenFromCookie() || pb.authStore.token;
+  return {
+    url,
+    options: {
+      ...options,
+      headers: { ...(options.headers || {}), "X-CSRF-Token": token },
+    },
+  };
+};

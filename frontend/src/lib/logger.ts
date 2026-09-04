@@ -20,10 +20,14 @@ function write(level: "info" | "warn" | "error", event: string, details?: Detail
   else console.log(line);
 }
 
+/** Writes an informational structured log event. @param {string} event The stable event name. @param {Details} [details] Optional structured context. @returns {void} Nothing. */
 export function logInfo(event: string, details?: Details): void { write("info", event, details); }
+/** Writes a warning structured log event. @param {string} event The stable event name. @param {Details} [details] Optional structured context. @returns {void} Nothing. */
 export function logWarn(event: string, details?: Details): void { write("warn", event, details); }
+/** Writes an error structured log event with redacted error context. @param {string} event The stable event name. @param {unknown} error The thrown value. @param {Details} [details] Optional structured context. @returns {void} Nothing. */
 export function logError(event: string, error: unknown, details?: Details): void { write("error", event, details, error); }
 
+/** Redacts the local part of an email address for logs. @param {string} email The email address to redact. @returns {string} A privacy-preserving representation. */
 export function redactEmail(email: string): string {
   const [local, domain] = email.split("@");
   if (!domain) return "[REDACTED]";
