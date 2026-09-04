@@ -197,7 +197,11 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
       </div>
 
       {filterOpen && <FilterSheet selected={filterGroups} onApply={setFilterGroups} onClose={() => setFilterOpen(false)} />}
-      {selected && <MemberDetailPopup member={selected} onClose={() => setSelected(null)} />}
+      {selected && <MemberDetailPopup member={selected} onClose={() => setSelected(null)} onReload={async () => {
+        const result = await membersQuery.refetch();
+        const refreshed = result.data?.items.find((member) => member.id === selected.id);
+        if (refreshed) setSelected(refreshed);
+      }} />}
     </div>
   );
 }
