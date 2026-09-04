@@ -57,13 +57,15 @@ routerAdd(
   "POST",
   "/api/bvhub/admin/venues",
   (e) => {
-  service.actor(e);
-    const data = venueInput(e);
+    service.actor(e);
+    let data;
+    try { data = venueInput(e); } catch (error) { console.log("WU05 venue input", String(error)); throw error; }
     const record = new Record($app.findCollectionByNameOrId("venues"));
     Object.keys(data).forEach((key) => record.set(key, data[key]));
     try {
       $app.save(record);
-    } catch (_) {
+    } catch (error) {
+      console.log("WU05 venue save", String(error));
       throw new ApiError(409, "Veranstaltungsort existiert bereits", {});
     }
     return e.json(201, service.venueDto(record));

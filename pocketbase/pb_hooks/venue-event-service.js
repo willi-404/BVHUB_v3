@@ -15,10 +15,6 @@ function user(e) {
   if (!record || record.getBool("active") !== true || record.getBool("verified") !== true) throw new ApiError(403, "Zugriff nicht erlaubt", {});
   return record;
 }
-function canRead(e) {
-  const record = e.auth;
-  return Boolean(record && record.getBool("active") === true && record.getBool("verified") === true);
-}
 
 function payload(e, allowed) {
   const value = e.requestInfo().body;
@@ -77,4 +73,4 @@ function parseEvent(value, existing) {
   const eventStatus = value.status !== undefined ? value.status : existing ? existing.getString("status") : "DRAFT";
   return { title: text(title, MAX_TITLE), description: text(description, MAX_DESCRIPTION, false), venue: String(venueId), start, end, capacity: capacity(cap), registrationOpen: boolean(value.registrationOpen, existing ? existing.getBool("registrationOpen") : false), status: status(eventStatus) };
 }
-module.exports = { actor, user, canRead, payload, venue, event, venueDto, eventDto, parseVenue, parseEvent };
+module.exports = { actor, user, payload, venue, event, venueDto, eventDto, parseVenue, parseEvent };
