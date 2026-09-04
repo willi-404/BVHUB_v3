@@ -182,7 +182,7 @@ function MemberCardOverlay({ onClose }: { onClose: () => void }) {
   const { data: profile } = useMyProfile();
   const displayName = profile?.user.displayName || "Profil";
   const memberId = profile?.user.id || "-";
-  const group = profile?.groups[0]?.name || "-";
+  const group = profile?.groups.map((item) => item.name) ?? ["-"];
   const activeSince = profile?.user.created ? profile.user.created.slice(0, 10) : "-";
   return (
     <div
@@ -515,7 +515,7 @@ function ActivityFeed() {
 function DashboardView({ events, onToggle, onOpenCard, profile }: { events: Event[]; onToggle: (id: number) => void; onOpenCard: () => void; profile: ProfileDto | null }) {
   const displayName = profile?.user.displayName || "Profil";
   const memberId = profile?.user.id || "-";
-  const group = profile?.groups[0]?.name || "-";
+  const group = profile?.groups.map((item) => item.name) ?? ["-"];
   const activeSince = profile?.user.created ? profile.user.created.slice(0, 10) : "-";
   return (
     <div className="flex flex-col gap-5">

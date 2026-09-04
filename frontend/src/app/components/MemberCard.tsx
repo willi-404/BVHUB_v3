@@ -1,11 +1,11 @@
 import logoSrc from "../../imports/logo1-high-resolution.png";
-import { resolveMemberCardGroup } from "./memberCardTheme";
+import { resolveMemberCardGroup, type MemberCardGroup } from "./memberCardTheme";
 
 interface MemberCardProps {
   name: string;
   memberId: string;
   activeSince: string;
-  group: string;
+  group: string | readonly string[];
 }
 
 type GroupConfig = {
@@ -21,7 +21,7 @@ type GroupConfig = {
   dot: string;
 };
 
-const GROUP: Record<MemberCardProps["group"], GroupConfig> = {
+const GROUP: Record<MemberCardGroup, GroupConfig> = {
   MemberER: {
     label: "MemberER",
     gradient: "linear-gradient(135deg, #14532d 0%, #15803d 55%, #22c55e 100%)",

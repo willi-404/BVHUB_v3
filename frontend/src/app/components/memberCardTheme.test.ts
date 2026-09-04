@@ -6,6 +6,8 @@ describe("member card group theme mapping", () => {
     expect(resolveMemberCardGroup("Member ER")).toBe("MemberER");
     expect(resolveMemberCardGroup("Member NUE")).toBe("MemberNUE");
     expect(resolveMemberCardGroup("Guest")).toBe("guest");
+    expect(resolveMemberCardGroup(["Member NUE", "Member ER"])).toBe("MemberER");
+    expect(resolveMemberCardGroup(["Guest", "Member NUE"])).toBe("MemberNUE");
     expect(resolveMemberCardGroup("unknown")).toBe("guest");
   });
 });
