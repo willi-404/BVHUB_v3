@@ -2,18 +2,24 @@ const MAX_TITLE = 200;
 const MAX_DESCRIPTION = 10000;
 const MAX_ADDRESS = 300;
 
-function actor(e) {
+function requireAuthenticatedReader(e) {
   const record = e.auth;
-  if (!record || record.getBool("active") !== true || record.getBool("verified") !== true) throw new ApiError(403, "Zugriff nicht erlaubt", {});
+  return record && record.getBool("active") === true && record.getBool("verified") === true ? record : null;
+}
+
+function requireAdminActor(e) {
+  const record = requireAuthenticatedReader(e);
+  if (!record) return null;
   const role = record.getString("role");
-  if (!["ADMIN", "SUPER_ADMIN"].includes(role)) throw new ApiError(403, "Zugriff nicht erlaubt", {});
-  return record;
+  return ["ADMIN", "SUPER_ADMIN"].includes(role) ? record : null;
+}
+
+function actor(e) {
+  return requireAdminActor(e);
 }
 
 function user(e) {
-  const record = e.auth;
-  if (!record || record.getBool("active") !== true || record.getBool("verified") !== true) throw new ApiError(403, "Zugriff nicht erlaubt", {});
-  return record;
+  return requireAuthenticatedReader(e);
 }
 
 function payload(e, allowed) {
@@ -56,6 +62,27 @@ function eventDto(app, record) {
   const v = venue(app, record.getString("venue"));
   return { id: record.id, title: record.getString("title"), description: record.getString("description"), venue: venueDto(v), start: record.getString("start"), end: record.getString("end"), capacity: record.getInt("capacity"), registrationOpen: record.getBool("registrationOpen"), status: record.getString("status"), createdBy: record.getString("createdBy"), created: record.getString("created"), updated: record.getString("updated") };
 }
+function idOf(e) {
+  const pathValue = e.request && typeof e.request.pathValue === "function" ? e.request.pathValue("id") : "";
+  if (pathValue) return pathValue;
+  const path = String(e.request && e.request.url && e.request.url.path || "");
+  return path.split("/").filter(Boolean).at(-1) || "";
+}
+function listVenues(app, admin) {
+  const records = app.findRecordsByFilter("venues", admin ? "id != ''" : "active = true", "", 100, 0);
+  return { items: records.map(venueDto), totalItems: records.length };
+}
+function publicEvents(app, e, detailId) {
+  if (!requireAuthenticatedReader(e)) return { forbidden: true };
+  if (detailId) {
+    const record = event(app, detailId);
+    if (record.getString("status") !== "PUBLISHED" || !venue(app, record.getString("venue")).getBool("active")) throw new ApiError(404, "Event nicht gefunden", {});
+    return eventDto(app, record);
+  }
+  const records = app.findRecordsByFilter("events", "status = 'PUBLISHED' && start >= @now", "start", 500, 0)
+    .filter((record) => venue(app, record.getString("venue")).getBool("active"));
+  return { items: records.map((record) => eventDto(app, record)), totalItems: records.length };
+}
 function parseVenue(value, existing) {
   const name = value.name !== undefined ? value.name : existing ? existing.getString("name") : "";
   const address = value.address !== undefined ? value.address : existing ? existing.getString("address") : "";
@@ -73,4 +100,4 @@ function parseEvent(value, existing) {
   const eventStatus = value.status !== undefined ? value.status : existing ? existing.getString("status") : "DRAFT";
   return { title: text(title, MAX_TITLE), description: text(description, MAX_DESCRIPTION, false), venue: String(venueId), start, end, capacity: capacity(cap), registrationOpen: boolean(value.registrationOpen, existing ? existing.getBool("registrationOpen") : false), status: status(eventStatus) };
 }
-module.exports = { actor, user, payload, venue, event, venueDto, eventDto, parseVenue, parseEvent };
+module.exports = { requireAuthenticatedReader, requireAdminActor, actor, user, payload, venue, event, venueDto, eventDto, idOf, listVenues, publicEvents, parseVenue, parseEvent };

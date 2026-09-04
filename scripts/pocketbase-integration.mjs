@@ -210,6 +210,24 @@ const superAdmin = expectStatus(await request("POST", "/api/collections/users/re
 const admin = expectStatus(await request("POST", "/api/collections/users/records", {
   token: rootToken, body: userBody("admin@example.test", "ADMIN"),
 }), 200, "create admin");
+const inactiveAdmin = expectStatus(await request("POST", "/api/collections/users/records", {
+  token: rootToken, body: { ...userBody("inactive-admin@example.test", "ADMIN"), displayName: "Inactive Admin" },
+}), 200, "create inactive admin");
+const inactiveAdminSession = expectStatus(await request("POST", `/api/collections/users/impersonate/${inactiveAdmin.id}`, {
+  token: rootToken, body: { duration: 300 },
+}), 200, "create inactive admin session");
+expectStatus(await request("PATCH", `/api/collections/users/records/${inactiveAdmin.id}`, {
+  token: rootToken, body: { active: false },
+}), 200, "deactivate admin test account");
+const unverifiedAdmin = expectStatus(await request("POST", "/api/collections/users/records", {
+  token: rootToken, body: { ...userBody("unverified-admin@example.test", "ADMIN"), displayName: "Unverified Admin" },
+}), 200, "create unverified admin");
+const unverifiedAdminSession = expectStatus(await request("POST", `/api/collections/users/impersonate/${unverifiedAdmin.id}`, {
+  token: rootToken, body: { duration: 300 },
+}), 200, "create unverified admin session");
+expectStatus(await request("PATCH", `/api/collections/users/records/${unverifiedAdmin.id}`, {
+  token: rootToken, body: { verified: false },
+}), 200, "unverify admin test account");
 const member = expectStatus(await request("POST", "/api/collections/users/records", {
   token: rootToken, body: userBody("member@example.test", "MEMBER"),
 }), 200, "create member with 12+ password");
@@ -319,6 +337,77 @@ const superLogin = expectStatus(await request("POST", "/api/collections/users/au
 const adminLogin = expectStatus(await request("POST", "/api/collections/users/auth-with-password", {
   body: { identity: admin.email, password: "Synthetic-password-12!" },
 }), 200, "admin password login");
+
+// WU-05 routes must load their authorization helpers explicitly in the hook module.
+expectStatus(await request("GET", "/api/bvhub/admin/events"), 401, "unauthenticated admin event list");
+expectStatus(await request("GET", "/api/bvhub/admin/venues"), 401, "unauthenticated admin venue list");
+for (const [label, token] of [["guest", guestLoginToken], ["member", memberLoginToken]]) {
+  expectStatus(await request("GET", "/api/bvhub/admin/events", { token }), 403, `${label} cannot list admin events`);
+  expectStatus(await request("GET", "/api/bvhub/admin/venues", { token }), 403, `${label} cannot list admin venues`);
+  expectStatus(await request("POST", "/api/bvhub/admin/events", { token, body: {} }), 403, `${label} cannot create admin events`);
+  expectStatus(await request("POST", "/api/bvhub/admin/venues", { token, body: {} }), 403, `${label} cannot create admin venues`);
+}
+for (const [account, session] of [[inactiveAdmin, inactiveAdminSession], [unverifiedAdmin, unverifiedAdminSession]]) {
+  expectStatus(await request("GET", "/api/bvhub/admin/events", { token: session.token }), 403, `${account.displayName} cannot list admin events`);
+  expectStatus(await request("GET", "/api/bvhub/admin/venues", { token: session.token }), 403, `${account.displayName} cannot list admin venues`);
+}
+for (const [label, token] of [["admin", adminLogin.token], ["superadmin", superLogin.token]]) {
+  expectStatus(await request("GET", "/api/bvhub/admin/events", { token }), 200, `${label} lists admin events`);
+  expectStatus(await request("GET", "/api/bvhub/admin/venues", { token }), 200, `${label} lists admin venues`);
+}
+const venuePayload = {
+  name: "  WU-05 Integration Venue  ",
+  address: "Teststrasse 42, 91052 Erlangen",
+  description: "Integration venue",
+};
+const createdVenue = expectStatus(await request("POST", "/api/bvhub/admin/venues", {
+  token: adminLogin.token, body: venuePayload,
+}), 201, "admin creates venue");
+assert.equal(createdVenue.name, venuePayload.name.trim(), "venue name is normalized");
+assert.equal(createdVenue.active, true, "new venue is active by default");
+assert.equal(createdVenue.createdBy, undefined, "venue does not expose a client-controlled creator");
+expectStatus(await request("GET", "/api/bvhub/venues", { token: memberLoginToken }), 200, "member reads active venues");
+expectStatus(await request("POST", "/api/bvhub/admin/venues", {
+  token: adminLogin.token, body: { ...venuePayload, name: "Invalid extra field venue", createdBy: superAdmin.id },
+}), 400, "venue rejects protected payload fields");
+const eventPayload = {
+  title: "WU-05 Integration Event",
+  description: "Plaintext integration event",
+  venue: createdVenue.id,
+  start: "2099-07-01T16:00:00.000Z",
+  end: "2099-07-01T18:00:00.000Z",
+  capacity: 25,
+  registrationOpen: false,
+  status: "DRAFT",
+};
+expectStatus(await request("POST", "/api/bvhub/admin/events", {
+  token: adminLogin.token, body: { ...eventPayload, createdBy: superAdmin.id },
+}), 400, "event rejects client-controlled creator");
+const validEvent = expectStatus(await request("POST", "/api/bvhub/admin/events", {
+  token: adminLogin.token, body: eventPayload,
+}), 201, "admin creates event");
+assert.equal(validEvent.createdBy, admin.id, "event creator is set from authenticated actor");
+assert.equal(validEvent.status, "DRAFT");
+expectStatus(await request("POST", "/api/bvhub/admin/events", {
+  token: adminLogin.token, body: { ...eventPayload, title: "Invalid range", start: eventPayload.end, end: eventPayload.start },
+}), 400, "event rejects invalid time range");
+expectStatus(await request("POST", "/api/bvhub/admin/events", {
+  token: adminLogin.token, body: { ...eventPayload, title: "Unknown field", unexpected: true },
+}), 400, "event rejects unknown fields");
+const publishedEvent = expectStatus(await request("PATCH", `/api/bvhub/admin/events/${validEvent.id}`, {
+  token: adminLogin.token, body: { status: "PUBLISHED" },
+}), 200, "admin publishes event");
+assert.equal(publishedEvent.status, "PUBLISHED");
+expectStatus(await request("GET", "/api/bvhub/events", { token: memberLoginToken }), 200, "member reads published events");
+expectStatus(await request("GET", `/api/bvhub/events/${validEvent.id}`, { token: guestLoginToken }), 200, "guest reads published event detail");
+const cancelledEvent = expectStatus(await request("DELETE", `/api/bvhub/admin/events/${validEvent.id}`, {
+  token: adminLogin.token,
+}), 200, "admin cancels published event");
+assert.equal(cancelledEvent.status, "CANCELLED");
+expectStatus(await request("GET", `/api/bvhub/events/${validEvent.id}`, { token: memberLoginToken }), 404, "cancelled event is hidden publicly");
+expectStatus(await request("DELETE", `/api/bvhub/admin/venues/${createdVenue.id}`, {
+  token: adminLogin.token,
+}), 409, "referenced venue cannot be deleted");
 for (const [label, token, displayName] of [["admin", adminLogin.token, "Updated Admin"], ["superadmin", superLogin.token, "Updated Superadmin"]]) {
   const updated = expectStatus(await request("PATCH", "/api/bvhub/me/profile", { token, body: { displayName } }), 200, `${label} updates own profile`);
   assert.equal(updated.user.displayName, displayName, `${label} profile response contains updated name`);
