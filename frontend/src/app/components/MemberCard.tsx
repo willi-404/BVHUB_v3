@@ -1,4 +1,5 @@
 import logoSrc from "../../imports/logo1-high-resolution.png";
+import { resolveMemberCardGroup } from "./memberCardTheme";
 
 interface MemberCardProps {
   name: string;
@@ -81,7 +82,7 @@ function ShuttlecockSVG({ opacity = 0.12 }: { opacity?: number }) {
 }
 
 export function MemberCard({ name, memberId, activeSince, group }: MemberCardProps) {
-  const cfg = GROUP[group as keyof typeof GROUP] || GROUP.guest;
+  const cfg = GROUP[resolveMemberCardGroup(group)];
 
   return (
     <div
