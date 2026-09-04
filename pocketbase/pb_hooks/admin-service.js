@@ -35,7 +35,9 @@ function groupRecords(app) {
 
 function groupsFor(app, userId) {
   const allowed = new Map(groupRecords(app).map((group) => [group.id, group]));
-  return app.findRecordsByFilter("user_groups", `user = '${userId}'`, "created", 100, 0)
+  // Legacy user_groups collections don't necessarily have created/updated
+  // autodate fields. The unique (user, group) index makes ordering irrelevant.
+  return app.findRecordsByFilter("user_groups", `user = '${userId}'`, "", 100, 0)
     .map((assignment) => {
       const group = allowed.get(assignment.getString("group"));
       if (!group) return null;
@@ -44,8 +46,6 @@ function groupsFor(app, userId) {
         id: group.id,
         name: group.getString("name"),
         active: group.getBool("active"),
-        created: assignment.getString("created"),
-        updated: assignment.getString("updated"),
       };
     })
     .filter(Boolean);

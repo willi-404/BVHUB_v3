@@ -31,9 +31,9 @@ routerAdd("PUT", "/api/bvhub/admin/users/{id}/groups", (e) => {
       assignment.set("group", groupId);
       txApp.save(assignment);
     });
+    service.audit(txApp, current.id, target.id, "USER_GROUPS_CHANGED");
   });
-  service.audit($app, current.id, target.id, "USER_GROUPS_CHANGED");
-  return e.json(200, { id: targetId, groups: ids });
+  return e.json(200, service.userDto($app, service.findUser($app, targetId)));
 }, $apis.requireAuth("users"));
 
 routerAdd("PATCH", "/api/bvhub/admin/users/{id}/role", (e) => {
@@ -49,14 +49,13 @@ routerAdd("PATCH", "/api/bvhub/admin/users/{id}/role", (e) => {
   if (payload.role === "MEMBER" && previousRole !== "ADMIN") throw new ForbiddenError("Nur Admins dürfen zurückgestuft werden");
   if (payload.role === previousRole) throw new BadRequestError("Die Rolle ist bereits gesetzt");
 
-  $app.runInTransaction((txApp) => {
-    txApp.db().newQuery(`UPDATE users SET role = '${payload.role}' WHERE id = '${targetId}'`).execute();
-  });
-  // Rotate the auth token key after the role transaction. Persisting the
-  // generated key directly avoids re-entering the generic update rule.
+  // Generate the replacement before entering the transaction, then persist the
+  // role, token invalidation and audit atomically through the scoped app.
   target.refreshTokenKey();
   const tokenKey = target.getString("tokenKey");
-  $app.db().newQuery("UPDATE users SET tokenKey = {:tokenKey} WHERE id = {:id}").bind({ tokenKey, id: targetId }).execute();
-  service.audit($app, current.id, targetId, "USER_ROLE_CHANGED");
-  return e.json(200, { id: targetId, role: payload.role });
+  $app.runInTransaction((txApp) => {
+    txApp.db().newQuery("UPDATE users SET role = {:role}, tokenKey = {:tokenKey} WHERE id = {:id}").bind({ role: payload.role, tokenKey, id: targetId }).execute();
+    service.audit(txApp, current.id, targetId, "USER_ROLE_CHANGED");
+  });
+  return e.json(200, service.userDto($app, service.findUser($app, targetId)));
 }, $apis.requireAuth("users"));
