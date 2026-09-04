@@ -1,17 +1,19 @@
 import { useState } from "react";
 import LoginView from "./LoginView";
 import { AppShell } from "../../pages/LegacyShell";
+import { useI18n, type MessageKey } from "../../i18n";
 
-const FRAMES = [
-  { id: "login", label: "Login" },
-  { id: "dashboard", label: "Dashboard" },
-  { id: "events", label: "Events" },
-  { id: "payments", label: "Payments" },
-  { id: "profile", label: "Profile" },
-  { id: "card", label: "Member Card" },
+const FRAMES: Array<{ id: string; key: MessageKey }> = [
+  { id: "login", key: "preview.login" },
+  { id: "dashboard", key: "preview.dashboard" },
+  { id: "events", key: "preview.events" },
+  { id: "payments", key: "preview.payments" },
+  { id: "profile", key: "preview.profile" },
+  { id: "card", key: "preview.memberCard" },
 ];
 
 export default function FramePreview() {
+  const { t } = useI18n();
   const [selected, setSelected] = useState<string[]>(["login", "dashboard"]);
 
   function toggle(id: string) {
@@ -43,7 +45,7 @@ export default function FramePreview() {
         }}
       >
         <span style={{ color: "rgba(255,255,255,0.9)", fontSize: "13px", fontWeight: 600, marginRight: 4 }}>
-          Frame Preview
+          {t("preview.framePreview")}
         </span>
         {FRAMES.map((f) => {
           const active = selected.includes(f.id);
@@ -63,12 +65,12 @@ export default function FramePreview() {
                 transition: "all 0.15s",
               }}
             >
-              {f.label}
+              {t(f.key)}
             </button>
           );
         })}
         <span style={{ marginLeft: "auto", color: "rgba(255,255,255,0.25)", fontSize: "11px" }}>
-          390 × 844 px · iPhone 14
+          {t("preview.device")}
         </span>
       </div>
 
@@ -87,7 +89,7 @@ export default function FramePreview() {
           <div key={id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", flexShrink: 0 }}>
             {/* Frame label */}
             <span style={{ color: "rgba(255,255,255,0.4)", fontSize: "12px", fontWeight: 500, letterSpacing: "0.04em" }}>
-              {FRAMES.find((f) => f.id === id)?.label}
+              {t(FRAMES.find((f) => f.id === id)?.key ?? "preview.framePreview")}
             </span>
             {/* Device shell */}
             <div
@@ -112,13 +114,13 @@ export default function FramePreview() {
               </div>
             </div>
             {/* Frame size label */}
-            <span style={{ color: "rgba(255,255,255,0.2)", fontSize: "11px" }}>390 × 844</span>
+            <span style={{ color: "rgba(255,255,255,0.2)", fontSize: "11px" }}>{t("preview.size")}</span>
           </div>
         ))}
 
         {selected.length === 0 && (
           <div style={{ color: "rgba(255,255,255,0.25)", fontSize: "14px", margin: "auto" }}>
-            Select frames above to preview them
+            {t("preview.selectFrames")}
           </div>
         )}
       </div>

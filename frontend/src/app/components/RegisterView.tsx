@@ -42,7 +42,7 @@ export default function RegisterView() {
     if (first) { refs.current[first]?.focus(); return; }
     setLoading(true);
     try { const result = await register(values); navigate("/register/success", { state: { email: result.email }, replace: true }); }
-    catch (error) { setServerError(error instanceof Error ? t(error.message) : t("register.error")); }
+    catch { setServerError(t("register.error")); }
     finally { setLoading(false); }
   }
   const input = (field: Field, label: string, type = "text", optional = false) => {

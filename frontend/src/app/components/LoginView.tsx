@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
 import logoSrc from "../../imports/logo1-high-resolution.png";
 import { useAuth } from "../../features/auth/AuthProvider";
-import { useI18n } from "../../i18n";
+import { LanguageSwitcher, useI18n } from "../../i18n";
 
 interface LoginViewProps {
   onLogin?: () => void;
@@ -108,6 +108,9 @@ export default function LoginView({ onLogin, sessionExpired = false }: LoginView
       }}
     >
       <div className="w-full max-w-sm relative">
+        <div className="flex justify-end mb-3 text-white">
+          <LanguageSwitcher />
+        </div>
         <div className="flex flex-col items-center mb-8">
           <div className="h-20 w-20 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center mb-4 overflow-hidden p-1.5 backdrop-blur-sm">
             <img src={logoSrc} alt={t("brand.logoAlt")} className="h-full w-full object-contain" />

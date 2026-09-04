@@ -19,7 +19,7 @@ import logoSrc from "../imports/logo1-high-resolution.png";
 import { AuthProvider, useAuth, useAuthUser } from "../features/auth/AuthProvider";
 import { isAdminRole } from "../features/auth/policy";
 import { queryClient } from "../lib/queryClient";
-import { I18nProvider, useI18n } from "../i18n";
+import { formatLocaleDate, LanguageSwitcher, useI18n } from "../i18n";
 import { AdminGuard, ProtectedRoute, PublicOnlyRoute } from "../routes/guards";
 import { useMyProfile, useUpdateMyProfile } from "../features/profile/hooks/useProfile";
 import { profileErrorStatus } from "../features/profile/api/profileApi";
@@ -170,11 +170,23 @@ const typeColors: Record<Event["type"], string> = {
   social: "secondary",
   workshop: "outline",
 };
-const typeLabels: Record<Event["type"], string> = {
-  training: "Training",
-  tournament: "Tournament",
-  social: "Social",
-  workshop: "Workshop",
+const typeLabelKeys: Record<Event["type"], "events.training" | "events.tournament" | "events.social" | "events.workshop"> = {
+  training: "events.training",
+  tournament: "events.tournament",
+  social: "events.social",
+  workshop: "events.workshop",
+};
+const eventTitleKeys: Record<string, "demo.event.tuesday" | "demo.event.championship" | "demo.event.beginner" | "demo.event.social"> = {
+  "Tuesday Evening Training": "demo.event.tuesday",
+  "Club Singles Championship": "demo.event.championship",
+  "Beginners Coaching Session": "demo.event.beginner",
+  "End-of-Season Social Night": "demo.event.social",
+};
+const levelKeys: Record<string, "demo.level.intermediate" | "demo.level.open" | "demo.level.beginner" | "demo.level.all"> = {
+  Intermediate: "demo.level.intermediate", Open: "demo.level.open", Beginner: "demo.level.beginner", All: "demo.level.all",
+};
+const locationKeys: Record<string, "demo.location.court12" | "demo.location.allCourts" | "demo.location.court3" | "demo.location.clubHall"> = {
+  "Court 1 & 2": "demo.location.court12", "All Courts": "demo.location.allCourts", "Court 3": "demo.location.court3", "Club Hall": "demo.location.clubHall",
 };
 
 // ─── Full-screen Member Card overlay ──────────────────────────────────────────
@@ -368,7 +380,7 @@ function QuickActions() {
 }
 
 function NewsSection() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
@@ -381,11 +393,11 @@ function NewsSection() {
         <Card key={item.id} className="overflow-hidden">
           <div className="p-4">
             <div className="flex items-center gap-2 mb-2">
-              <Badge variant={item.tagColor}>{item.tag}</Badge>
-              <span className="text-[10px] text-[var(--muted-foreground)]">{item.date}</span>
+              <Badge variant={item.tagColor}>{t("demo.news.tag")}</Badge>
+              <span className="text-[10px] text-[var(--muted-foreground)]">{formatLocaleDate(item.date, locale)}</span>
             </div>
-            <h3 className="font-600 text-sm text-[var(--foreground)] leading-snug mb-1">{item.title}</h3>
-            <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">{item.excerpt}</p>
+            <h3 className="font-600 text-sm text-[var(--foreground)] leading-snug mb-1">{t("demo.news.title")}</h3>
+            <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">{t("demo.news.excerpt")}</p>
             <button className="mt-2 text-xs text-[var(--primary)] font-500 flex items-center gap-0.5">
               {t("common.readMore")} <Icon d={icons.chevronRight} size={11} />
             </button>
@@ -397,39 +409,39 @@ function NewsSection() {
 }
 
 function EventCard({ event, onToggle }: { event: Event; onToggle: (id: number) => void }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const spotsLeft = event.capacity - event.registered;
   const isFull = spotsLeft === 0;
   return (
     <Card className="overflow-hidden">
       <div className="p-4 pb-3">
         <div className="flex items-center gap-2 flex-wrap mb-2">
-          <Badge variant={typeColors[event.type] as Parameters<typeof Badge>[0]["variant"]}>{typeLabels[event.type]}</Badge>
-          <Badge variant="outline">{event.level}</Badge>
+              <Badge variant={typeColors[event.type] as Parameters<typeof Badge>[0]["variant"]}>{t(typeLabelKeys[event.type])}</Badge>
+          <Badge variant="outline">{t(levelKeys[event.level])}</Badge>
           {event.isRegistered && <Badge variant="success">{t("events.registered")}</Badge>}
         </div>
-        <h3 className="font-600 text-sm text-[var(--foreground)] leading-tight mb-2">{event.title}</h3>
+        <h3 className="font-600 text-sm text-[var(--foreground)] leading-tight mb-2">{t(eventTitleKeys[event.title] ?? "demo.event.social")}</h3>
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]">
             <Icon d={icons.calendar} size={12} />
-            <span>{event.date}</span>
+            <span>{formatLocaleDate(event.date, locale)}</span>
             <span className="mx-1 opacity-30">·</span>
             <Icon d={icons.clock} size={12} />
             <span>{event.time}</span>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]">
             <Icon d={icons.mapPin} size={12} />
-            <span>{event.location}</span>
+            <span>{t(locationKeys[event.location])}</span>
           </div>
         </div>
         <div className="mt-3">
           <div className="flex items-center justify-between mb-1.5">
             <div className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]">
               <Icon d={icons.users} size={12} />
-              <span>{event.registered}/{event.capacity} {t("events.participants")}</span>
+              <span>{t("events.participantCount", { registered: event.registered, capacity: event.capacity })}</span>
             </div>
             <span className={`text-xs font-500 ${isFull ? "text-red-500" : spotsLeft <= 4 ? "text-amber-600" : "text-[var(--muted-foreground)]"}`}>
-              {isFull ? t("events.full") : `${spotsLeft} ${t("events.left")}`}
+              {isFull ? t("events.full") : t("events.spotsLeft", { count: spotsLeft })}
             </span>
           </div>
           <Progress value={event.registered} max={event.capacity} color={isFull ? "hsl(0,84%,60%)" : spotsLeft <= 4 ? "hsl(38,92%,50%)" : undefined} />
@@ -451,7 +463,7 @@ function EventCard({ event, onToggle }: { event: Event; onToggle: (id: number) =
 }
 
 function PaymentCard({ payment, onPay }: { payment: Payment; onPay: (id: number) => void }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   return (
     <Card className="overflow-hidden">
       <div className="p-4 pb-3">
@@ -460,11 +472,11 @@ function PaymentCard({ payment, onPay }: { payment: Payment; onPay: (id: number)
             {payment.paid ? t("payments.paid") : t("payments.unpaid")}
           </Badge>
         </div>
-        <h3 className="font-600 text-sm text-[var(--foreground)] leading-tight mb-2">{payment.eventTitle}</h3>
+        <h3 className="font-600 text-sm text-[var(--foreground)] leading-tight mb-2">{t(eventTitleKeys[payment.eventTitle] ?? "demo.event.social")}</h3>
         <div className="flex flex-col gap-1 mb-3">
           <div className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]">
             <Icon d={icons.calendar} size={12} />
-            <span>{payment.date}</span>
+            <span>{formatLocaleDate(payment.date, locale)}</span>
             <span className="mx-1 opacity-30">·</span>
             <Icon d={icons.clock} size={12} />
             <span>{payment.time}</span>
@@ -492,7 +504,10 @@ function PaymentCard({ payment, onPay }: { payment: Payment; onPay: (id: number)
 }
 
 function ActivityFeed() {
+  const { t } = useI18n();
   const iconMap: Record<string, string> = { check: icons.check, shield: icons.shield, trophy: icons.trophy };
+  const activityText: Record<number, "demo.activity.registered" | "demo.activity.renewed" | "demo.activity.tournament"> = { 1: "demo.activity.registered", 2: "demo.activity.renewed", 3: "demo.activity.tournament" };
+  const activityTime: Record<number, "demo.activity.twoHours" | "demo.activity.aug28" | "demo.activity.aug27"> = { 1: "demo.activity.twoHours", 2: "demo.activity.aug28", 3: "demo.activity.aug27" };
   return (
     <div className="flex flex-col">
       {ACTIVITIES.map((a, i) => (
@@ -502,8 +517,8 @@ function ActivityFeed() {
               <Icon d={iconMap[a.icon]} size={13} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-[var(--foreground)] leading-snug">{a.text}</p>
-              <p className="text-[10px] text-[var(--muted-foreground)] mt-0.5">{a.time}</p>
+              <p className="text-xs text-[var(--foreground)] leading-snug">{t(activityText[a.id])}</p>
+              <p className="text-[10px] text-[var(--muted-foreground)] mt-0.5">{t(activityTime[a.id])}</p>
             </div>
           </div>
           {i < ACTIVITIES.length - 1 && <Separator />}
@@ -689,13 +704,13 @@ function AdminDrawer({ onClose, onAdminMembers, onAdminPayments, onAdminEvents }
 }
 
 function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, onAdminPayments, onAdminEvents, canAccessAdmin }: { profile: ProfileDto | null; onEditProfile: () => void; onLogout: () => void; onAdminMembers: () => void; onAdminPayments: () => void; onAdminEvents: () => void; canAccessAdmin: boolean }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [adminOpen, setAdminOpen] = useState(false);
 
   if (!profile) return <div className="flex flex-col gap-4"><Card><CardContent className="p-5"><h1 className="text-lg font-700">{t("profile.title")}</h1><p className="text-sm text-[var(--muted-foreground)] mt-2">{t("profile.incompleteDetails")}</p><Button className="mt-4" onClick={onEditProfile}>{t("profile.edit")}</Button></CardContent></Card><Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 gap-2" onClick={onLogout}><Icon d={icons.logout} size={15} /> {t("auth.signOut")}</Button></div>;
   const initials = `${profile.user.firstName[0] || ""}${profile.user.lastName[0] || ""}`.toUpperCase() || "?";
   const address = profile.profile ? `${profile.profile.street} ${profile.profile.houseNumber}, ${profile.profile.postalCode} ${profile.profile.city}` : t("profile.incomplete");
-  const localizedBirthDate = profile.profile?.birthDate ? new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(new Date(`${profile.profile.birthDate}T12:00:00Z`)) : "-";
+  const localizedBirthDate = profile.profile?.birthDate ? formatLocaleDate(`${profile.profile.birthDate}T12:00:00Z`, locale) : "-";
 
   return (
     <div className="flex flex-col gap-4">
@@ -703,7 +718,7 @@ function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, onAdmin
         <Avatar fallback={initials} size="lg" className="h-16 w-16 text-lg mb-3" />
         <h1 className="text-lg font-700">{profile.user.displayName}</h1>
         <p className="text-xs text-[var(--muted-foreground)]">{profile.user.email}</p>
-        <Badge variant={profile.user.active ? "success" : "outline"} className="mt-2">{profile.user.role}</Badge>
+        <Badge variant={profile.user.active ? "success" : "outline"} className="mt-2">{profile.user.role === "SUPER_ADMIN" ? t("roles.superAdmin") : profile.user.role === "ADMIN" ? t("roles.admin") : profile.user.role === "MEMBER" ? t("roles.member") : t("roles.guest")}</Badge>
       </div>
 
       <Card><CardContent className="p-4 flex flex-col gap-2 text-sm"><div><span className="text-[var(--muted-foreground)]">{t("profile.name")}: </span>{profile.user.firstName} {profile.user.lastName}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.address")}: </span>{address}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.birthDate")}: </span>{localizedBirthDate}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.phone")}: </span>{profile.profile?.phone || "-"}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.contactInfo")}: </span>{profile.profile?.contactInfo || "-"}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.groups")}: </span>{profile.groups.length ? profile.groups.map((group) => group.name).join(", ") : "-"}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.userId")}: </span>{profile.user.id}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.status")}: </span>{profile.user.active ? t("profile.active") : t("profile.inactive")} / {profile.user.verified ? t("profile.verified") : t("profile.unverified")}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.createdAt")}: </span>{profile.user.created}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.updatedAt")}: </span>{profile.user.updated}</div></CardContent></Card>
@@ -822,7 +837,7 @@ function Sidebar({
   const { t } = useI18n();
   const displayName = profile?.user.displayName || t("profile.title");
   const groups = profile?.groups.map((item) => item.name) ?? [];
-  const role = profile?.user.role === "SUPER_ADMIN" ? "Super Admin" : profile?.user.role === "ADMIN" ? "Admin" : profile?.user.role === "MEMBER" ? "Member" : "Guest";
+  const role = profile?.user.role === "SUPER_ADMIN" ? t("roles.superAdmin") : profile?.user.role === "ADMIN" ? t("roles.admin") : profile?.user.role === "MEMBER" ? t("roles.member") : t("roles.guest");
   return (
     <aside className="hidden lg:flex flex-col w-[var(--sidebar-width)] shrink-0 bg-[var(--card)] border-r border-[var(--border)] h-full">
       {/* Logo */}
@@ -872,7 +887,7 @@ function Sidebar({
                   </span>
                 )}
               </div>
-              {item.label}
+              {t(item.label === "Members" ? "admin.members.title" : item.label === "Payments" ? "admin.payments.title" : "admin.events.title")}
               {isActive && <div className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--primary)]" />}
             </button>
           );
@@ -968,6 +983,7 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
         <div className="hidden lg:flex items-center justify-between px-8 py-5 border-b border-[var(--border)] bg-[var(--card)] sticky top-0 z-10">
           <h1 className="text-base font-600 text-[var(--foreground)]">{tabLabel[tab]}</h1>
           <div className="flex items-center gap-3">
+            <LanguageSwitcher className="text-[var(--foreground)]" />
             <button className="relative h-9 w-9 rounded-full flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
               <Icon d={icons.bell} size={18} />
               <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 border-2 border-[var(--card)]" />
@@ -976,6 +992,10 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
           </div>
         </div>
 
+        <div className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--card)] sticky top-0 z-10">
+          <span className="text-sm font-600 text-[var(--foreground)]">{tabLabel[tab]}</span>
+          <LanguageSwitcher className="text-[var(--foreground)]" />
+        </div>
         <div className="px-4 py-5 lg:px-8 lg:py-7 pb-24 lg:pb-8 max-w-2xl lg:max-w-none">
           {renderView()}
         </div>
@@ -1046,11 +1066,9 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <I18nProvider>
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-        </I18nProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>
   );

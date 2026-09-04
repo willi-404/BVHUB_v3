@@ -4,7 +4,7 @@ import { Separator } from "./ui/separator";
 import { Member, Group, groupConfig, initials } from "./shared/MemberTypes";
 import { MemberDetailPopup } from "./shared/MemberDetailPopup";
 import { useMembers } from "../../features/members/hooks/useMembers";
-import { useI18n } from "../../i18n";
+import { useI18n, type MessageKey } from "../../i18n";
 
 function Icon({ d, size = 18, className = "" }: { d: string; size?: number; className?: string }) {
   return (
@@ -26,10 +26,10 @@ const ic = {
 
 const ALL_GROUPS: Group[] = ["MemberER", "MemberNUE", "guest", "Admin"];
 const roleConfig = {
-  GUEST: { label: "Guest", color: "#b45309", bg: "#fef3c7" },
-  MEMBER: { label: "Member", color: "#15803d", bg: "#dcfce7" },
-  ADMIN: { label: "Admin", color: "#7c3aed", bg: "#ede9fe" },
-  SUPER_ADMIN: { label: "Super Admin", color: "#be123c", bg: "#ffe4e6" },
+  GUEST: { key: "roles.guest", color: "#b45309", bg: "#fef3c7" },
+  MEMBER: { key: "roles.member", color: "#15803d", bg: "#dcfce7" },
+  ADMIN: { key: "roles.admin", color: "#7c3aed", bg: "#ede9fe" },
+  SUPER_ADMIN: { key: "roles.superAdmin", color: "#be123c", bg: "#ffe4e6" },
 } as const;
 
 // ─── Filter Sheet ─────────────────────────────────────────────────────────────
@@ -58,7 +58,7 @@ function FilterSheet({ selected, onApply, onClose }: { selected: Group[]; onAppl
                 className="flex items-center gap-3 px-4 py-3 rounded-[var(--radius)] border transition-all duration-150 w-full text-left"
                 style={{ background: on ? cfg.bg : "var(--card)", borderColor: on ? cfg.color : "var(--border)" }}>
                 <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-700" style={{ background: cfg.bg, color: cfg.color }}>{g[0]}</div>
-                <span className="flex-1 text-sm font-500" style={{ color: on ? cfg.color : "var(--foreground)" }}>{cfg.label}</span>
+                <span className="flex-1 text-sm font-500" style={{ color: on ? cfg.color : "var(--foreground)" }}>{g === "MemberER" ? t("groups.memberER") : g === "MemberNUE" ? t("groups.memberNUE") : g === "guest" ? t("groups.guest") : t("groups.admin")}</span>
                 {on && <div className="h-5 w-5 rounded-full flex items-center justify-center" style={{ background: cfg.color }}><Icon d={ic.check} size={11} className="text-white" /></div>}
               </button>
             );
@@ -66,7 +66,7 @@ function FilterSheet({ selected, onApply, onClose }: { selected: Group[]; onAppl
         </div>
         <div className="px-5">
           <Button className="w-full" onClick={() => { onApply(local); onClose(); }}>
-            {t("common.apply")} ({local.length === 0 ? t("common.all") : `${local.length} ${t("admin.members.groups")}`})
+            {t("common.apply")} ({local.length === 0 ? t("common.all") : t("common.selectedGroups", { count: local.length })})
           </Button>
         </div>
       </div>
@@ -93,14 +93,14 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
       {/* Sticky header */}
       <div style={{ flexShrink: 0 }} className="bg-[var(--card)] border-b border-[var(--border)]">
         <div className="flex items-center gap-3 px-4 pt-4 pb-2">
-          <button onClick={onBack} className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-[var(--muted)] text-[var(--muted-foreground)] transition-colors shrink-0">
+          <button onClick={onBack} aria-label={t("common.back")} className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-[var(--muted)] text-[var(--muted-foreground)] transition-colors shrink-0">
             <Icon d={ic.chevronLeft} size={18} />
           </button>
           <div className="flex-1">
             <h1 className="font-700 text-base text-[var(--foreground)]">{t("admin.members.title")}</h1>
-            <p className="text-[10px] text-[var(--muted-foreground)]">{membersQuery.data?.totalItems ?? 0} {t("admin.members.count")}</p>
+            <p className="text-[10px] text-[var(--muted-foreground)]">{t("admin.members.count", { count: membersQuery.data?.totalItems ?? 0 })}</p>
           </div>
-          <button onClick={() => setFilterOpen(true)}
+          <button onClick={() => setFilterOpen(true)} aria-label={t("common.filter")}
             className={`relative h-9 w-9 rounded-full flex items-center justify-center transition-colors ${hasFilter ? "bg-[var(--primary)] text-white" : "hover:bg-[var(--muted)] text-[var(--muted-foreground)]"}`}>
             <Icon d={ic.filter} size={16} />
             {hasFilter && (
@@ -115,7 +115,7 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]"><Icon d={ic.search} size={15} /></span>
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("admin.members.searchPlaceholder")}
               className="w-full h-10 pl-9 pr-9 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/15 transition-all" />
-            {search && <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"><Icon d={ic.x} size={14} /></button>}
+            {search && <button onClick={() => setSearch("")} aria-label={t("common.clearSearch")} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"><Icon d={ic.x} size={14} /></button>}
           </div>
           {hasFilter && (
             <div className="flex gap-1.5 mt-2 flex-wrap">
@@ -124,7 +124,7 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
                 return (
                   <button key={g} onClick={() => setFilterGroups((prev) => prev.filter((x) => x !== g))}
                     className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-600" style={{ background: cfg.bg, color: cfg.color }}>
-                    {cfg.label}<Icon d={ic.x} size={9} />
+                    {g === "MemberER" ? t("groups.memberER") : g === "MemberNUE" ? t("groups.memberNUE") : g === "guest" ? t("groups.guest") : t("groups.admin")}<Icon d={ic.x} size={9} />
                   </button>
                 );
               })}
@@ -150,7 +150,7 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
                 <thead>
                   <tr className="border-b border-[var(--border)] bg-[var(--muted)]/50">
                     {["admin.members.avatar", "admin.members.memberId", "admin.members.username", "profile.firstName", "profile.lastName", "auth.email", "profile.role", "profile.groups", "admin.members.memberSince"].map((h) => (
-                      <th key={h} className="text-left text-[10px] font-700 text-[var(--muted-foreground)] uppercase tracking-wide px-4 py-3">{h}</th>
+                      <th key={h} className="text-left text-[10px] font-700 text-[var(--muted-foreground)] uppercase tracking-wide px-4 py-3">{t(h as MessageKey)}</th>
                     ))}
                   </tr>
                 </thead>
@@ -169,7 +169,7 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
                         <td className="px-4 py-3 text-sm">{m.vorname}</td>
                         <td className="px-4 py-3 text-sm">{m.nachname}</td>
                         <td className="px-4 py-3 text-xs text-[var(--muted-foreground)]">{m.email}</td>
-                        <td className="px-4 py-3"><span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-600" style={{ background: roleCfg.bg, color: roleCfg.color }}>{roleCfg.label}</span></td>
+                        <td className="px-4 py-3"><span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-600" style={{ background: roleCfg.bg, color: roleCfg.color }}>{t(roleCfg.key)}</span></td>
                         <td className="px-4 py-3"><div className="flex flex-wrap gap-1">{m.groups?.length ? m.groups.map((group) => <span key={group.id} className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-500 bg-[var(--muted)]">{group.name}</span>) : <span className="text-xs text-[var(--muted-foreground)]">-</span>}</div></td>
                         <td className="px-4 py-3 text-xs text-[var(--muted-foreground)]">{m.memberSince}</td>
                       </tr>
@@ -192,7 +192,7 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-600 truncate">{m.vorname} {m.nachname}</p>
-                        <span className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-700" style={{ background: roleCfg.bg, color: roleCfg.color }}>{roleCfg.label}</span>
+                        <span className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-700" style={{ background: roleCfg.bg, color: roleCfg.color }}>{t(roleCfg.key)}</span>
                       </div>
                       <p className="text-[11px] text-[var(--muted-foreground)] truncate">@{m.username} · {m.id}</p>
                       <p className="text-[11px] text-[var(--muted-foreground)] truncate">{m.email}</p>

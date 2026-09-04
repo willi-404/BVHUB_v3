@@ -88,6 +88,7 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
   const [message, setMessage] = useState<string | null>(null);
   const canManageGroups = canManageMemberGroups(currentUser?.role, role);
   const canManageRole = canManageMemberRole(currentUser?.role, role);
+  const localizedRole = role === "SUPER_ADMIN" ? t("roles.superAdmin") : role === "ADMIN" ? t("roles.admin") : role === "MEMBER" ? t("roles.member") : t("roles.guest");
   useEffect(() => {
     setGroups(member.groups ?? []);
     setRole(member.role ?? "GUEST");
@@ -124,7 +125,7 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
       <div className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-[111] bg-[var(--card)] rounded-2xl shadow-2xl overflow-hidden max-w-md mx-auto max-h-[90vh] flex flex-col">
         {/* Header band */}
         <div className="relative h-20 shrink-0" style={{ background: `linear-gradient(135deg, ${cfg.color}dd, ${cfg.color}88)` }}>
-          <button onClick={onClose} className="absolute top-3 right-3 h-8 w-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors">
+          <button onClick={onClose} aria-label={t("common.close")} className="absolute top-3 right-3 h-8 w-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors">
             <Icon d={ic.x} size={15} />
           </button>
         </div>
@@ -144,7 +145,7 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
               className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-600 mt-1.5"
               style={{ background: cfg.bg, color: cfg.color }}
             >
-              {t("profile.role")}: {role}
+              {t("profile.role")}: {localizedRole}
             </span>
           </div>
         </div>
@@ -167,7 +168,7 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
             </Section>
             <Separator />
             <Section title={t("profile.account")}>
-              <Row icon={ic.shield} label={t("profile.role")} value={role} />
+              <Row icon={ic.shield} label={t("profile.role")} value={localizedRole} />
               <Row icon={ic.shield} label={t("profile.groups")} value={member.groups?.map((group) => group.name).join(", ") || "-"} />
               <Row icon={ic.clock} label={t("profile.createdAt")} value={member.accountCreated} />
               <Row icon={ic.clock} label={t("profile.updatedAt")} value={member.accountUpdated} />

@@ -154,10 +154,10 @@ export function MemberCard({ name, memberId, activeSince, group }: MemberCardPro
           />
           <div>
             <p style={{ fontSize: "10px", fontWeight: 600, color: cfg.textSecondary, letterSpacing: "0.04em", textTransform: "uppercase", margin: 0 }}>
-              BV Erlangen
+              {t("brand.name")}
             </p>
             <p style={{ fontSize: "11px", fontWeight: 700, color: cfg.textPrimary, margin: "1px 0 0", letterSpacing: "-0.01em", lineHeight: 1.2 }}>
-              Badminton Verein Erlangen n.e.V.
+              {t("brand.legalSuffix")}
             </p>
           </div>
         </div>
@@ -183,7 +183,7 @@ export function MemberCard({ name, memberId, activeSince, group }: MemberCardPro
         {/* Name */}
         <div>
           <p style={{ fontSize: "10px", fontWeight: 500, color: cfg.textSecondary, letterSpacing: "0.06em", textTransform: "uppercase", margin: 0 }}>
-            Member Name
+            {t("memberCard.memberName")}
           </p>
           <p style={{ fontSize: "16px", fontWeight: 700, color: cfg.textPrimary, margin: "2px 0 0", letterSpacing: "-0.01em" }}>
             {name}
@@ -194,7 +194,7 @@ export function MemberCard({ name, memberId, activeSince, group }: MemberCardPro
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
           <div>
             <p style={{ fontSize: "10px", fontWeight: 500, color: cfg.textSecondary, letterSpacing: "0.06em", textTransform: "uppercase", margin: 0 }}>
-              Member ID
+              {t("memberCard.memberId")}
             </p>
             <p style={{ fontSize: "13px", fontWeight: 600, color: cfg.textPrimary, margin: "2px 0 0", letterSpacing: "0.06em", fontFamily: "monospace" }}>
               {memberId}
@@ -202,7 +202,7 @@ export function MemberCard({ name, memberId, activeSince, group }: MemberCardPro
           </div>
           <div style={{ textAlign: "right" }}>
             <p style={{ fontSize: "10px", fontWeight: 500, color: cfg.textSecondary, letterSpacing: "0.06em", textTransform: "uppercase", margin: 0 }}>
-              Active Since
+              {t("memberCard.activeSince")}
             </p>
             <p style={{ fontSize: "13px", fontWeight: 600, color: cfg.textPrimary, margin: "2px 0 0" }}>
               {activeSince}
@@ -216,7 +216,7 @@ export function MemberCard({ name, memberId, activeSince, group }: MemberCardPro
         {/* Membership label */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <p style={{ fontSize: "10px", fontWeight: 500, color: cfg.textSecondary, margin: 0, letterSpacing: "0.04em" }}>
-            Membership · {cfg.label}
+            {t("memberCard.membership")} · {groupLabels.map((label) => label === "Member ER" ? t("groups.memberER") : label === "Member NUE" ? t("groups.memberNUE") : t("groups.guest")).join(", ")}
           </p>
           <div style={{ display: "flex", gap: "3px" }}>
             {[...Array(3)].map((_, i) => (

@@ -1,10 +1,10 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import { useI18n } from "../i18n";
+import { useI18n, type MessageKey } from "../i18n";
 import { logError } from "../lib/logger";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
-  translate?: (key: string) => string;
+  translate?: (key: MessageKey) => string;
 }
 
 interface ErrorBoundaryState {
@@ -29,10 +29,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if (!this.state.hasError) return this.props.children;
     return (
       <main role="alert" className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 bg-[var(--background)] text-[var(--foreground)]">
-        <h1 className="text-xl font-700">{this.props.translate?.("errors.unexpected_title") ?? "errors.unexpected_title"}</h1>
-        <p className="text-sm text-[var(--muted-foreground)]">{this.props.translate?.("errors.unexpected_message") ?? "errors.unexpected_message"}</p>
+        <h1 className="text-xl font-700">{this.props.translate?.("errors.unexpected_title") ?? "Something went wrong"}</h1>
+        <p className="text-sm text-[var(--muted-foreground)]">{this.props.translate?.("errors.unexpected_message") ?? "An unexpected error occurred."}</p>
         <button type="button" onClick={() => window.location.reload()} className="h-10 px-4 rounded-[var(--radius)] bg-[var(--primary)] text-[var(--primary-foreground)] font-500">
-          {this.props.translate?.("common.reload") ?? "common.reload"}
+          {this.props.translate?.("common.reload") ?? "Reload"}
         </button>
       </main>
     );
