@@ -5,5 +5,5 @@ export function canManageMemberGroups(actor: Role | undefined, target: Role | un
 }
 
 export function canManageMemberRole(actor: Role | undefined, target: Role | undefined): boolean {
-  return actor === "SUPER_ADMIN" && (target === "GUEST" || target === "MEMBER" || target === "ADMIN");
+  return (actor === "ADMIN" && (target === "GUEST" || target === "MEMBER")) || (actor === "SUPER_ADMIN" && (target === "GUEST" || target === "MEMBER" || target === "ADMIN"));
 }

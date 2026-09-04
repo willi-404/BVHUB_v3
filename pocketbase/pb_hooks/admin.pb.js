@@ -38,15 +38,16 @@ routerAdd("PUT", "/api/bvhub/admin/users/{id}/groups", (e) => {
 
 routerAdd("PATCH", "/api/bvhub/admin/users/{id}/role", (e) => {
   const service = require(`${__hooks}/admin-service.js`);
-  const current = service.actor(e, true);
+  const current = service.actor(e);
+  const actorRole = current.getString("role");
   const targetId = service.pathId(e);
   const payload = service.body(e);
-  if (Object.keys(payload).length !== 2 || payload.confirmation !== "ROLE_CHANGE" || !["ADMIN", "MEMBER"].includes(payload.role)) throw new BadRequestError("Bestätigung oder Zielrolle ungültig");
+  if (Object.keys(payload).length !== 2 || payload.confirmation !== "ROLE_CHANGE" || !["ADMIN", "MEMBER", "GUEST"].includes(payload.role)) throw new BadRequestError("Bestätigung oder Zielrolle ungültig");
   const target = service.findUser($app, targetId);
   const previousRole = target.getString("role");
   if (target.id === current.id || previousRole === "SUPER_ADMIN") throw new ForbiddenError("Dieser Benutzer darf nicht verwaltet werden");
-  if (payload.role === "ADMIN" && !service.MANAGED_ROLES.includes(previousRole)) throw new ForbiddenError("Nur Gäste und Mitglieder dürfen Admin werden");
-  if (payload.role === "MEMBER" && previousRole !== "ADMIN") throw new ForbiddenError("Nur Admins dürfen zurückgestuft werden");
+  if (actorRole === "ADMIN" && (!service.MANAGED_ROLES.includes(previousRole) || !service.MANAGED_ROLES.includes(payload.role))) throw new ForbiddenError("Admins dürfen nur Gäste und Mitglieder verwalten");
+  if (actorRole === "SUPER_ADMIN" && ![...service.MANAGED_ROLES, "ADMIN"].includes(previousRole)) throw new ForbiddenError("Diese Zielrolle darf nicht verwaltet werden");
   if (payload.role === previousRole) throw new BadRequestError("Die Rolle ist bereits gesetzt");
 
   // Generate the replacement before entering the transaction, then persist the

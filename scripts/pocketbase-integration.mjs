@@ -131,6 +131,10 @@ assert.equal(registeredUser.displayName, registrationDisplayName, "registration 
 assert.equal(registeredUser.role, "GUEST");
 assert.equal(registeredUser.active, false);
 assert.equal(registeredUser.emailVisibility, true, "registration forces email visibility");
+const registeredGroups = expectStatus(await request("GET", `/api/collections/user_groups/records?filter=${encodeURIComponent(`user = "${registeredUser.id}"`)}`, { token: rootToken }), 200, "registration default group");
+assert.equal(registeredGroups.items.length, 1, "new users receive one default group");
+const registeredGuestGroup = expectStatus(await request("GET", `/api/collections/groups/records/${registeredGroups.items[0].group}`, { token: rootToken }), 200, "read registration default group");
+assert.equal(registeredGuestGroup.name, "Guest");
 const forcedVisibility = expectStatus(await request("PATCH", `/api/collections/users/records/${registeredUser.id}`, { token: rootToken, body: { emailVisibility: false } }), 200, "force email visibility on update");
 assert.equal(forcedVisibility.emailVisibility, true);
 assert.equal(registeredUser.verified, false);
@@ -315,11 +319,14 @@ expectStatus(await request("PATCH", `/api/collections/users/records/${managed.id
   token: superLogin.token, body: { role: "ADMIN" },
 }), 404, "direct role update rejected");
 expectStatus(await request("PATCH", `/api/bvhub/admin/users/${managed.id}/role`, {
+  token: adminLogin.token, body: { role: "GUEST", confirmation: "ROLE_CHANGE" },
+}), 200, "admin changes member to guest");
+expectStatus(await request("PATCH", `/api/bvhub/admin/users/${managed.id}/role`, {
+  token: adminLogin.token, body: { role: "ADMIN", confirmation: "ROLE_CHANGE" },
+}), 403, "admin cannot grant admin role");
+expectStatus(await request("PATCH", `/api/bvhub/admin/users/${managed.id}/role`, {
   token: superLogin.token, body: { role: "ADMIN", confirmation: "ROLE_CHANGE" },
 }), 200, "superadmin promotes member");
-expectStatus(await request("PATCH", `/api/bvhub/admin/users/${managed.id}/role`, {
-  token: adminLogin.token, body: { role: "MEMBER", confirmation: "ROLE_CHANGE" },
-}), 403, "admin cannot change roles");
 expectStatus(await request("PATCH", `/api/bvhub/admin/users/${managed.id}/role`, {
   token: memberLoginToken, body: { role: "ADMIN", confirmation: "ROLE_CHANGE" },
 }), 403, "member cannot change roles");

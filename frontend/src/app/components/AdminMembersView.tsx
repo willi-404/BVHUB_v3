@@ -24,6 +24,12 @@ const ic = {
 };
 
 const ALL_GROUPS: Group[] = ["MemberER", "MemberNUE", "guest", "Admin"];
+const roleConfig = {
+  GUEST: { label: "Guest", color: "#b45309", bg: "#fef3c7" },
+  MEMBER: { label: "Member", color: "#15803d", bg: "#dcfce7" },
+  ADMIN: { label: "Admin", color: "#7c3aed", bg: "#ede9fe" },
+  SUPER_ADMIN: { label: "Super Admin", color: "#be123c", bg: "#ffe4e6" },
+} as const;
 
 // ─── Filter Sheet ─────────────────────────────────────────────────────────────
 
@@ -140,14 +146,14 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-[var(--border)] bg-[var(--muted)]/50">
-                    {["Avatar", "Member ID", "Username", "Vorname", "Nachname", "E-Mail", "Gruppe", "Member seit"].map((h) => (
+                    {["Avatar", "Member ID", "Username", "Vorname", "Nachname", "E-Mail", "Rolle", "Gruppen", "Member seit"].map((h) => (
                       <th key={h} className="text-left text-[10px] font-700 text-[var(--muted-foreground)] uppercase tracking-wide px-4 py-3">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((m, i) => {
-                    const cfg = groupConfig[m.gruppe];
+                    const roleCfg = roleConfig[m.role ?? "GUEST"];
                     return (
                       <tr key={m.id} className={`border-b border-[var(--border)] hover:bg-[var(--muted)]/40 transition-colors ${i % 2 === 0 ? "" : "bg-[var(--background)]"}`}>
                         <td className="px-4 py-3">
@@ -160,7 +166,8 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
                         <td className="px-4 py-3 text-sm">{m.vorname}</td>
                         <td className="px-4 py-3 text-sm">{m.nachname}</td>
                         <td className="px-4 py-3 text-xs text-[var(--muted-foreground)]">{m.email}</td>
-                        <td className="px-4 py-3"><div className="flex flex-wrap gap-1"><span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-600" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>{m.groups?.map((group) => <span key={group.id} className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-500 bg-[var(--muted)]">{group.name}</span>)}</div></td>
+                        <td className="px-4 py-3"><span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-600" style={{ background: roleCfg.bg, color: roleCfg.color }}>{roleCfg.label}</span></td>
+                        <td className="px-4 py-3"><div className="flex flex-wrap gap-1">{m.groups?.length ? m.groups.map((group) => <span key={group.id} className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-500 bg-[var(--muted)]">{group.name}</span>) : <span className="text-xs text-[var(--muted-foreground)]">-</span>}</div></td>
                         <td className="px-4 py-3 text-xs text-[var(--muted-foreground)]">{m.memberSince}</td>
                       </tr>
                     );
@@ -172,7 +179,7 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
             {/* Mobile list */}
             <div className="lg:hidden flex flex-col divide-y divide-[var(--border)]">
               {filtered.map((m) => {
-                const cfg = groupConfig[m.gruppe];
+                const roleCfg = roleConfig[m.role ?? "GUEST"];
                 return (
                   <button key={m.id} onClick={() => setSelected(m)}
                     className="flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--muted)]/40 transition-colors text-left w-full active:bg-[var(--muted)]">
@@ -182,10 +189,11 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-600 truncate">{m.vorname} {m.nachname}</p>
-                        <span className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-700" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
+                        <span className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-700" style={{ background: roleCfg.bg, color: roleCfg.color }}>{roleCfg.label}</span>
                       </div>
                       <p className="text-[11px] text-[var(--muted-foreground)] truncate">@{m.username} · {m.id}</p>
                       <p className="text-[11px] text-[var(--muted-foreground)] truncate">{m.email}</p>
+                      <p className="text-[11px] text-[var(--muted-foreground)] truncate">Gruppen: {m.groups?.map((group) => group.name).join(", ") || "-"}</p>
                     </div>
                     <Icon d={ic.chevronRight} size={12} className="text-[var(--muted-foreground)] shrink-0" />
                   </button>

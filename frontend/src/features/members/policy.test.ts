@@ -14,10 +14,10 @@ describe("member administration policy", () => {
     }
   });
 
-  it("allows only superadmins to promote or demote supported roles", () => {
+  it("lets admins change only guest/member roles and superadmins all managed roles", () => {
     for (const actor of roles) {
       for (const target of roles) {
-        const expected = actor === "SUPER_ADMIN" && target !== "SUPER_ADMIN";
+        const expected = (actor === "ADMIN" && (target === "GUEST" || target === "MEMBER")) || (actor === "SUPER_ADMIN" && target !== "SUPER_ADMIN");
         expect(canManageMemberRole(actor, target)).toBe(expected);
       }
     }

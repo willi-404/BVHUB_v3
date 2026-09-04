@@ -46,6 +46,19 @@ routerAdd("POST", "/api/bvhub/register", (e) => {
       user.setRandomPassword();
       txApp.save(user);
 
+      // New accounts start in the canonical Guest group. Further group
+      // assignments remain an explicit admin action through the management API.
+      try {
+        const guestGroup = txApp.findFirstRecordByData("groups", "name", "Guest");
+        const assignment = new Record(txApp.findCollectionByNameOrId("user_groups"));
+        assignment.set("user", user.id);
+        assignment.set("group", guestGroup.id);
+        txApp.save(assignment);
+      } catch (_) {
+        // Keep registration compatible with instances upgraded before the
+        // canonical groups migration; admins can assign the group later.
+      }
+
       const profile = new Record(profiles);
       profile.set("user", user.id);
       profile.set("street", value.street);

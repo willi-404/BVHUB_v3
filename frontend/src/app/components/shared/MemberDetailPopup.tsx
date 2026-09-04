@@ -5,6 +5,7 @@ import { Separator } from "../ui/separator";
 import { pb } from "../../../lib/pocketbase";
 import { useAuthUser } from "../../../features/auth/AuthProvider";
 import { canManageMemberGroups, canManageMemberRole } from "../../../features/members/policy";
+import type { Role } from "../../../features/auth/policy";
 
 function Icon({ d, size = 18, className = "" }: { d: string; size?: number; className?: string }) {
   return (
@@ -74,9 +75,11 @@ function Row({ icon, label, value, mono = false, action }: { icon: string; label
 
 export function MemberDetailPopup({ member, onClose, onReload }: { member: Member; onClose: () => void; onReload?: () => Promise<void> }) {
   const cfg = groupConfig[member.gruppe];
+  const initialRole = member.role ?? "GUEST";
   const { data: currentUser } = useAuthUser();
   const [groups, setGroups] = useState(member.groups ?? []);
-  const [role, setRole] = useState(member.role);
+  const [role, setRole] = useState<Role>(initialRole);
+  const [roleDraft, setRoleDraft] = useState<Role>(initialRole);
   const [available, setAvailable] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -84,7 +87,8 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
   const canManageRole = canManageMemberRole(currentUser?.role, role);
   useEffect(() => {
     setGroups(member.groups ?? []);
-    setRole(member.role);
+    setRole(member.role ?? "GUEST");
+    setRoleDraft(member.role ?? "GUEST");
   }, [member]);
   useEffect(() => {
     if (!canManageGroups) return;
@@ -99,13 +103,13 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
     } catch (_) { setMessage("Gruppen konnten nicht gespeichert werden."); }
     finally { setSaving(false); }
   }
-  async function changeRole() {
-    const nextRole = role === "ADMIN" ? "MEMBER" : "ADMIN";
-    if (!window.confirm(`Rolle wirklich auf ${nextRole} ändern? Diese Aktion beendet die Sitzung des Benutzers.`)) return;
+  async function saveRole() {
+    if (roleDraft === role) return;
+    if (!window.confirm(`Rolle wirklich auf ${roleDraft} ändern? Diese Aktion beendet die Sitzung des Benutzers.`)) return;
     setSaving(true); setMessage(null);
     try {
-      await pb.send(`/api/bvhub/admin/users/${member.id}/role`, { method: "PATCH", body: { role: nextRole, confirmation: "ROLE_CHANGE" } });
-      setRole(nextRole);
+      await pb.send(`/api/bvhub/admin/users/${member.id}/role`, { method: "PATCH", body: { role: roleDraft, confirmation: "ROLE_CHANGE" } });
+      setRole(roleDraft);
       await onReload?.();
       setMessage("Rolle erfolgreich geändert.");
     } catch (_) { setMessage("Rolle konnte nicht geändert werden."); }
@@ -137,7 +141,7 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
               className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-600 mt-1.5"
               style={{ background: cfg.bg, color: cfg.color }}
             >
-              {cfg.label}
+              Rolle: {role === "SUPER_ADMIN" ? "Super Admin" : role === "ADMIN" ? "Admin" : role === "MEMBER" ? "Member" : "Guest"}
             </span>
           </div>
         </div>
@@ -160,6 +164,7 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
             </Section>
             <Separator />
             <Section title="Account">
+              <Row icon={ic.shield} label="Rolle" value={role === "SUPER_ADMIN" ? "Super Admin" : role === "ADMIN" ? "Admin" : role === "MEMBER" ? "Member" : "Guest"} />
               <Row icon={ic.shield} label="Gruppen" value={member.groups?.map((group) => group.name).join(", ") || "-"} />
               <Row icon={ic.clock} label="Erstellt am"       value={member.accountCreated} />
               <Row icon={ic.clock} label="Zuletzt geändert"  value={member.accountUpdated} />
@@ -174,7 +179,15 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
                       return <label key={group.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={checked} onChange={() => setGroups((current) => checked ? current.filter((item) => item.id !== group.id) : [...current, { id: group.id, membershipId: "", name: group.name, active: true }])} />{group.name}</label>;
                     })}
                     {canManageGroups && <Button size="sm" onClick={() => void saveGroups()} disabled={saving}>{saving ? "Speichern …" : "Gruppen speichern"}</Button>}
-                    {canManageRole && <Button size="sm" variant="outline" onClick={() => void changeRole()} disabled={saving}>{role === "ADMIN" ? "Auf Member zurückstufen" : "Zum Admin ernennen"}</Button>}
+                    {canManageRole && <>
+                      <label className="text-xs font-600" htmlFor="member-role">Rolle</label>
+                      <select id="member-role" value={roleDraft} onChange={(event) => setRoleDraft(event.target.value as Role)} disabled={saving} className="h-9 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-2 text-sm">
+                        <option value="GUEST">Guest</option>
+                        <option value="MEMBER">Member</option>
+                        {currentUser?.role === "SUPER_ADMIN" && <option value="ADMIN">Admin</option>}
+                      </select>
+                      <Button size="sm" variant="outline" onClick={() => void saveRole()} disabled={saving || roleDraft === role}>{saving ? "Speichern …" : "Rolle speichern"}</Button>
+                    </>}
                     {message && <p role="status" className="text-xs text-[var(--muted-foreground)]">{message}</p>}
                   </div>
                 </Section>
