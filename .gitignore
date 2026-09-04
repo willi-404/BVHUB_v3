@@ -48,4 +48,3 @@ temp/
 *.db
 
 build_deploy.sh
-

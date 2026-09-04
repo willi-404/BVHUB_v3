@@ -1,10 +1,12 @@
 import logoSrc from "../../imports/logo1-high-resolution.png";
+import { useI18n } from "../../i18n";
+import { memberCardGroupLabels, resolveMemberCardGroup, type MemberCardGroup } from "./memberCardTheme";
 
 interface MemberCardProps {
   name: string;
   memberId: string;
   activeSince: string;
-  group: "MemberER" | "MemberNUE" | "guest";
+  group: string | readonly string[];
 }
 
 type GroupConfig = {
@@ -20,7 +22,7 @@ type GroupConfig = {
   dot: string;
 };
 
-const GROUP: Record<MemberCardProps["group"], GroupConfig> = {
+const GROUP: Record<MemberCardGroup, GroupConfig> = {
   MemberER: {
     label: "MemberER",
     gradient: "linear-gradient(135deg, #14532d 0%, #15803d 55%, #22c55e 100%)",
@@ -81,7 +83,9 @@ function ShuttlecockSVG({ opacity = 0.12 }: { opacity?: number }) {
 }
 
 export function MemberCard({ name, memberId, activeSince, group }: MemberCardProps) {
-  const cfg = GROUP[group];
+  const { t } = useI18n();
+  const cfg = GROUP[resolveMemberCardGroup(group)];
+  const groupLabels = memberCardGroupLabels(group);
 
   return (
     <div
@@ -145,7 +149,7 @@ export function MemberCard({ name, memberId, activeSince, group }: MemberCardPro
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <img
             src={logoSrc}
-            alt="BV Erlangen Logo"
+            alt={t("brand.logoAlt")}
             style={{ width: "36px", height: "36px", objectFit: "contain", borderRadius: "6px", background: "rgba(255,255,255,0.12)", padding: "2px" }}
           />
           <div>
@@ -170,7 +174,7 @@ export function MemberCard({ name, memberId, activeSince, group }: MemberCardPro
           }}
         >
           <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: cfg.dot, display: "inline-block", flexShrink: 0 }} />
-          <span style={{ fontSize: "11px", fontWeight: 600, color: cfg.chipText }}>{cfg.label}</span>
+          <span style={{ fontSize: "11px", fontWeight: 600, color: cfg.chipText, lineHeight: 1.25, textAlign: "center", whiteSpace: "normal" }}>{groupLabels.map((label) => <span key={label} style={{ display: "block" }}>{label}</span>)}</span>
         </div>
       </div>
 

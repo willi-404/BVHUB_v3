@@ -1,6 +1,6 @@
 import { useState } from "react";
 import LoginView from "./LoginView";
-import { AppShell } from "../../App";
+import { AppShell } from "../../pages/LegacyShell";
 
 const FRAMES = [
   { id: "login", label: "Login" },

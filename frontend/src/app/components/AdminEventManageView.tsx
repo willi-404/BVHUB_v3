@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
+import { useI18n } from "../../i18n";
 
 function Icon({ d, size = 18, className = "" }: { d: string; size?: number; className?: string }) {
   return (
@@ -82,13 +83,14 @@ function TextInput({ value, onChange, placeholder }: { value: string; onChange: 
 }
 
 function SelectInput({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
+  const { t } = useI18n();
   return (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className="w-full h-10 px-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/15 transition-all appearance-none"
     >
-      <option value="" disabled>Bitte wählen…</option>
+      <option value="" disabled>{t("common.selectPlaceholder")}</option>
       {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
   );
@@ -140,6 +142,7 @@ function SectionCard({ title, icon, children }: { title: string; icon: string; c
 // ─── Status pill selector ─────────────────────────────────────────────────────
 
 function StatusSelector({ value, onChange }: { value: Status; onChange: (v: Status) => void }) {
+  const { t } = useI18n();
   return (
     <div className="flex gap-2 flex-wrap">
       {STATUS_OPTIONS.map((opt) => {
@@ -156,7 +159,7 @@ function StatusSelector({ value, onChange }: { value: Status; onChange: (v: Stat
             }
           >
             {active && <Icon d={ic.check} size={11} />}
-            {opt.label}
+            {t(`events.status.${opt.value}`)}
           </button>
         );
       })}
@@ -167,6 +170,7 @@ function StatusSelector({ value, onChange }: { value: Status; onChange: (v: Stat
 // ─── Main view ────────────────────────────────────────────────────────────────
 
 export default function AdminEventManageView({ onBack }: { onBack: () => void }) {
+  const { t } = useI18n();
   const [form, setForm] = useState<EventForm>(EMPTY_FORM);
   const [saved, setSaved] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof EventForm, boolean>>>({});
@@ -205,13 +209,13 @@ export default function AdminEventManageView({ onBack }: { onBack: () => void })
           <Icon d={ic.chevronLeft} size={18} />
         </button>
         <div className="flex-1">
-          <h1 className="font-700 text-base text-[var(--foreground)]">Event erstellen</h1>
-          <p className="text-[10px] text-[var(--muted-foreground)]">Neue Veranstaltung anlegen</p>
+          <h1 className="font-700 text-base text-[var(--foreground)]">{t("admin.events.create")}</h1>
+          <p className="text-[10px] text-[var(--muted-foreground)]">{t("admin.events.createHint")}</p>
         </div>
         {errorCount > 0 && (
           <div className="flex items-center gap-1.5 text-xs text-red-500 font-600">
             <Icon d={ic.alertCircle} size={14} />
-            {errorCount} Pflichtfeld{errorCount !== 1 ? "er" : ""} fehlen
+            {errorCount} {t("admin.events.requiredMissing")}
           </div>
         )}
       </div>
@@ -220,16 +224,16 @@ export default function AdminEventManageView({ onBack }: { onBack: () => void })
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "16px", display: "flex", flexDirection: "column", gap: "16px" }}>
 
         {/* Basic info */}
-        <SectionCard title="Grundinformationen" icon={ic.tag}>
+        <SectionCard title={t("admin.events.basicInfo")} icon={ic.tag}>
           <div>
-            <FieldLabel>Titel *</FieldLabel>
+            <FieldLabel>{t("admin.events.titleLabel")} *</FieldLabel>
             <div className={errors.titel ? "ring-2 ring-red-400 rounded-[var(--radius)]" : ""}>
-              <TextInput value={form.titel} onChange={(v) => set("titel", v)} placeholder="z. B. Tuesday Evening Training" />
+              <TextInput value={form.titel} onChange={(v) => set("titel", v)} placeholder={t("admin.events.titlePlaceholder")} />
             </div>
           </div>
 
           <div>
-            <FieldLabel>Ort *</FieldLabel>
+            <FieldLabel>{t("admin.events.location")} *</FieldLabel>
             <div className={errors.ort ? "ring-2 ring-red-400 rounded-[var(--radius)]" : ""}>
               <SelectInput
                 value={form.ort}
@@ -240,15 +244,15 @@ export default function AdminEventManageView({ onBack }: { onBack: () => void })
           </div>
 
           <div>
-            <FieldLabel>Status</FieldLabel>
+            <FieldLabel>{t("profile.status")}</FieldLabel>
             <StatusSelector value={form.status} onChange={(v) => set("status", v)} />
           </div>
         </SectionCard>
 
         {/* Date & Time */}
-        <SectionCard title="Datum & Uhrzeit" icon={ic.calendar}>
+        <SectionCard title={t("admin.events.dateTime")} icon={ic.calendar}>
           <div>
-            <FieldLabel>Datum *</FieldLabel>
+            <FieldLabel>{t("admin.events.date")} *</FieldLabel>
             <div className={errors.date ? "ring-2 ring-red-400 rounded-[var(--radius)]" : ""}>
               <DateInput value={form.date} onChange={(v) => set("date", v)} />
             </div>
@@ -256,13 +260,13 @@ export default function AdminEventManageView({ onBack }: { onBack: () => void })
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <FieldLabel>Start *</FieldLabel>
+              <FieldLabel>{t("admin.events.start")} *</FieldLabel>
               <div className={errors.start ? "ring-2 ring-red-400 rounded-[var(--radius)]" : ""}>
                 <TimeInput value={form.start} onChange={(v) => set("start", v)} />
               </div>
             </div>
             <div>
-              <FieldLabel>End *</FieldLabel>
+              <FieldLabel>{t("admin.events.end")} *</FieldLabel>
               <div className={errors.end ? "ring-2 ring-red-400 rounded-[var(--radius)]" : ""}>
                 <TimeInput value={form.end} onChange={(v) => set("end", v)} />
               </div>
@@ -271,9 +275,9 @@ export default function AdminEventManageView({ onBack }: { onBack: () => void })
         </SectionCard>
 
         {/* Fristen */}
-        <SectionCard title="Fristen" icon={ic.clock}>
+        <SectionCard title={t("admin.events.deadlines")} icon={ic.clock}>
           <div>
-            <FieldLabel>Member Priority bis</FieldLabel>
+            <FieldLabel>{t("admin.events.memberPriorityUntil")}</FieldLabel>
             <DateTimeRow
               dateVal={form.memberPriorityBis.split("T")[0] ?? ""}
               timeVal={form.memberPriorityBis.split("T")[1] ?? ""}
@@ -285,7 +289,7 @@ export default function AdminEventManageView({ onBack }: { onBack: () => void })
           <Separator />
 
           <div>
-            <FieldLabel>Anmeldeschluss</FieldLabel>
+            <FieldLabel>{t("admin.events.registrationDeadline")}</FieldLabel>
             <DateTimeRow
               dateVal={form.anmeldeschluss.split("T")[0] ?? ""}
               timeVal={form.anmeldeschluss.split("T")[1] ?? ""}
@@ -297,7 +301,7 @@ export default function AdminEventManageView({ onBack }: { onBack: () => void })
           <Separator />
 
           <div>
-            <FieldLabel>Abmeldeschluss</FieldLabel>
+            <FieldLabel>{t("admin.events.cancellationDeadline")}</FieldLabel>
             <DateTimeRow
               dateVal={form.abmeldeschluss.split("T")[0] ?? ""}
               timeVal={form.abmeldeschluss.split("T")[1] ?? ""}
@@ -311,10 +315,10 @@ export default function AdminEventManageView({ onBack }: { onBack: () => void })
         <div className="flex gap-3 pb-4">
           <Button variant="outline" className="flex-1 gap-2" onClick={handleReset}>
             <Icon d={ic.trash} size={14} />
-            Zurücksetzen
+            {t("common.reset")}
           </Button>
           <Button className="flex-1 gap-2" variant={saved ? "secondary" : "default"} onClick={handleSave}>
-            {saved ? <><Icon d={ic.check} size={14} />Gespeichert</> : <><Icon d={ic.save} size={14} />Speichern</>}
+            {saved ? <><Icon d={ic.check} size={14} />{t("common.saved")}</> : <><Icon d={ic.save} size={14} />{t("common.save")}</>}
           </Button>
         </div>
       </div>

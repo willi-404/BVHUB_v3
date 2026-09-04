@@ -1,7 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Member, groupConfig, initials } from "./MemberTypes";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
+import { pb } from "../../../lib/pocketbase";
+import { useAuthUser } from "../../../features/auth/AuthProvider";
+import { canManageMemberGroups, canManageMemberRole } from "../../../features/members/policy";
+import type { Role } from "../../../features/auth/policy";
+import { useI18n } from "../../../i18n";
 
 function Icon({ d, size = 18, className = "" }: { d: string; size?: number; className?: string }) {
   return (
@@ -26,6 +31,7 @@ const ic = {
 };
 
 function CopyButton({ text }: { text: string }) {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   function handleCopy() {
     navigator.clipboard.writeText(text).then(() => {
@@ -36,7 +42,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      title="E-Mail kopieren"
+      title={t("common.copyEmail")}
       className="shrink-0 h-6 w-6 flex items-center justify-center rounded-md hover:bg-[var(--muted)] transition-colors"
       style={{ color: copied ? "#15803d" : "var(--muted-foreground)" }}
     >
@@ -69,8 +75,49 @@ function Row({ icon, label, value, mono = false, action }: { icon: string; label
   );
 }
 
-export function MemberDetailPopup({ member, onClose }: { member: Member; onClose: () => void }) {
+export function MemberDetailPopup({ member, onClose, onReload }: { member: Member; onClose: () => void; onReload?: () => Promise<void> }) {
+  const { t } = useI18n();
   const cfg = groupConfig[member.gruppe];
+  const initialRole = member.role ?? "GUEST";
+  const { data: currentUser } = useAuthUser();
+  const [groups, setGroups] = useState(member.groups ?? []);
+  const [role, setRole] = useState<Role>(initialRole);
+  const [roleDraft, setRoleDraft] = useState<Role>(initialRole);
+  const [available, setAvailable] = useState<{ id: string; name: string }[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const canManageGroups = canManageMemberGroups(currentUser?.role, role);
+  const canManageRole = canManageMemberRole(currentUser?.role, role);
+  useEffect(() => {
+    setGroups(member.groups ?? []);
+    setRole(member.role ?? "GUEST");
+    setRoleDraft(member.role ?? "GUEST");
+  }, [member]);
+  useEffect(() => {
+    if (!canManageGroups) return;
+    void pb.send<{ groups: { id: string; name: string }[] }>("/api/bvhub/admin/groups", { method: "GET" }).then((result) => setAvailable(result.groups)).catch(() => setMessage(t("admin.groups.loadError")));
+  }, [canManageGroups, t]);
+  async function saveGroups() {
+    setSaving(true); setMessage(null);
+    try {
+      await pb.send(`/api/bvhub/admin/users/${member.id}/groups`, { method: "PUT", body: { groups: groups.map((group) => group.id) } });
+      await onReload?.();
+      setMessage(t("admin.groups.saved"));
+    } catch (_) { setMessage(t("admin.groups.saveError")); }
+    finally { setSaving(false); }
+  }
+  async function saveRole() {
+    if (roleDraft === role) return;
+    if (!window.confirm(`${t("admin.role.confirm")} ${roleDraft}?`)) return;
+    setSaving(true); setMessage(null);
+    try {
+      await pb.send(`/api/bvhub/admin/users/${member.id}/role`, { method: "PATCH", body: { role: roleDraft, confirmation: "ROLE_CHANGE" } });
+      setRole(roleDraft);
+      await onReload?.();
+      setMessage(t("admin.role.saved"));
+    } catch (_) { setMessage(t("admin.role.saveError")); }
+    finally { setSaving(false); }
+  }
   return (
     <>
       <div className="fixed inset-0 z-[110] bg-black/50 backdrop-blur-sm" onClick={onClose} />
@@ -97,7 +144,7 @@ export function MemberDetailPopup({ member, onClose }: { member: Member; onClose
               className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-600 mt-1.5"
               style={{ background: cfg.bg, color: cfg.color }}
             >
-              {cfg.label}
+              {t("profile.role")}: {role}
             </span>
           </div>
         </div>
@@ -105,29 +152,55 @@ export function MemberDetailPopup({ member, onClose }: { member: Member; onClose
         {/* Body */}
         <div className="overflow-y-auto flex-1 px-5 py-4">
           <div className="flex flex-col gap-4">
-            <Section title="Identität">
-              <Row icon={ic.shield}   label="Member ID"   value={member.id} mono />
-              <Row icon={ic.user}     label="Username"    value={`@${member.username}`} />
-              <Row icon={ic.calendar} label="Member seit" value={member.memberSince} />
-              <Row icon={ic.calendar} label="Geburtstag"  value={member.geburtstag} />
+            <Section title={t("profile.identity")}>
+              <Row icon={ic.shield}   label={t("admin.members.memberId")}   value={member.id} mono />
+              <Row icon={ic.user}     label={t("admin.members.username")}    value={`@${member.username}`} />
+              <Row icon={ic.calendar} label={t("admin.members.memberSince")} value={member.memberSince} />
+              <Row icon={ic.calendar} label={t("profile.birthDate")}  value={member.geburtstag} />
             </Section>
             <Separator />
-            <Section title="Kontakt">
-              <Row icon={ic.mail}   label="E-Mail"   value={member.email} action={<CopyButton text={member.email} />} />
-              <Row icon={ic.phone}  label="Telefon"  value={member.phone} />
-              <Row icon={ic.mapPin} label="Adresse"  value={member.adresse} />
-              {member.instagram && <Row icon={ic.instagram} label="Instagram" value={member.instagram} />}
+            <Section title={t("profile.contact")}>
+              <Row icon={ic.mail}   label={t("auth.email")}   value={member.email} action={<CopyButton text={member.email} />} />
+              <Row icon={ic.phone}  label={t("profile.phone")}  value={member.phone} />
+              <Row icon={ic.mapPin} label={t("profile.address")}  value={member.adresse} />
+              {member.instagram && <Row icon={ic.instagram} label={t("profile.instagram")} value={member.instagram} />}
             </Section>
             <Separator />
-            <Section title="Account">
-              <Row icon={ic.clock} label="Erstellt am"       value={member.accountCreated} />
-              <Row icon={ic.clock} label="Zuletzt geändert"  value={member.accountUpdated} />
+            <Section title={t("profile.account")}>
+              <Row icon={ic.shield} label={t("profile.role")} value={role} />
+              <Row icon={ic.shield} label={t("profile.groups")} value={member.groups?.map((group) => group.name).join(", ") || "-"} />
+              <Row icon={ic.clock} label={t("profile.createdAt")} value={member.accountCreated} />
+              <Row icon={ic.clock} label={t("profile.updatedAt")} value={member.accountUpdated} />
             </Section>
+            {(canManageGroups || canManageRole) && (
+              <>
+                <Separator />
+                <Section title={t("admin.management")}>
+                  <div className="flex flex-col gap-2">
+                    {canManageGroups && available.map((group) => {
+                      const checked = groups.some((item) => item.id === group.id);
+                      return <label key={group.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={checked} onChange={() => setGroups((current) => checked ? current.filter((item) => item.id !== group.id) : [...current, { id: group.id, membershipId: "", name: group.name, active: true }])} />{group.name}</label>;
+                    })}
+                    {canManageGroups && <Button size="sm" onClick={() => void saveGroups()} disabled={saving}>{saving ? t("common.saving") : t("admin.groups.save")}</Button>}
+                    {canManageRole && <>
+                      <label className="text-xs font-600" htmlFor="member-role">{t("profile.role")}</label>
+                      <select id="member-role" value={roleDraft} onChange={(event) => setRoleDraft(event.target.value as Role)} disabled={saving} className="h-9 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-2 text-sm">
+                        <option value="GUEST">{t("roles.guest")}</option>
+                        <option value="MEMBER">{t("roles.member")}</option>
+                        {currentUser?.role === "SUPER_ADMIN" && <option value="ADMIN">{t("roles.admin")}</option>}
+                      </select>
+                      <Button size="sm" variant="outline" onClick={() => void saveRole()} disabled={saving || roleDraft === role}>{saving ? t("common.saving") : t("admin.role.save")}</Button>
+                    </>}
+                    {message && <p role="status" className="text-xs text-[var(--muted-foreground)]">{message}</p>}
+                  </div>
+                </Section>
+              </>
+            )}
           </div>
         </div>
 
         <div className="px-5 py-3 border-t border-[var(--border)] shrink-0">
-          <Button variant="outline" className="w-full" onClick={onClose}>Schließen</Button>
+          <Button variant="outline" className="w-full" onClick={onClose}>{t("common.close")}</Button>
         </div>
       </div>
     </>
