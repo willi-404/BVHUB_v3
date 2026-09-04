@@ -811,7 +811,7 @@ function Sidebar({
   profile: ProfileDto | null;
 }) {
   const displayName = profile?.user.displayName || "Profil";
-  const group = profile?.groups[0]?.name || "-";
+  const groups = profile?.groups.map((item) => item.name) ?? [];
   const role = profile?.user.role === "SUPER_ADMIN" ? "Super Admin" : profile?.user.role === "ADMIN" ? "Admin" : profile?.user.role === "MEMBER" ? "Member" : "Guest";
   return (
     <aside className="hidden lg:flex flex-col w-[var(--sidebar-width)] shrink-0 bg-[var(--card)] border-r border-[var(--border)] h-full">
@@ -835,7 +835,7 @@ function Sidebar({
           <div className="min-w-0">
             <p className="text-sm font-600 truncate">{displayName}</p>
             <p className="text-[10px] text-[var(--muted-foreground)]">{role}</p>
-            <p className="text-[10px] text-[var(--muted-foreground)]/75 truncate">{group}</p>
+            <div className="text-[10px] text-[var(--muted-foreground)]/75 leading-tight">{groups.length ? groups.map((group) => <p key={group} className="truncate">{group}</p>) : <p>-</p>}</div>
           </div>
           <button className="ml-auto text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
             <Icon d={icons.bell} size={16} />

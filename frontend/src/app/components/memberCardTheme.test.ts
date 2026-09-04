@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveMemberCardGroup } from "./memberCardTheme";
+import { memberCardGroupLabels, resolveMemberCardGroup } from "./memberCardTheme";
 
 describe("member card group theme mapping", () => {
   it("preserves the Figma card theme for API group names", () => {
@@ -9,5 +9,7 @@ describe("member card group theme mapping", () => {
     expect(resolveMemberCardGroup(["Member NUE", "Member ER"])).toBe("MemberER");
     expect(resolveMemberCardGroup(["Guest", "Member NUE"])).toBe("MemberNUE");
     expect(resolveMemberCardGroup("unknown")).toBe("guest");
+    expect(memberCardGroupLabels(["Member NUE", "Member ER"])).toEqual(["Member NUE", "Member ER"]);
+    expect(memberCardGroupLabels(["Member ER", "Member ER"])).toEqual(["Member ER"]);
   });
 });
