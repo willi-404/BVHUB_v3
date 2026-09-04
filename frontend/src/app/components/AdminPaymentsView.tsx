@@ -3,6 +3,7 @@ import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
 import { MEMBERS, Member, initials, groupConfig } from "./shared/MemberTypes";
 import { MemberDetailPopup } from "./shared/MemberDetailPopup";
+import { useI18n } from "../../i18n";
 
 function Icon({ d, size = 18, className = "" }: { d: string; size?: number; className?: string }) {
   return (
@@ -92,6 +93,7 @@ function getMember(id: string): Member | undefined {
 // ─── Payment toggle pill ──────────────────────────────────────────────────────
 
 function PaidToggle({ paid, onChange }: { paid: boolean; onChange: (v: boolean) => void }) {
+  const { t } = useI18n();
   return (
     <button
       onClick={() => onChange(!paid)}
@@ -103,7 +105,7 @@ function PaidToggle({ paid, onChange }: { paid: boolean; onChange: (v: boolean) 
       }
     >
       <Icon d={paid ? ic.check : "M18 6 6 18M6 6l12 12"} size={11} />
-      {paid ? "Bezahlt" : "Offen"}
+      {paid ? t("admin.payments.paid") : t("admin.payments.open")}
     </button>
   );
 }
@@ -117,6 +119,7 @@ function EventPaymentCard({
   event: AdminEvent;
   onShowMember: (m: Member) => void;
 }) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const [participants, setParticipants] = useState<EventParticipant[]>(event.participants);
   const [saved, setSaved] = useState(false);
@@ -166,8 +169,8 @@ function EventPaymentCard({
             <Icon d={ic.users} size={13} className={allPaid ? "text-emerald-600" : "text-amber-600"} />
             <span className="text-xs font-600" style={{ color: allPaid ? "#15803d" : "#b45309" }}>
               {allPaid
-                ? `Alle ${participants.length} Teilnehmer haben bezahlt`
-                : `${unpaidCount} von ${participants.length} Personen noch offen`}
+                ? `${t("admin.payments.allPaid")} (${participants.length})`
+                : `${unpaidCount} / ${participants.length} ${t("admin.payments.open")}`}
             </span>
           </div>
           <span className="text-xs font-700" style={{ color: allPaid ? "#15803d" : "#b45309" }}>
@@ -181,7 +184,7 @@ function EventPaymentCard({
           className="mt-3 flex items-center gap-1.5 text-xs font-600 text-[var(--primary)] hover:underline"
         >
           <Icon d={expanded ? ic.chevronUp : ic.chevronDown} size={13} />
-          {expanded ? "Details ausblenden" : "Details anzeigen"}
+          {expanded ? t("common.hideDetails") : t("common.showDetails")}
         </button>
       </div>
 
@@ -240,12 +243,12 @@ function EventPaymentCard({
               {saved ? (
                 <>
                   <Icon d={ic.check} size={15} />
-                  Gespeichert
+                  {t("common.saved")}
                 </>
               ) : (
                 <>
                   <Icon d={ic.save} size={15} />
-                  Speichern
+                  {t("common.save")}
                 </>
               )}
             </Button>
@@ -259,6 +262,7 @@ function EventPaymentCard({
 // ─── Main view ────────────────────────────────────────────────────────────────
 
 export default function AdminPaymentsView({ onBack }: { onBack: () => void }) {
+  const { t } = useI18n();
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
 
   return (
@@ -272,8 +276,8 @@ export default function AdminPaymentsView({ onBack }: { onBack: () => void }) {
           <Icon d={ic.chevronLeft} size={18} />
         </button>
         <div>
-          <h1 className="font-700 text-base text-[var(--foreground)]">Payments</h1>
-          <p className="text-[10px] text-[var(--muted-foreground)]">{ADMIN_EVENTS.length} Veranstaltungen</p>
+          <h1 className="font-700 text-base text-[var(--foreground)]">{t("admin.payments.title")}</h1>
+          <p className="text-[10px] text-[var(--muted-foreground)]">{ADMIN_EVENTS.length} {t("admin.payments.events")}</p>
         </div>
       </div>
 

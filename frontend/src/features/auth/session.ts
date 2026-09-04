@@ -15,5 +15,9 @@ export function getTokenExpiry(token: string): number | null {
 export type SessionDecision = "authenticated" | "unauthenticated";
 
 export function resolveSessionDecision(tokenIsValid: boolean, user: AuthUser | null): SessionDecision {
-  return tokenIsValid && isUsableUser(user) ? "authenticated" : "unauthenticated";
+  // Token expiry/signature parsing is deliberately excluded here. PocketBase's
+  // authStore validity is the sole token decision source; JWT parsing is only
+  // used by the provider's refresh timer.
+  if (!tokenIsValid) return "unauthenticated";
+  return isUsableUser(user) ? "authenticated" : "unauthenticated";
 }

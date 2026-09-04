@@ -30,6 +30,11 @@ Das Frontend verwendet standardmäßig `http://127.0.0.1:18099`. Für eine ander
 
 Details zu Migrationen, API-Regeln und dem lokalen Setup stehen in [pocketbase/README.md](pocketbase/README.md).
 
+Sicherheitsrelevante PocketBase-Administratoreinstellungen (Rate-Limiting,
+API-Regeln und das CSRF-Hook-Muster) sind in
+[docs/SECURITY_CONFIGURATION.md](docs/SECURITY_CONFIGURATION.md) dokumentiert
+und müssen manuell im Dashboard oder per Migration gesetzt werden.
+
 ## Pruefen und bauen
 
 ```bash

@@ -2,11 +2,13 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth, useAuthUser } from "../features/auth/AuthProvider";
 import { isAdminRole, type Role } from "../features/auth/policy";
 import { canAccessRole, publicRouteDecision, protectedRouteDecision } from "./guardLogic";
+import { useI18n } from "../i18n";
 
 function LoadingView() {
+  const { t } = useI18n();
   return (
     <div className="min-h-full flex items-center justify-center bg-[var(--background)] text-sm text-[var(--muted-foreground)]">
-      Anmeldung wird geprüft …
+      {t("auth.checkingSession")}
     </div>
   );
 }

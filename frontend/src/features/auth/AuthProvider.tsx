@@ -60,8 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     async function bootstrap() {
-      const expiry = getTokenExpiry(pb.authStore.token);
-      if (!pb.authStore.isValid || expiry === null || expiry <= Math.floor(Date.now() / 1000)) {
+      if (!pb.authStore.isValid) {
         pb.authStore.clear();
         if (mounted) {
           setUser(null);

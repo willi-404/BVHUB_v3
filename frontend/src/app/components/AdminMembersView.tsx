@@ -4,6 +4,7 @@ import { Separator } from "./ui/separator";
 import { Member, Group, groupConfig, initials } from "./shared/MemberTypes";
 import { MemberDetailPopup } from "./shared/MemberDetailPopup";
 import { useMembers } from "../../features/members/hooks/useMembers";
+import { useI18n } from "../../i18n";
 
 function Icon({ d, size = 18, className = "" }: { d: string; size?: number; className?: string }) {
   return (
@@ -34,6 +35,7 @@ const roleConfig = {
 // ─── Filter Sheet ─────────────────────────────────────────────────────────────
 
 function FilterSheet({ selected, onApply, onClose }: { selected: Group[]; onApply: (g: Group[]) => void; onClose: () => void }) {
+  const { t } = useI18n();
   const [local, setLocal] = useState<Group[]>(selected);
   function toggle(g: Group) {
     setLocal((prev) => prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]);
@@ -44,8 +46,8 @@ function FilterSheet({ selected, onApply, onClose }: { selected: Group[]; onAppl
       <div className="fixed bottom-0 left-0 right-0 z-[111] bg-[var(--card)] rounded-t-2xl border-t border-[var(--border)] pb-8 max-w-2xl mx-auto" style={{ boxShadow: "0 -8px 40px rgba(0,0,0,0.15)" }}>
         <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-[var(--border)]" /></div>
         <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
-          <p className="font-700 text-sm">Filter nach Gruppe</p>
-          <button onClick={() => setLocal([])} className="text-xs text-[var(--primary)] font-500">Alle entfernen</button>
+          <p className="font-700 text-sm">{t("admin.members.filterByGroup")}</p>
+          <button onClick={() => setLocal([])} className="text-xs text-[var(--primary)] font-500">{t("common.clearAll")}</button>
         </div>
         <div className="px-5 py-4 flex flex-col gap-2">
           {ALL_GROUPS.map((g) => {
@@ -64,7 +66,7 @@ function FilterSheet({ selected, onApply, onClose }: { selected: Group[]; onAppl
         </div>
         <div className="px-5">
           <Button className="w-full" onClick={() => { onApply(local); onClose(); }}>
-            Anwenden ({local.length === 0 ? "Alle" : `${local.length} Gruppe${local.length !== 1 ? "n" : ""}`})
+            {t("common.apply")} ({local.length === 0 ? t("common.all") : `${local.length} ${t("admin.members.groups")}`})
           </Button>
         </div>
       </div>
@@ -75,6 +77,7 @@ function FilterSheet({ selected, onApply, onClose }: { selected: Group[]; onAppl
 // ─── Main View ────────────────────────────────────────────────────────────────
 
 export default function AdminMembersView({ onBack }: { onBack: () => void }) {
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [filterGroups, setFilterGroups] = useState<Group[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -94,8 +97,8 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
             <Icon d={ic.chevronLeft} size={18} />
           </button>
           <div className="flex-1">
-            <h1 className="font-700 text-base text-[var(--foreground)]">Members</h1>
-            <p className="text-[10px] text-[var(--muted-foreground)]">{membersQuery.data?.totalItems ?? 0} Mitglieder</p>
+            <h1 className="font-700 text-base text-[var(--foreground)]">{t("admin.members.title")}</h1>
+            <p className="text-[10px] text-[var(--muted-foreground)]">{membersQuery.data?.totalItems ?? 0} {t("admin.members.count")}</p>
           </div>
           <button onClick={() => setFilterOpen(true)}
             className={`relative h-9 w-9 rounded-full flex items-center justify-center transition-colors ${hasFilter ? "bg-[var(--primary)] text-white" : "hover:bg-[var(--muted)] text-[var(--muted-foreground)]"}`}>
@@ -110,7 +113,7 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
         <div className="px-4 pb-3">
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]"><Icon d={ic.search} size={15} /></span>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name, ID, E-Mail suchen…"
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("admin.members.searchPlaceholder")}
               className="w-full h-10 pl-9 pr-9 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/15 transition-all" />
             {search && <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"><Icon d={ic.x} size={14} /></button>}
           </div>
@@ -132,12 +135,12 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
 
       {/* List */}
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "auto" }}>
-        {membersQuery.isLoading ? <div className="p-8 text-sm text-[var(--muted-foreground)]">Lade Mitglieder …</div> : membersQuery.isError ? (
-          <div className="flex flex-col items-center py-16"><p className="text-sm text-red-600">Mitglieder konnten nicht geladen werden.</p><Button variant="outline" className="mt-3" onClick={() => void membersQuery.refetch()}>Erneut versuchen</Button></div>
+        {membersQuery.isLoading ? <div className="p-8 text-sm text-[var(--muted-foreground)]">{t("admin.members.loading")}</div> : membersQuery.isError ? (
+          <div className="flex flex-col items-center py-16"><p className="text-sm text-red-600">{t("admin.members.loadError")}</p><Button variant="outline" className="mt-3" onClick={() => void membersQuery.refetch()}>{t("common.retry")}</Button></div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center py-16 text-[var(--muted-foreground)]">
             <Icon d={ic.user} size={32} />
-            <p className="text-sm mt-3 font-500">Keine Mitglieder gefunden</p>
+            <p className="text-sm mt-3 font-500">{t("admin.members.empty")}</p>
           </div>
         ) : (
           <>
@@ -146,7 +149,7 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-[var(--border)] bg-[var(--muted)]/50">
-                    {["Avatar", "Member ID", "Username", "Vorname", "Nachname", "E-Mail", "Rolle", "Gruppen", "Member seit"].map((h) => (
+                    {["admin.members.avatar", "admin.members.memberId", "admin.members.username", "profile.firstName", "profile.lastName", "auth.email", "profile.role", "profile.groups", "admin.members.memberSince"].map((h) => (
                       <th key={h} className="text-left text-[10px] font-700 text-[var(--muted-foreground)] uppercase tracking-wide px-4 py-3">{h}</th>
                     ))}
                   </tr>
@@ -193,7 +196,7 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
                       </div>
                       <p className="text-[11px] text-[var(--muted-foreground)] truncate">@{m.username} · {m.id}</p>
                       <p className="text-[11px] text-[var(--muted-foreground)] truncate">{m.email}</p>
-                      <p className="text-[11px] text-[var(--muted-foreground)] truncate">Gruppen: {m.groups?.map((group) => group.name).join(", ") || "-"}</p>
+                      <p className="text-[11px] text-[var(--muted-foreground)] truncate">{t("profile.groups")}: {m.groups?.map((group) => group.name).join(", ") || "-"}</p>
                     </div>
                     <Icon d={ic.chevronRight} size={12} className="text-[var(--muted-foreground)] shrink-0" />
                   </button>

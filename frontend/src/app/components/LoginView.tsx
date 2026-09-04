@@ -40,7 +40,7 @@ export default function LoginView({ onLogin, sessionExpired = false }: LoginView
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    if (sessionExpired) setNotice("Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.");
+    if (sessionExpired) setNotice(t("auth.sessionExpired"));
   }, [sessionExpired]);
 
   function switchMode(nextMode: "otp" | "password") {
@@ -110,10 +110,10 @@ export default function LoginView({ onLogin, sessionExpired = false }: LoginView
       <div className="w-full max-w-sm relative">
         <div className="flex flex-col items-center mb-8">
           <div className="h-20 w-20 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center mb-4 overflow-hidden p-1.5 backdrop-blur-sm">
-            <img src={logoSrc} alt="BV Erlangen Logo" className="h-full w-full object-contain" />
+            <img src={logoSrc} alt={t("brand.logoAlt")} className="h-full w-full object-contain" />
           </div>
-          <h1 className="text-white font-700 text-xl tracking-tight text-center">Badminton Verein Erlangen</h1>
-          <p className="text-white/50 text-xs mt-1">n.e.V. · Member Portal</p>
+          <h1 className="text-white font-700 text-xl tracking-tight text-center">{t("brand.name")}</h1>
+          <p className="text-white/50 text-xs mt-1">{t("brand.portal")}</p>
         </div>
 
         <div className="rounded-[var(--radius)] border border-white/10 shadow-2xl" style={{ background: "rgba(255,255,255,0.97)" }}>
@@ -163,7 +163,7 @@ export default function LoginView({ onLogin, sessionExpired = false }: LoginView
                       autoComplete="current-password"
                       className="w-full h-11 pl-9 pr-10 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] outline-none transition-all focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/15"
                     />
-                    <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" aria-label="Toggle password visibility">
+                    <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" aria-label={t("auth.togglePassword")}>
                       <Icon d={showPassword ? icons.eyeOff : icons.eye} size={15} />
                     </button>
                   </div>
@@ -187,7 +187,7 @@ export default function LoginView({ onLogin, sessionExpired = false }: LoginView
           </div>
         </div>
 
-        <p className="text-center text-white/25 text-[10px] mt-6">Badminton Verein Erlangen n.e.V. · Est. 2025</p>
+        <p className="text-center text-white/25 text-[10px] mt-6">{t("brand.footer")}</p>
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import logoSrc from "../../imports/logo1-high-resolution.png";
+import { useI18n } from "../../i18n";
 import { memberCardGroupLabels, resolveMemberCardGroup, type MemberCardGroup } from "./memberCardTheme";
 
 interface MemberCardProps {
@@ -82,6 +83,7 @@ function ShuttlecockSVG({ opacity = 0.12 }: { opacity?: number }) {
 }
 
 export function MemberCard({ name, memberId, activeSince, group }: MemberCardProps) {
+  const { t } = useI18n();
   const cfg = GROUP[resolveMemberCardGroup(group)];
   const groupLabels = memberCardGroupLabels(group);
 
@@ -147,7 +149,7 @@ export function MemberCard({ name, memberId, activeSince, group }: MemberCardPro
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <img
             src={logoSrc}
-            alt="BV Erlangen Logo"
+            alt={t("brand.logoAlt")}
             style={{ width: "36px", height: "36px", objectFit: "contain", borderRadius: "6px", background: "rgba(255,255,255,0.12)", padding: "2px" }}
           />
           <div>
