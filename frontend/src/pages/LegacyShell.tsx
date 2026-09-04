@@ -25,6 +25,7 @@ import { useMyProfile, useUpdateMyProfile } from "../features/profile/hooks/useP
 import { profileErrorStatus } from "../features/profile/api/profileApi";
 import { profilePatchFromDto } from "../features/profile/profilePatch";
 import type { ProfileDto, ProfilePatch } from "../features/profile/types";
+import { primaryNavMessageKey, type PrimaryNavTab } from "./navigationLabels";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -66,7 +67,7 @@ const icons = {
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
-type NavTab = "dashboard" | "events" | "payments" | "profile";
+type NavTab = PrimaryNavTab;
 
 interface Event {
   id: number;
@@ -805,7 +806,7 @@ function BottomNav({
                 </span>
               )}
             </div>
-            <span className="text-[10px] font-500">{t(item.label === "Home" ? "nav.home" : item.label === "Events" ? "nav.events" : item.label === "Payments" ? "nav.payments" : "nav.profile")}</span>
+            <span className="text-[10px] font-500">{t(primaryNavMessageKey(item.key))}</span>
           </button>
         );
       })}
@@ -887,7 +888,7 @@ function Sidebar({
                   </span>
                 )}
               </div>
-              {t(item.label === "Members" ? "admin.members.title" : item.label === "Payments" ? "admin.payments.title" : "admin.events.title")}
+              {t(primaryNavMessageKey(item.key))}
               {isActive && <div className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--primary)]" />}
             </button>
           );
@@ -952,10 +953,10 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
   }
 
   const tabLabel: Record<NavTab, string> = {
-    dashboard: t("nav.home"),
-    events: t("nav.events"),
-    payments: t("nav.payments"),
-    profile: t("nav.profile"),
+    dashboard: t(primaryNavMessageKey("dashboard")),
+    events: t(primaryNavMessageKey("events")),
+    payments: t(primaryNavMessageKey("payments")),
+    profile: t(primaryNavMessageKey("profile")),
   };
 
   const logout = onLogout ?? authLogout;
