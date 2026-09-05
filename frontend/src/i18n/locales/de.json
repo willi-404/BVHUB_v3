@@ -350,6 +350,7 @@
   "admin.events.filterCompleted": "Abgeschlossen",
   "admin.events.published": "Veröffentlicht",
   "admin.events.unpublished": "Unveröffentlicht",
+  "admin.events.publishVenueRequired": "Vor dem Veröffentlichen eine aktive Venue mit Checkout-Region konfigurieren.",
   "admin.events.changelog": "Änderungsverlauf",
   "errors.forbidden": "Du hast keine Berechtigung für diese Aktion.",
   "errors.generic": "Etwas ist schiefgelaufen. Bitte versuche es erneut."

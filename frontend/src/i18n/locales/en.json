@@ -350,6 +350,7 @@
   "admin.events.filterCompleted": "Completed",
   "admin.events.published": "Published",
   "admin.events.unpublished": "Unpublished",
+  "admin.events.publishVenueRequired": "Set an active venue with a checkout region before publishing.",
   "admin.events.changelog": "Change history",
   "errors.forbidden": "You do not have permission for this action.",
   "errors.generic": "Something went wrong. Please try again."

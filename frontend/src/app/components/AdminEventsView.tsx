@@ -100,12 +100,6 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
     setVenueFormOpen(false)
     setEditingVenue(null)
   }
-  async function publishEvent(event: EventRecord) {
-    await eventMutation.mutateAsync({
-      id: event.id,
-      input: { published: true },
-    })
-  }
   const failure =
     eventMutation.isError || venueMutation.isError || cancelOrDelete.isError
 
@@ -189,7 +183,6 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
             onEdit={(event) => navigate(`/admin/events/${encodeURIComponent(event.id)}`)}
             onChange={setEventForm}
             onSave={() => void saveEvent()}
-            onPublish={(event) => void publishEvent(event)}
             onPublishForm={() => void saveEvent(eventForm.status)}
             onStatusChange={(event, status) => {
               if (status === "CANCELLED" && !window.confirm(t("admin.events.confirmCancel"))) return
@@ -375,7 +368,6 @@ function EventPanel({
   onEdit,
   onChange,
   onSave,
-  onPublish,
   onPublishForm,
   onStatusChange,
   onPublishedChange,
@@ -395,7 +387,6 @@ function EventPanel({
   onEdit: (e: EventRecord) => void
   onChange: (v: typeof emptyEvent) => void
   onSave: () => void
-  onPublish: (event: EventRecord) => void
   onPublishForm: () => void
   onStatusChange: (event: EventRecord, status: EventStatus) => void
   onPublishedChange: (event: EventRecord, published: boolean) => void
@@ -447,13 +438,9 @@ function EventPanel({
               <select aria-label={t("admin.events.status")} value={event.status} disabled={saving} onChange={(e) => onStatusChange(event, e.target.value as EventStatus)} className="h-9 rounded border px-2 text-sm">
                 {(["MEMBERS_ONLY", "OPEN_TO_ALL", "CANCELLED", "COMPLETED"] as EventStatus[]).map((status) => <option key={status} value={status}>{t(`events.status.${status}` as MessageKey)}</option>)}
               </select>
-              <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={event.published} disabled={saving} onChange={(e) => onPublishedChange(event, e.target.checked)} />{event.published ? t("admin.events.published") : t("admin.events.unpublished")}</label>
+              <label className="flex items-center gap-1 text-sm" title={!event.venue.active || !event.venue.checkoutRegion ? t("admin.events.publishVenueRequired") : undefined}><input type="checkbox" checked={event.published} disabled={saving || (!event.published && (!event.venue.active || !event.venue.checkoutRegion))} onChange={(e) => onPublishedChange(event, e.target.checked)} />{event.published ? t("admin.events.published") : t("admin.events.unpublished")}</label>
+              {!event.published && (!event.venue.active || !event.venue.checkoutRegion) && <span className="text-xs text-amber-700">{t("admin.events.publishVenueRequired")}</span>}
               <Button size="sm" variant="outline" onClick={() => onEdit(event)}>{t("common.edit")}</Button>
-              {!event.published && (
-                <Button size="sm" onClick={() => onPublish(event)}>
-                  {t("admin.events.publish")}
-                </Button>
-              )}
               {event.published && event.status !== "CANCELLED" && (
                 <Button
                   size="sm"

@@ -350,6 +350,7 @@
   "admin.events.filterCompleted": "已完成",
   "admin.events.published": "已发布",
   "admin.events.unpublished": "未发布",
+  "admin.events.publishVenueRequired": "发布前请配置带有结算区域的有效地点。",
   "admin.events.changelog": "变更记录",
   "errors.forbidden": "你没有执行此操作的权限。",
   "errors.generic": "发生错误，请重试。"

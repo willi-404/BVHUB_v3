@@ -367,6 +367,15 @@ const createdVenue = expectStatus(await request("POST", "/api/bvhub/admin/venues
 assert.equal(createdVenue.name, venuePayload.name.trim(), "venue name is normalized");
 assert.equal(createdVenue.active, true, "new venue is active by default");
 assert.equal(createdVenue.createdBy, undefined, "venue does not expose a client-controlled creator");
+const unconfiguredVenue = expectStatus(await request("POST", "/api/bvhub/admin/venues", {
+  token: adminLogin.token, body: { name: "WU-05 Unconfigured Venue", address: "No checkout region" },
+}), 201, "admin creates venue without checkout region");
+const unconfiguredEvent = expectStatus(await request("POST", "/api/bvhub/admin/events", {
+  token: adminLogin.token, body: { title: "Unconfigured publish test", description: "", venue: unconfiguredVenue.id, start: "2099-08-01T16:00:00.000Z", end: "2099-08-01T18:00:00.000Z", capacity: 5, published: false, status: "MEMBERS_ONLY" },
+}), 201, "admin creates unpublished event with unconfigured venue");
+const blockedPublish = await request("PATCH", `/api/bvhub/admin/events/${unconfiguredEvent.id}`, { token: adminLogin.token, body: { published: true } });
+assert.notEqual(blockedPublish.status, 500, "publishing an unconfigured venue never returns 500");
+assert.ok([400, 409].includes(blockedPublish.status), "publishing an unconfigured venue is rejected");
 expectStatus(await request("GET", "/api/bvhub/venues", { token: memberLoginToken }), 200, "member reads active venues");
 expectStatus(await request("POST", "/api/bvhub/admin/venues", {
   token: adminLogin.token, body: { ...venuePayload, name: "Invalid extra field venue", createdBy: superAdmin.id },
