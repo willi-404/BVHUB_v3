@@ -98,8 +98,9 @@ function publicEvents(app, e, detailId) {
     if (!record.getBool("published") || !["MEMBERS_ONLY", "OPEN_TO_ALL"].includes(record.getString("status")) || !venue(app, record.getString("venue")).getBool("active")) throw new ApiError(404, "Event nicht gefunden", {});
     return eventDtoForUser(app, record, e.auth);
   }
-  const records = app.findRecordsByFilter("events", "published = true && start >= @now", "start", 100, 0)
-    .filter((record) => ["MEMBERS_ONLY", "OPEN_TO_ALL"].includes(record.getString("status")) && venue(app, record.getString("venue")).getBool("active"));
+  const now = Date.now();
+  const records = app.findRecordsByFilter("events", "published = true", "start", 100, 0)
+    .filter((record) => Date.parse(record.getString("start")) >= now && ["MEMBERS_ONLY", "OPEN_TO_ALL"].includes(record.getString("status")) && venue(app, record.getString("venue")).getBool("active"));
   return { items: records.map((record) => eventDtoForUser(app, record, e.auth)), totalItems: records.length };
 }
 function parseVenue(value, existing) {

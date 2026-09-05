@@ -415,7 +415,8 @@ const publishedEvent = expectStatus(await request("PATCH", `/api/bvhub/admin/eve
   token: adminLogin.token, body: { published: true },
 }), 200, "admin publishes event");
 assert.equal(publishedEvent.published, true);
-expectStatus(await request("GET", "/api/bvhub/events", { token: memberLoginToken }), 200, "member reads published events");
+const publicEventList = expectStatus(await request("GET", "/api/bvhub/events", { token: memberLoginToken }), 200, "member reads published events");
+assert.ok(publicEventList.items.some((item) => item.id === validEvent.id), "published future event appears in public event list");
 expectStatus(await request("GET", `/api/bvhub/events/${validEvent.id}`, { token: guestLoginToken }), 200, "guest reads published event detail");
 expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrations`, {
   token: guestLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" },
