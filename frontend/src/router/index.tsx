@@ -25,7 +25,7 @@ export const router = createBrowserRouter([
     { path: "/events", element: load(<EventsPage />) },
     { path: "/events/:eventId", element: load(<EventDetailPage />) },
     { path: "/events/:eventId/checkout", element: load(<EventCheckoutPage />) },
-    { element: <ProtectedRoute admin />, children: [{ path: "/admin/events/:eventId", element: load(<EventDetailPage />) }] },
+    { element: <ProtectedRoute admin />, children: [{ path: "/admin/events/new", element: load(<AdminEventsPage />) }, { path: "/admin/events/:eventId", element: load(<EventDetailPage />) }] },
     { element: <ProtectedRoute admin />, children: [{ path: "/members", element: load(<MembersPage />) }, { path: "/admin", element: load(<AdminPage />) }, { path: "/admin/events", element: load(<AdminEventsPage />) }, { path: "/admin/venues", element: load(<AdminEventsPage />) }] },
   ] },
   { path: "/register", element: load(<RegisterPage />) },

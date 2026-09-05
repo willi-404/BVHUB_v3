@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BrowserRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useNavigate, Link } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Badge } from "../app/components/ui/badge";
 import { Button } from "../app/components/ui/button";
@@ -19,13 +19,15 @@ import logoSrc from "../imports/logo1-high-resolution.png";
 import { AuthProvider, useAuth, useAuthUser } from "../features/auth/AuthProvider";
 import { isAdminRole } from "../features/auth/policy";
 import { queryClient } from "../lib/queryClient";
-import { formatLocaleDate, LanguageSwitcher, useI18n } from "../i18n";
+import { formatLocaleDate, formatLocaleDateTime, LanguageSwitcher, useI18n, type MessageKey } from "../i18n";
 import { AdminGuard, ProtectedRoute, PublicOnlyRoute } from "../routes/guards";
 import { useMyProfile, useUpdateMyProfile } from "../features/profile/hooks/useProfile";
 import { profileErrorStatus } from "../features/profile/api/profileApi";
 import { profilePatchFromDto } from "../features/profile/profilePatch";
 import type { ProfileDto, ProfilePatch } from "../features/profile/types";
 import { primaryNavMessageKey, type PrimaryNavTab } from "./navigationLabels";
+import { useEvents, useEventRealtime } from "../features/events/hooks/useEvents";
+import type { EventRecord } from "../features/events/types";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -531,7 +533,7 @@ function ActivityFeed() {
 
 // ─── Page views ────────────────────────────────────────────────────────────────
 
-function DashboardView({ events, onToggle, onOpenCard, profile }: { events: Event[]; onToggle: (id: number) => void; onOpenCard: () => void; profile: ProfileDto | null }) {
+function DashboardView({ events, liveEvents, onToggle, onOpenCard, profile }: { events: Event[]; liveEvents: EventRecord[]; onToggle: (id: number) => void; onOpenCard: () => void; profile: ProfileDto | null }) {
   const { t } = useI18n();
   const displayName = profile?.user.displayName || t("profile.title");
   const memberId = profile?.user.id || "-";
@@ -577,11 +579,7 @@ function DashboardView({ events, onToggle, onOpenCard, profile }: { events: Even
             {t("common.seeAll")} <Icon d={icons.chevronRight} size={12} />
           </button>
         </div>
-        <div className="flex flex-col gap-3">
-          {events.slice(0, 3).map((e) => (
-            <EventCard key={e.id} event={e} onToggle={onToggle} />
-          ))}
-        </div>
+        <LiveEventCards events={liveEvents.slice(0, 3)} />
       </div>
 
       <div>
@@ -596,39 +594,25 @@ function DashboardView({ events, onToggle, onOpenCard, profile }: { events: Even
   );
 }
 
-function EventsView({ events, onToggle }: { events: Event[]; onToggle: (id: number) => void }) {
+function EventsView({ events, loading, error }: { events: EventRecord[]; loading: boolean; error: boolean }) {
   const { t } = useI18n();
-  const [filter, setFilter] = useState<"all" | Event["type"]>("all");
-  const filtered = filter === "all" ? events : events.filter((e) => e.type === filter);
-  const eventFilters: Array<{ key: "all" | Event["type"]; label: string }> = [
-    { key: "all", label: t("common.all") },
-    { key: "training", label: t("events.training") },
-    { key: "tournament", label: t("events.tournament") },
-    { key: "social", label: t("events.social") },
-    { key: "workshop", label: t("events.workshop") },
-  ];
   return (
     <div className="flex flex-col gap-4">
       <div>
         <h1 className="text-xl font-700 text-[var(--foreground)]">{t("events.title")}</h1>
         <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{t("events.subtitle")}</p>
       </div>
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4" style={{ scrollbarWidth: "none" }}>
-        {eventFilters.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-500 transition-all duration-150 ${filter === f.key ? "bg-[var(--primary)] text-white" : "bg-[var(--card)] border border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--primary)]"}`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-      <div className="flex flex-col gap-3">
-        {filtered.map((e) => <EventCard key={e.id} event={e} onToggle={onToggle} />)}
-      </div>
+      {loading && <p className="text-sm text-[var(--muted-foreground)]">{t("common.loading")}</p>}
+      {error && <p role="alert" className="text-sm text-red-700">{t("events.loadError")}</p>}
+      {!loading && !error && <LiveEventCards events={events} />}
     </div>
   );
+}
+
+function LiveEventCards({ events }: { events: EventRecord[] }) {
+  const { t, locale } = useI18n();
+  if (!events.length) return <p className="text-sm text-[var(--muted-foreground)]">{t("events.empty")}</p>;
+  return <div className="flex max-h-[min(62vh,44rem)] flex-col gap-3 overflow-y-auto pr-1">{events.map((event) => <Card key={event.id} className="p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="font-700 text-[var(--foreground)]">{event.title}</h3><p className="mt-1 text-xs text-[var(--muted-foreground)]">{event.venue.name}</p></div><Badge variant={event.status === "CANCELLED" || event.status === "COMPLETED" ? "destructive" : "success"}>{t(`events.status.${event.status}` as MessageKey)}</Badge></div><div className="mt-3 grid gap-1 text-xs text-[var(--muted-foreground)] sm:grid-cols-2"><span>{formatLocaleDateTime(event.start, locale)} - {formatLocaleDateTime(event.end, locale)}</span><span>{t("events.capacity")}: {event.registeredCount}/{event.capacity} ({event.spotsLeft} {t("events.spotsLeftLabel")})</span></div><Link className="mt-3 inline-flex text-xs font-600 text-[var(--primary)] underline" to={`/events/${encodeURIComponent(event.id)}`}>{t("events.details")}</Link></Card>)}</div>;
 }
 
 function PaymentsView({ payments, onPay }: { payments: Payment[]; onPay: (id: number) => void }) {
@@ -931,6 +915,8 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
   const { logout: authLogout } = useAuth();
   const { data: user } = useAuthUser();
   const { t } = useI18n();
+  const liveEvents = useEvents();
+  useEventRealtime();
   const { data: profile, isLoading: profileLoading, isError: profileError, refetch: refetchProfile } = useMyProfile();
   const canAccessAdmin = isAdminRole(user?.role);
   const [tab, setTab] = useState<NavTab>(initialTab);
@@ -964,9 +950,9 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
   function renderView() {
     switch (tab) {
       case "dashboard":
-        return <DashboardView events={events} onToggle={toggleRegistration} onOpenCard={() => setCardOpen(true)} profile={profile || null} />;
+        return <DashboardView events={events} liveEvents={liveEvents.data ?? []} onToggle={toggleRegistration} onOpenCard={() => setCardOpen(true)} profile={profile || null} />;
       case "events":
-        return <EventsView events={events} onToggle={toggleRegistration} />;
+        return <EventsView events={liveEvents.data ?? []} loading={liveEvents.isPending} error={liveEvents.isError} />;
       case "payments":
         return <PaymentsView payments={payments} onPay={handlePay} />;
       case "profile":

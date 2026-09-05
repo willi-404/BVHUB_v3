@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { useLocation } from "react-router-dom"
+import { useEffect, useState } from "react"
+import { useLocation, useNavigate, Link } from "react-router-dom"
 import { Button } from "./ui/button"
 import { Card } from "./ui/card"
 import {
@@ -33,6 +33,7 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
   const { t } = useI18n()
   useEventRealtime()
   const location = useLocation()
+  const navigate = useNavigate()
   const [tab, setTab] = useState<"events" | "venues">(
     location.pathname.endsWith("/venues") ? "venues" : "events",
   )
@@ -47,6 +48,7 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
   const eventMutation = useEventMutation()
   const cancelOrDelete = useCancelEvent()
   const venueMutation = useVenueMutation()
+  useEffect(() => { if (location.pathname.endsWith("/new")) openEvent() }, [location.pathname])
 
   function openEvent(event?: EventRecord) {
     setEventFormOpen(true)
@@ -183,8 +185,8 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
             form={eventForm}
             editing={editingEvent}
             saving={eventMutation.isPending}
-            onCreate={() => openEvent()}
-            onEdit={openEvent}
+            onCreate={() => navigate("/admin/events/new")}
+            onEdit={(event) => navigate(`/admin/events/${encodeURIComponent(event.id)}`)}
             onChange={setEventForm}
             onSave={() => void saveEvent()}
             onPublish={(event) => void publishEvent(event)}
@@ -446,9 +448,7 @@ function EventPanel({
                 {(["MEMBERS_ONLY", "OPEN_TO_ALL", "CANCELLED", "COMPLETED"] as EventStatus[]).map((status) => <option key={status} value={status}>{t(`events.status.${status}` as MessageKey)}</option>)}
               </select>
               <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={event.published} disabled={saving} onChange={(e) => onPublishedChange(event, e.target.checked)} />{event.published ? t("admin.events.published") : t("admin.events.unpublished")}</label>
-              <Button size="sm" variant="outline" onClick={() => onEdit(event)}>
-                {t("common.save")}
-              </Button>
+              <Button size="sm" variant="outline" onClick={() => onEdit(event)}>{t("common.edit")}</Button>
               {!event.published && (
                 <Button size="sm" onClick={() => onPublish(event)}>
                   {t("admin.events.publish")}

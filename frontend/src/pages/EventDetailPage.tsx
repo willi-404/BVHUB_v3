@@ -1,7 +1,7 @@
 import { Link, useLocation, useParams } from "react-router-dom"
 import { Badge } from "../app/components/ui/badge"
 import { Card } from "../app/components/ui/card"
-import { useCancelRegistration, useEvent, useRegistration, useEventRealtime, useEventChangelog } from "../features/events/hooks/useEvents"
+import { useAdminEvents, useCancelRegistration, useEvent, useRegistration, useEventRealtime, useEventChangelog } from "../features/events/hooks/useEvents"
 import { formatLocaleDateTime, useI18n, type MessageKey } from "../i18n"
 export default function EventDetailPage() {
   const { eventId } = useParams()
@@ -10,16 +10,18 @@ export default function EventDetailPage() {
   const isAdmin = location.pathname.startsWith("/admin/events/")
   useEventRealtime()
   const query = useEvent(eventId)
+  const adminEvents = useAdminEvents()
   const registration = useRegistration(eventId)
   const changelog = useEventChangelog(isAdmin ? eventId : undefined)
   const cancel = useCancelRegistration()
-  if (query.isPending)
+  const event = isAdmin ? adminEvents.data?.find((item) => item.id === eventId) : query.data
+  if ((isAdmin ? adminEvents.isPending : query.isPending) && !event)
     return (
       <div className="p-6 text-sm text-[var(--muted-foreground)]">
         {t("common.loading")}
       </div>
     )
-  if (query.isError || !query.data)
+  if ((isAdmin ? adminEvents.isError : query.isError) || !event)
     return (
       <div className="p-6">
         <p role="alert" className="text-sm text-red-700">
@@ -30,7 +32,6 @@ export default function EventDetailPage() {
         </Link>
       </div>
     )
-  const event = query.data
   return (
     <div className="min-h-full bg-[var(--background)] px-4 py-6 lg:px-8">
       <div className="mx-auto max-w-3xl">
