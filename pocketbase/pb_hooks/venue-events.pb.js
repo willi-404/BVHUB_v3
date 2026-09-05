@@ -27,7 +27,7 @@ routerAdd(
     const service = require(`${__hooks}/venue-event-service.js`);
     if (!service.requireAdminActor(e)) throw new ForbiddenError("Zugriff nicht erlaubt");
     const data = service.parseVenue(
-      service.payload(e, ["name", "address", "description", "active"]),
+      service.payload(e, ["name", "address", "description", "checkoutRegion", "active"]),
     );
     const record = new Record($app.findCollectionByNameOrId("venues"));
     Object.keys(data).forEach((key) => record.set(key, data[key]));
@@ -48,7 +48,7 @@ routerAdd(
     if (!service.requireAdminActor(e)) throw new ForbiddenError("Zugriff nicht erlaubt");
     const record = service.venue($app, service.idOf(e));
     const data = service.parseVenue(
-      service.payload(e, ["name", "address", "description", "active"]),
+      service.payload(e, ["name", "address", "description", "checkoutRegion", "active"]),
       record,
     );
     Object.keys(data).forEach((key) => record.set(key, data[key]));
@@ -111,7 +111,9 @@ routerAdd(
   (e) => {
     const service = require(`${__hooks}/venue-event-service.js`);
     if (!service.requireAdminActor(e)) throw new ForbiddenError("Zugriff nicht erlaubt");
-    const records = $app.findRecordsByFilter("events", "id != ''", "start", 500, 0);
+    let records = [];
+    ["MEMBERS_ONLY", "OPEN_TO_ALL", "CANCELLED", "COMPLETED"].forEach((status) => { records = records.concat($app.findRecordsByFilter("events", `status = '${status}'`, "", 100, 0)); });
+    records.sort((a, b) => { const startDelta = Date.parse(b.getString("start")) - Date.parse(a.getString("start")); if (startDelta) return startDelta; return Date.parse(b.getString("created")) - Date.parse(a.getString("created")); });
     return e.json(200, {
       items: records.map((record) => service.eventDto($app, record)),
       totalItems: records.length,
@@ -134,17 +136,20 @@ routerAdd(
         "start",
         "end",
         "capacity",
-        "registrationOpen",
+        "published",
         "status",
       ]),
     );
     const v = service.venue($app, data.venue);
-    if (data.status === "PUBLISHED" && !v.getBool("active"))
+    if (data.published && (!v.getBool("active") || !v.getString("checkoutRegion")))
       throw new ApiError(409, "Aktiver Veranstaltungsort erforderlich", {});
     const record = new Record($app.findCollectionByNameOrId("events"));
     Object.keys(data).forEach((key) => record.set(key, data[key]));
     record.set("createdBy", current.id);
     $app.save(record);
+    service.appendChangelog($app, record, current, {
+      title: { old: null, new: data.title }, description: { old: null, new: data.description }, venue: { old: null, new: data.venue }, start: { old: null, new: data.start }, end: { old: null, new: data.end }, capacity: { old: null, new: data.capacity }, status: { old: null, new: data.status }, published: { old: null, new: data.published },
+    }, "CREATED");
     return e.json(201, service.eventDto($app, record));
   },
   $apis.requireAuth("users"),
@@ -164,16 +169,17 @@ routerAdd(
         "start",
         "end",
         "capacity",
-        "registrationOpen",
+        "published",
         "status",
       ]),
       record,
     );
     const v = service.venue($app, data.venue);
-    if (data.status === "PUBLISHED" && !v.getBool("active"))
+    if (data.published && (!v.getBool("active") || !v.getString("checkoutRegion")))
       throw new ApiError(409, "Aktiver Veranstaltungsort erforderlich", {});
-    Object.keys(data).forEach((key) => record.set(key, data[key]));
-    $app.save(record);
+    const changes = {};
+    Object.keys(data).forEach((key) => { const old = key === "venue" ? record.getString(key) : key === "published" ? record.getBool(key) : key === "capacity" ? record.getInt(key) : record.getString(key); const equal = ["start", "end"].includes(key) ? Date.parse(old) === Date.parse(data[key]) : old === data[key]; if (!equal) changes[key] = { old, new: data[key] }; record.set(key, data[key]); });
+    $app.runInTransaction((txApp) => { txApp.save(record); service.appendChangelog(txApp, record, e.auth, changes); });
     return e.json(200, service.eventDto($app, record));
   },
   $apis.requireAuth("users"),
@@ -185,10 +191,10 @@ routerAdd(
     const service = require(`${__hooks}/venue-event-service.js`);
     if (!service.requireAdminActor(e)) throw new ForbiddenError("Zugriff nicht erlaubt");
     const record = service.event($app, service.idOf(e));
-    if (record.getString("status") === "PUBLISHED") {
+    if (record.getBool("published") && record.getString("status") !== "CANCELLED") {
+      const previous = record.getString("status");
       record.set("status", "CANCELLED");
-      record.set("registrationOpen", false);
-      $app.save(record);
+      $app.runInTransaction((txApp) => { txApp.save(record); service.appendChangelog(txApp, record, e.auth, { status: { old: previous, new: "CANCELLED" } }, "CANCELLED"); });
       return e.json(200, service.eventDto($app, record));
     }
     $app.delete(record);

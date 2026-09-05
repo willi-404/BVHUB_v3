@@ -1,9 +1,10 @@
-export type EventStatus = "DRAFT" | "PUBLISHED" | "CANCELLED"
+export type EventStatus = "MEMBERS_ONLY" | "OPEN_TO_ALL" | "CANCELLED" | "COMPLETED"
 export interface Venue {
   id: string
   name: string
   address: string
   description: string
+  checkoutRegion: "ER" | "NUE" | ""
   active: boolean
   created: string
   updated: string
@@ -16,7 +17,12 @@ export interface EventRecord {
   start: string
   end: string
   capacity: number
-  registrationOpen: boolean
+  registeredCount: number
+  spotsLeft: number
+  myRegistrationStatus: "REGISTERED" | "CANCELLED" | null
+  canRegister: boolean
+  canCancel: boolean
+  published: boolean
   status: EventStatus
   createdBy: string
   created: string
@@ -29,6 +35,6 @@ export interface EventInput {
   start: string
   end: string
   capacity: number
-  registrationOpen: boolean
+  published: boolean
   status: EventStatus
 }

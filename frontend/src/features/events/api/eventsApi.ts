@@ -41,6 +41,18 @@ export async function deleteOrCancelEvent(
     { method: "DELETE" },
   )
 }
+export async function getRegistration(id: string) {
+  return pb.send<{ status: "REGISTERED" | "CANCELLED" | null }>(`/api/bvhub/events/${encodeURIComponent(id)}/registration`, { method: "GET" })
+}
+export async function registerEvent(id: string, input: { checkoutRegion: "ER" | "NUE"; termsVersion: string }) {
+  return pb.send(`/api/bvhub/events/${encodeURIComponent(id)}/registrations`, { method: "POST", body: input })
+}
+export async function cancelRegistration(id: string) {
+  return pb.send(`/api/bvhub/events/${encodeURIComponent(id)}/registrations/me`, { method: "DELETE" })
+}
+export async function getEventChangelog(id: string) {
+  return pb.send<{ items: Array<{ id: string; action: string; actorName: string; actorRole: string; changes: Record<string, { old: unknown; new: unknown }>; correlationId: string; created: string }> }>(`/api/bvhub/admin/events/${encodeURIComponent(id)}/changelog`, { method: "GET" })
+}
 export async function getVenues(
   scope: "public" | "admin" = "public",
 ): Promise<Venue[]> {
@@ -51,7 +63,7 @@ export async function getVenues(
   return result.items
 }
 export async function createVenue(
-  input: Pick<Venue, "name" | "address" | "description"> & { active?: boolean },
+  input: Pick<Venue, "name" | "address" | "description" | "checkoutRegion"> & { active?: boolean },
 ): Promise<Venue> {
   return pb.send<Venue>("/api/bvhub/admin/venues", {
     method: "POST",
@@ -60,7 +72,7 @@ export async function createVenue(
 }
 export async function updateVenue(
   id: string,
-  input: Partial<Pick<Venue, "name" | "address" | "description" | "active">>,
+  input: Partial<Pick<Venue, "name" | "address" | "description" | "checkoutRegion" | "active">>,
 ): Promise<Venue> {
   return pb.send<Venue>(`/api/bvhub/admin/venues/${encodeURIComponent(id)}`, {
     method: "PATCH",

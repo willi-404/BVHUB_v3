@@ -8,6 +8,7 @@ import {
   useEventMutation,
   useVenues,
   useVenueMutation,
+  useEventRealtime,
 } from "../../features/events/hooks/useEvents"
 import type {
   EventRecord,
@@ -23,13 +24,14 @@ const emptyEvent = {
   start: "",
   end: "",
   capacity: 1,
-  registrationOpen: false,
-  status: "DRAFT" as EventStatus,
+  published: false,
+  status: "MEMBERS_ONLY" as EventStatus,
 }
-const emptyVenue = { name: "", address: "", description: "" }
+const emptyVenue = { name: "", address: "", description: "", checkoutRegion: "" as "ER" | "NUE" | "" }
 
 export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
   const { t } = useI18n()
+  useEventRealtime()
   const location = useLocation()
   const [tab, setTab] = useState<"events" | "venues">(
     location.pathname.endsWith("/venues") ? "venues" : "events",
@@ -58,7 +60,7 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
             start: event.start.slice(0, 16),
             end: event.end.slice(0, 16),
             capacity: event.capacity,
-            registrationOpen: event.registrationOpen,
+            published: event.published,
             status: event.status,
           }
         : emptyEvent,
@@ -73,6 +75,7 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
             name: venue.name,
             address: venue.address,
             description: venue.description,
+            checkoutRegion: venue.checkoutRegion,
           }
         : emptyVenue,
     )
@@ -98,7 +101,7 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
   async function publishEvent(event: EventRecord) {
     await eventMutation.mutateAsync({
       id: event.id,
-      input: { status: "PUBLISHED" },
+      input: { published: true },
     })
   }
   const failure =
@@ -185,7 +188,15 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
             onChange={setEventForm}
             onSave={() => void saveEvent()}
             onPublish={(event) => void publishEvent(event)}
-            onPublishForm={() => void saveEvent("PUBLISHED")}
+            onPublishForm={() => void saveEvent(eventForm.status)}
+            onStatusChange={(event, status) => {
+              if (status === "CANCELLED" && !window.confirm(t("admin.events.confirmCancel"))) return
+              void eventMutation.mutateAsync({ id: event.id, input: { status } })
+            }}
+            onPublishedChange={(event, published) => {
+              if (published && !window.confirm(t("admin.events.publish"))) return
+              void eventMutation.mutateAsync({ id: event.id, input: { published } })
+            }}
             onClose={() => setEventFormOpen(false)}
             onCancel={(id) => {
               if (window.confirm(t("admin.events.confirmCancel")))
@@ -319,6 +330,12 @@ function VenuePanel({
             />
           </label>
           <label className="grid gap-1 text-sm">
+            {t("admin.venues.checkoutRegion")}
+            <select value={form.checkoutRegion} onChange={(e) => onChange({ ...form, checkoutRegion: e.target.value as typeof form.checkoutRegion })} className="h-10 rounded border p-2">
+              <option value="">{t("common.selectPlaceholder")}</option><option value="ER">ER</option><option value="NUE">NUE</option>
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm">
             {t("admin.venues.description")}
             <textarea
               maxLength={2000}
@@ -358,6 +375,8 @@ function EventPanel({
   onSave,
   onPublish,
   onPublishForm,
+  onStatusChange,
+  onPublishedChange,
   onClose,
   onCancel,
   onDelete,
@@ -376,14 +395,30 @@ function EventPanel({
   onSave: () => void
   onPublish: (event: EventRecord) => void
   onPublishForm: () => void
+  onStatusChange: (event: EventRecord, status: EventStatus) => void
+  onPublishedChange: (event: EventRecord, published: boolean) => void
   onClose: () => void
   onCancel: (id: string) => void
   onDelete: (id: string) => void
 }) {
   const { t } = useI18n()
+  const [filter, setFilter] = useState<"ALL" | EventStatus>("ALL")
+  const visibleEvents = filter === "ALL" ? events : events.filter((event) => event.status === filter)
   return (
     <section className="mt-5">
-      <Button onClick={onCreate}>{t("admin.events.create")}</Button>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <Button onClick={onCreate}>{t("admin.events.create")}</Button>
+        <label className="grid gap-1 text-sm">
+          {t("admin.events.filter")}
+          <select value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)} className="h-10 rounded border p-2">
+            <option value="ALL">{t("admin.events.filterAll")}</option>
+            <option value="MEMBERS_ONLY">{t("admin.events.filterMembers")}</option>
+            <option value="OPEN_TO_ALL">{t("admin.events.filterOpen")}</option>
+            <option value="CANCELLED">{t("admin.events.filterCancelled")}</option>
+            <option value="COMPLETED">{t("admin.events.filterCompleted")}</option>
+          </select>
+        </label>
+      </div>
       <div className="mt-4 grid gap-3">
         {loading && <p>{t("common.loading")}</p>}
         {error && <p>{t("admin.events.loadError")}</p>}
@@ -392,7 +427,7 @@ function EventPanel({
             {t("admin.events.empty")}
           </p>
         )}
-        {events.map((event) => (
+        {visibleEvents.map((event) => (
           <Card key={event.id} className="p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
@@ -406,16 +441,20 @@ function EventPanel({
                 {t(`events.status.${event.status}` as MessageKey)}
               </span>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <select aria-label={t("admin.events.status")} value={event.status} disabled={saving} onChange={(e) => onStatusChange(event, e.target.value as EventStatus)} className="h-9 rounded border px-2 text-sm">
+                {(["MEMBERS_ONLY", "OPEN_TO_ALL", "CANCELLED", "COMPLETED"] as EventStatus[]).map((status) => <option key={status} value={status}>{t(`events.status.${status}` as MessageKey)}</option>)}
+              </select>
+              <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={event.published} disabled={saving} onChange={(e) => onPublishedChange(event, e.target.checked)} />{event.published ? t("admin.events.published") : t("admin.events.unpublished")}</label>
               <Button size="sm" variant="outline" onClick={() => onEdit(event)}>
                 {t("common.save")}
               </Button>
-              {event.status === "DRAFT" && (
+              {!event.published && (
                 <Button size="sm" onClick={() => onPublish(event)}>
                   {t("admin.events.publish")}
                 </Button>
               )}
-              {event.status === "PUBLISHED" && (
+              {event.published && event.status !== "CANCELLED" && (
                 <Button
                   size="sm"
                   variant="destructive"
@@ -424,7 +463,7 @@ function EventPanel({
                   {t("admin.events.cancel")}
                 </Button>
               )}
-              {event.status === "DRAFT" && (
+              {!event.published && (
                 <Button
                   size="sm"
                   variant="destructive"
@@ -526,12 +565,12 @@ function EventPanel({
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
-              checked={form.registrationOpen}
+              checked={form.published}
               onChange={(e) =>
-                onChange({ ...form, registrationOpen: e.target.checked })
+                onChange({ ...form, published: e.target.checked })
               }
             />
-            {t("admin.events.registrationOpen")}
+            {t("admin.events.published")}
           </label>
           <div className="flex gap-2">
             <Button disabled={saving} type="submit">

@@ -51,22 +51,41 @@ function capacity(value) {
 }
 
 function status(value) {
-  if (!["DRAFT", "PUBLISHED", "CANCELLED"].includes(value)) throw new BadRequestError("Ungültiger Status");
+  if (!["MEMBERS_ONLY", "OPEN_TO_ALL", "CANCELLED", "COMPLETED"].includes(value)) throw new BadRequestError("Ungültiger Status");
   return value;
 }
 
 function venue(app, id) { try { return app.findRecordById("venues", id); } catch (_) { throw new ApiError(404, "Veranstaltungsort nicht gefunden", {}); } }
 function event(app, id) { try { return app.findRecordById("events", id); } catch (_) { throw new ApiError(404, "Event nicht gefunden", {}); } }
-function venueDto(record) { return { id: record.id, name: record.getString("name"), address: record.getString("address"), description: record.getString("description"), active: record.getBool("active"), created: record.getString("created"), updated: record.getString("updated") }; }
+function venueDto(record) { return { id: record.id, name: record.getString("name"), address: record.getString("address"), description: record.getString("description"), checkoutRegion: record.getString("checkoutRegion"), active: record.getBool("active"), created: record.getString("created"), updated: record.getString("updated") }; }
+function registrationCount(app, eventId) {
+  return app.findRecordsByFilter("event_registrations", `event = '${eventId}' && status = 'REGISTERED'`, "", 100000, 0).length;
+}
+function roleCanRegister(role, status) {
+  return status === "OPEN_TO_ALL" ? ["GUEST", "MEMBER", "ADMIN", "SUPER_ADMIN"].includes(role) : status === "MEMBERS_ONLY" ? ["MEMBER", "ADMIN", "SUPER_ADMIN"].includes(role) : false;
+}
 function eventDto(app, record) {
   const v = venue(app, record.getString("venue"));
-  return { id: record.id, title: record.getString("title"), description: record.getString("description"), venue: venueDto(v), start: record.getString("start"), end: record.getString("end"), capacity: record.getInt("capacity"), registrationOpen: record.getBool("registrationOpen"), status: record.getString("status"), createdBy: record.getString("createdBy"), created: record.getString("created"), updated: record.getString("updated") };
+  const registeredCount = registrationCount(app, record.id);
+  const spotsLeft = Math.max(0, record.getInt("capacity") - registeredCount);
+  return { id: record.id, title: record.getString("title"), description: record.getString("description"), venue: venueDto(v), start: record.getString("start"), end: record.getString("end"), capacity: record.getInt("capacity"), registeredCount, spotsLeft, status: record.getString("status"), published: record.getBool("published"), createdBy: record.getString("createdBy"), created: record.getString("created"), updated: record.getString("updated") };
+}
+function eventDtoForUser(app, record, userRecord) {
+  const dto = eventDto(app, record);
+  const mine = app.findRecordsByFilter("event_registrations", `event = '${record.id}' && user = '${userRecord.id}'`, "", 1, 0)[0];
+  dto.myRegistrationStatus = mine ? mine.getString("status") : null;
+  const now = Date.now();
+  dto.canRegister = dto.published === true && roleCanRegister(userRecord.getString("role"), dto.status) && dto.venue.active === true && Boolean(dto.venue.checkoutRegion) && Date.parse(dto.end) > now && dto.spotsLeft > 0 && dto.myRegistrationStatus !== "REGISTERED";
+  dto.canCancel = dto.myRegistrationStatus === "REGISTERED";
+  return dto;
 }
 function idOf(e) {
   const pathValue = e.request && typeof e.request.pathValue === "function" ? e.request.pathValue("id") : "";
   if (pathValue) return pathValue;
   const path = String(e.request && e.request.url && e.request.url.path || "");
-  return path.split("/").filter(Boolean).at(-1) || "";
+  const parts = path.split("/").filter(Boolean);
+  const eventIndex = parts.indexOf("events");
+  return eventIndex >= 0 && parts[eventIndex + 1] ? parts[eventIndex + 1] : parts.at(-1) || "";
 }
 function listVenues(app, admin) {
   const records = app.findRecordsByFilter("venues", admin ? "id != ''" : "active = true", "", 100, 0);
@@ -76,18 +95,20 @@ function publicEvents(app, e, detailId) {
   if (!requireAuthenticatedReader(e)) return { forbidden: true };
   if (detailId) {
     const record = event(app, detailId);
-    if (record.getString("status") !== "PUBLISHED" || !venue(app, record.getString("venue")).getBool("active")) throw new ApiError(404, "Event nicht gefunden", {});
-    return eventDto(app, record);
+    if (!record.getBool("published") || !["MEMBERS_ONLY", "OPEN_TO_ALL"].includes(record.getString("status")) || !venue(app, record.getString("venue")).getBool("active")) throw new ApiError(404, "Event nicht gefunden", {});
+    return eventDtoForUser(app, record, e.auth);
   }
-  const records = app.findRecordsByFilter("events", "status = 'PUBLISHED' && start >= @now", "start", 500, 0)
-    .filter((record) => venue(app, record.getString("venue")).getBool("active"));
-  return { items: records.map((record) => eventDto(app, record)), totalItems: records.length };
+  const records = app.findRecordsByFilter("events", "published = true && start >= @now", "start", 100, 0)
+    .filter((record) => ["MEMBERS_ONLY", "OPEN_TO_ALL"].includes(record.getString("status")) && venue(app, record.getString("venue")).getBool("active"));
+  return { items: records.map((record) => eventDtoForUser(app, record, e.auth)), totalItems: records.length };
 }
 function parseVenue(value, existing) {
   const name = value.name !== undefined ? value.name : existing ? existing.getString("name") : "";
   const address = value.address !== undefined ? value.address : existing ? existing.getString("address") : "";
   const description = value.description !== undefined ? value.description : existing ? existing.getString("description") : "";
-  return { name: text(name, MAX_TITLE), address: text(address, MAX_ADDRESS), description: text(description, MAX_DESCRIPTION, false), active: boolean(value.active, existing ? existing.getBool("active") : true) };
+  const checkoutRegion = value.checkoutRegion !== undefined ? value.checkoutRegion : existing ? existing.getString("checkoutRegion") : "";
+  if (checkoutRegion !== "" && !["ER", "NUE"].includes(checkoutRegion)) throw new BadRequestError("Ungültige Checkout-Region");
+  return { name: text(name, MAX_TITLE), address: text(address, MAX_ADDRESS), description: text(description, MAX_DESCRIPTION, false), checkoutRegion, active: boolean(value.active, existing ? existing.getBool("active") : true) };
 }
 function parseEvent(value, existing) {
   const start = date(value.start !== undefined ? value.start : existing ? existing.getString("start") : "");
@@ -97,7 +118,16 @@ function parseEvent(value, existing) {
   const description = value.description !== undefined ? value.description : existing ? existing.getString("description") : "";
   const venueId = value.venue !== undefined ? value.venue : existing ? existing.getString("venue") : "";
   const cap = value.capacity !== undefined ? value.capacity : existing ? existing.getInt("capacity") : 0;
-  const eventStatus = value.status !== undefined ? value.status : existing ? existing.getString("status") : "DRAFT";
-  return { title: text(title, MAX_TITLE), description: text(description, MAX_DESCRIPTION, false), venue: String(venueId), start, end, capacity: capacity(cap), registrationOpen: boolean(value.registrationOpen, existing ? existing.getBool("registrationOpen") : false), status: status(eventStatus) };
+  const eventStatus = value.status !== undefined ? value.status : existing ? existing.getString("status") : "MEMBERS_ONLY";
+  return { title: text(title, MAX_TITLE), description: text(description, MAX_DESCRIPTION, false), venue: String(venueId), start, end, capacity: capacity(cap), published: boolean(value.published, existing ? existing.getBool("published") : false), status: status(eventStatus) };
 }
-module.exports = { requireAuthenticatedReader, requireAdminActor, actor, user, payload, venue, event, venueDto, eventDto, idOf, listVenues, publicEvents, parseVenue, parseEvent };
+function nowIso() { return new Date().toISOString(); }
+function correlationId() { return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`; }
+function appendChangelog(app, eventRecord, actorRecord, changes, action) {
+  if (!Object.keys(changes).length) return;
+  const record = new Record(app.findCollectionByNameOrId("event_changelog"));
+  record.set("event", eventRecord.id); record.set("action", action || "UPDATED"); record.set("actor", actorRecord.id);
+  record.set("actorName", actorRecord.getString("displayName")); record.set("actorRole", actorRecord.getString("role"));
+  record.set("changes", changes); record.set("correlationId", correlationId()); app.save(record);
+}
+module.exports = { requireAuthenticatedReader, requireAdminActor, actor, user, payload, venue, event, venueDto, eventDto, eventDtoForUser, idOf, listVenues, publicEvents, parseVenue, parseEvent, registrationCount, roleCanRegister, nowIso, appendChangelog };

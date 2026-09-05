@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom"
 import { Badge } from "../app/components/ui/badge"
 import { Card } from "../app/components/ui/card"
-import { useEvents } from "../features/events/hooks/useEvents"
+import { useEvents, useEventRealtime } from "../features/events/hooks/useEvents"
 import { formatLocaleDateTime, useI18n, type MessageKey } from "../i18n"
 
 export default function EventListPage() {
   const { t, locale } = useI18n()
+  useEventRealtime()
   const query = useEvents()
   return (
     <div className="min-h-full bg-[var(--background)] px-4 py-6 lg:px-8">
@@ -47,7 +48,7 @@ export default function EventListPage() {
                 <h2 className="text-lg font-700">{event.title}</h2>
                 <Badge
                   variant={
-                    event.status === "PUBLISHED"
+                    event.status !== "CANCELLED" && event.status !== "COMPLETED"
                       ? "success"
                       : event.status === "CANCELLED"
                         ? "destructive"

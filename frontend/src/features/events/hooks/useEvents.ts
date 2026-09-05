@@ -1,4 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useEffect } from "react"
+import { pb } from "../../../lib/pocketbase"
 import { eventKeys, venueKeys } from "../../../lib/queryKeys"
 import * as api from "../api/eventsApi"
 import type { EventInput } from "../types"
@@ -23,6 +25,23 @@ export function useVenues(scope: "public" | "admin" = "public") {
     queryKey: venueKeys.list(scope),
     queryFn: () => api.getVenues(scope),
   })
+}
+export function useRegistration(id: string | undefined) { return useQuery({ queryKey: [...eventKeys.detail(id ?? ""), "registration"], queryFn: () => api.getRegistration(id as string), enabled: Boolean(id) }) }
+export function useRegisterEvent() { const client = useQueryClient(); return useMutation({ mutationFn: ({ id, input }: { id: string; input: { checkoutRegion: "ER" | "NUE"; termsVersion: string } }) => api.registerEvent(id, input), onSuccess: (_data, variables) => { void client.invalidateQueries({ queryKey: eventKeys.all }); void client.invalidateQueries({ queryKey: [...eventKeys.detail(variables.id), "registration"] }) } }) }
+export function useCancelRegistration() { const client = useQueryClient(); return useMutation({ mutationFn: api.cancelRegistration, onSuccess: (_data, id) => { void client.invalidateQueries({ queryKey: eventKeys.all }); void client.invalidateQueries({ queryKey: [...eventKeys.detail(id), "registration"] }) } }) }
+export function useEventChangelog(id: string | undefined) { return useQuery({ queryKey: [...eventKeys.detail(id ?? ""), "changelog"], queryFn: () => api.getEventChangelog(id as string), enabled: Boolean(id) }) }
+export function useEventRealtime() {
+  const client = useQueryClient()
+  useEffect(() => {
+    let active = true
+    void pb.collection("events").subscribe("*", () => {
+      if (active) void client.invalidateQueries({ queryKey: eventKeys.all })
+    }).catch(() => undefined)
+    return () => {
+      active = false
+      void pb.collection("events").unsubscribe("*")
+    }
+  }, [client])
 }
 function invalidate(client: ReturnType<typeof useQueryClient>) {
   void client.invalidateQueries({ queryKey: eventKeys.all })

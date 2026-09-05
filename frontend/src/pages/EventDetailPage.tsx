@@ -1,12 +1,18 @@
-import { Link, useParams } from "react-router-dom"
+import { Link, useLocation, useParams } from "react-router-dom"
 import { Badge } from "../app/components/ui/badge"
 import { Card } from "../app/components/ui/card"
-import { useEvent } from "../features/events/hooks/useEvents"
+import { useCancelRegistration, useEvent, useRegistration, useEventRealtime, useEventChangelog } from "../features/events/hooks/useEvents"
 import { formatLocaleDateTime, useI18n, type MessageKey } from "../i18n"
 export default function EventDetailPage() {
   const { eventId } = useParams()
   const { t, locale } = useI18n()
+  const location = useLocation()
+  const isAdmin = location.pathname.startsWith("/admin/events/")
+  useEventRealtime()
   const query = useEvent(eventId)
+  const registration = useRegistration(eventId)
+  const changelog = useEventChangelog(isAdmin ? eventId : undefined)
+  const cancel = useCancelRegistration()
   if (query.isPending)
     return (
       <div className="p-6 text-sm text-[var(--muted-foreground)]">
@@ -34,9 +40,7 @@ export default function EventDetailPage() {
         <Card className="mt-4 p-5 lg:p-8">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <h1 className="text-2xl font-700">{event.title}</h1>
-            <Badge
-              variant={event.status === "PUBLISHED" ? "success" : "destructive"}
-            >
+            <Badge variant={event.status === "CANCELLED" || event.status === "COMPLETED" ? "destructive" : "success"}>
               {t(`events.status.${event.status}` as MessageKey)}
             </Badge>
           </div>
@@ -85,13 +89,16 @@ export default function EventDetailPage() {
             </div>
           </dl>
           <div className="mt-6 rounded-[var(--radius)] bg-[var(--muted)] p-4 text-sm">
-            {event.registrationOpen
-              ? t("events.registrationOpen")
-              : t("events.registrationClosed")}
+            {event.status === "MEMBERS_ONLY" ? t("events.membersOnly") : event.status === "OPEN_TO_ALL" ? t("events.openToAll") : t(`events.status.${event.status}` as MessageKey)}
             <p className="mt-1 text-xs text-[var(--muted-foreground)]">
-              {t("events.registrationInfo")}
+              {t("events.spotsLeft", { count: event.spotsLeft })}
             </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {event.canRegister && <Link className="rounded bg-[var(--primary)] px-4 py-2 text-white" to={`/events/${encodeURIComponent(event.id)}/checkout`}>{t("events.registerNow")}</Link>}
+              {(registration.data?.status === "REGISTERED" || event.canCancel) && <button className="rounded border px-4 py-2" disabled={cancel.isPending} onClick={() => { if (window.confirm(t("events.confirmCancel"))) void cancel.mutateAsync(event.id) }}>{t("events.cancelRegistration")}</button>}
+            </div>
           </div>
+          {isAdmin && changelog.data?.items?.length ? <section className="mt-8"><h2 className="text-sm font-700">{t("admin.events.changelog")}</h2><div className="mt-3 grid gap-2">{changelog.data.items.map((entry) => <div key={entry.id} className="rounded border p-3 text-xs"><div className="font-600">{entry.action} · {entry.actorName} ({entry.actorRole})</div><time dateTime={entry.created}>{formatLocaleDateTime(entry.created, locale)}</time></div>)}</div></section> : null}
         </Card>
       </div>
     </div>

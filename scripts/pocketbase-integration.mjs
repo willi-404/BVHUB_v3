@@ -359,6 +359,7 @@ const venuePayload = {
   name: "  WU-05 Integration Venue  ",
   address: "Teststrasse 42, 91052 Erlangen",
   description: "Integration venue",
+  checkoutRegion: "ER",
 };
 const createdVenue = expectStatus(await request("POST", "/api/bvhub/admin/venues", {
   token: adminLogin.token, body: venuePayload,
@@ -377,8 +378,8 @@ const eventPayload = {
   start: "2099-07-01T16:00:00.000Z",
   end: "2099-07-01T18:00:00.000Z",
   capacity: 25,
-  registrationOpen: false,
-  status: "DRAFT",
+  published: false,
+  status: "MEMBERS_ONLY",
 };
 expectStatus(await request("POST", "/api/bvhub/admin/events", {
   token: adminLogin.token, body: { ...eventPayload, createdBy: superAdmin.id },
@@ -387,7 +388,14 @@ const validEvent = expectStatus(await request("POST", "/api/bvhub/admin/events",
   token: adminLogin.token, body: eventPayload,
 }), 201, "admin creates event");
 assert.equal(validEvent.createdBy, admin.id, "event creator is set from authenticated actor");
-assert.equal(validEvent.status, "DRAFT");
+assert.equal(validEvent.status, "MEMBERS_ONLY");
+const initialChangelog = expectStatus(await request("GET", `/api/bvhub/admin/events/${validEvent.id}/changelog`, { token: adminLogin.token }), 200, "admin reads event changelog");
+assert.equal(initialChangelog.items.length, 1, "event creation creates one changelog entry");
+const noOpEvent = expectStatus(await request("PATCH", `/api/bvhub/admin/events/${validEvent.id}`, { token: adminLogin.token, body: eventPayload }), 200, "no-op event patch");
+assert.equal(noOpEvent.id, validEvent.id);
+const noOpChangelog = expectStatus(await request("GET", `/api/bvhub/admin/events/${validEvent.id}/changelog`, { token: adminLogin.token }), 200, "read changelog after no-op");
+assert.equal(noOpChangelog.items.length, initialChangelog.items.length, "no-op patch does not create changelog");
+expectStatus(await request("GET", `/api/bvhub/admin/events/${validEvent.id}/changelog`, { token: memberLoginToken }), 403, "member cannot read event changelog");
 expectStatus(await request("POST", "/api/bvhub/admin/events", {
   token: adminLogin.token, body: { ...eventPayload, title: "Invalid range", start: eventPayload.end, end: eventPayload.start },
 }), 400, "event rejects invalid time range");
@@ -395,11 +403,32 @@ expectStatus(await request("POST", "/api/bvhub/admin/events", {
   token: adminLogin.token, body: { ...eventPayload, title: "Unknown field", unexpected: true },
 }), 400, "event rejects unknown fields");
 const publishedEvent = expectStatus(await request("PATCH", `/api/bvhub/admin/events/${validEvent.id}`, {
-  token: adminLogin.token, body: { status: "PUBLISHED" },
+  token: adminLogin.token, body: { published: true },
 }), 200, "admin publishes event");
-assert.equal(publishedEvent.status, "PUBLISHED");
+assert.equal(publishedEvent.published, true);
 expectStatus(await request("GET", "/api/bvhub/events", { token: memberLoginToken }), 200, "member reads published events");
 expectStatus(await request("GET", `/api/bvhub/events/${validEvent.id}`, { token: guestLoginToken }), 200, "guest reads published event detail");
+expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrations`, {
+  token: guestLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" },
+}), 409, "guest cannot register for members-only event");
+expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrations`, {
+  token: memberLoginToken, body: { checkoutRegion: "NUE", termsVersion: "NUE-v1" },
+}), 409, "registration rejects wrong checkout region");
+const wuRegistration = expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrations`, {
+  token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" },
+}), 201, "member registers for event");
+assert.equal(wuRegistration.status, "REGISTERED");
+const repeatedRegistration = expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrations`, {
+  token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" },
+}), 201, "repeated registration is idempotent");
+assert.equal(repeatedRegistration.id, wuRegistration.id);
+expectStatus(await request("GET", `/api/bvhub/events/${validEvent.id}/registration`, { token: memberLoginToken }), 200, "member reads own registration");
+expectStatus(await request("DELETE", `/api/bvhub/events/${validEvent.id}/registrations/me`, { token: memberLoginToken }), 200, "member cancels own registration");
+expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrations`, {
+  token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" },
+}), 201, "member registers again after cancellation");
+const outbox = expectStatus(await request("GET", `/api/collections/notification_outbox/records?filter=${encodeURIComponent(`registration = "${wuRegistration.id}"`)}`, { token: rootToken }), 200, "registration creates notification outbox");
+assert.equal(outbox.items.length, 1, "idempotent registration creates one confirmation outbox item");
 const cancelledEvent = expectStatus(await request("DELETE", `/api/bvhub/admin/events/${validEvent.id}`, {
   token: adminLogin.token,
 }), 200, "admin cancels published event");

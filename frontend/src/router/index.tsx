@@ -7,6 +7,7 @@ const DashboardPage = lazy(() => import("../pages/DashboardPage"));
 const MembersPage = lazy(() => import("../pages/MembersPage"));
 const EventsPage = lazy(() => import("../pages/EventsPage"));
 const EventDetailPage = lazy(() => import("../pages/EventDetailPage"));
+const EventCheckoutPage = lazy(() => import("../pages/EventCheckoutPage"));
 const AdminEventsPage = lazy(() => import("../app/components/AdminEventsView"));
 const AdminPage = lazy(() => import("../pages/AdminPage"));
 const RegisterPage = lazy(() => import("../app/components/RegisterView"));
@@ -23,6 +24,8 @@ export const router = createBrowserRouter([
     { path: "/dashboard", element: load(<DashboardPage />) },
     { path: "/events", element: load(<EventsPage />) },
     { path: "/events/:eventId", element: load(<EventDetailPage />) },
+    { path: "/events/:eventId/checkout", element: load(<EventCheckoutPage />) },
+    { element: <ProtectedRoute admin />, children: [{ path: "/admin/events/:eventId", element: load(<EventDetailPage />) }] },
     { element: <ProtectedRoute admin />, children: [{ path: "/members", element: load(<MembersPage />) }, { path: "/admin", element: load(<AdminPage />) }, { path: "/admin/events", element: load(<AdminEventsPage />) }, { path: "/admin/venues", element: load(<AdminEventsPage />) }] },
   ] },
   { path: "/register", element: load(<RegisterPage />) },
