@@ -318,6 +318,7 @@
   "admin.venues.name": "名称",
   "admin.venues.address": "地址",
   "admin.venues.checkoutRegion": "报名区域",
+  "admin.venues.checkoutRegionMissing": "未配置",
   "admin.venues.description": "描述",
   "admin.venues.active": "启用",
   "admin.venues.inactive": "停用",

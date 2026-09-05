@@ -257,6 +257,9 @@ function VenuePanel({
                 <p className="text-sm text-[var(--muted-foreground)]">
                   {venue.address}
                 </p>
+                <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+                  {t("admin.venues.checkoutRegion")}: {venue.checkoutRegion || t("admin.venues.checkoutRegionMissing")}
+                </p>
               </div>
               <span className="text-xs">
                 {venue.active
@@ -508,7 +511,7 @@ function EventPanel({
                 .filter((v) => v.active)
                 .map((v) => (
                   <option key={v.id} value={v.id}>
-                    {v.name}
+                    {v.name}{v.checkoutRegion ? ` (${v.checkoutRegion})` : ` - ${t("admin.venues.checkoutRegionMissing")}`}
                   </option>
                 ))}
             </select>

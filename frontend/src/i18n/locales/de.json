@@ -318,6 +318,7 @@
   "admin.venues.name": "Name",
   "admin.venues.address": "Adresse",
   "admin.venues.checkoutRegion": "Checkout-Region",
+  "admin.venues.checkoutRegionMissing": "nicht konfiguriert",
   "admin.venues.description": "Beschreibung",
   "admin.venues.active": "Aktiv",
   "admin.venues.inactive": "Inaktiv",
