@@ -18,7 +18,7 @@ routerAdd("POST", "/api/bvhub/events/{id}/registrations", (e) => {
   const event = api.event($app, api.idOf(e));
   const venue = api.venue($app, event.getString("venue"));
   const body = registrations.registrationPayload(e);
-  if (!event.getBool("published") || !api.roleCanRegister(user.getString("role"), event.getString("status")) || ["CANCELLED", "COMPLETED"].includes(event.getString("status")) || Date.parse(event.getString("end")) <= Date.now() || !venue.getString("checkoutRegion") || venue.getString("checkoutRegion") !== body.checkoutRegion) return e.json(409, { message: "Event ist nicht registrierbar" });
+  if (!event.getBool("published") || !api.roleCanRegister(user.getString("role"), event.getString("status")) || ["CANCELLED", "COMPLETED"].includes(event.getString("status")) || Date.parse(event.getString("end")) <= Date.now() || !venue.getBool("active") || !venue.getString("checkoutRegion") || venue.getString("checkoutRegion") !== body.checkoutRegion) return e.json(409, { message: "Event ist nicht registrierbar" });
   let result;
   $app.runInTransaction((txApp) => {
     const current = registrations.registrationFor(txApp, event, user);

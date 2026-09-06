@@ -443,7 +443,8 @@ const cancelledEvent = expectStatus(await request("DELETE", `/api/bvhub/admin/ev
   token: adminLogin.token,
 }), 200, "admin cancels published event");
 assert.equal(cancelledEvent.status, "CANCELLED");
-expectStatus(await request("GET", `/api/bvhub/events/${validEvent.id}`, { token: memberLoginToken }), 404, "cancelled event is hidden publicly");
+const publicCancelledEvent = expectStatus(await request("GET", `/api/bvhub/events/${validEvent.id}`, { token: memberLoginToken }), 200, "cancelled published event remains visible publicly");
+assert.equal(publicCancelledEvent.canRegister, false, "cancelled event cannot be registered");
 expectStatus(await request("DELETE", `/api/bvhub/admin/venues/${createdVenue.id}`, {
   token: adminLogin.token,
 }), 409, "referenced venue cannot be deleted");

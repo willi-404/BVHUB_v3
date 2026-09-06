@@ -5,7 +5,11 @@ import { eventKeys, venueKeys } from "../../../lib/queryKeys"
 import * as api from "../api/eventsApi"
 import type { EventInput } from "../types"
 export function useEvents() {
-  return useQuery({ queryKey: eventKeys.lists(), queryFn: api.getEvents })
+  return useQuery({
+    queryKey: eventKeys.lists(),
+    queryFn: api.getEvents,
+    refetchOnMount: "always",
+  })
 }
 export function useEvent(id: string | undefined) {
   return useQuery({

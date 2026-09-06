@@ -91,16 +91,33 @@ function listVenues(app, admin) {
   const records = app.findRecordsByFilter("venues", admin ? "id != ''" : "active = true", "", 100, 0);
   return { items: records.map(venueDto), totalItems: records.length };
 }
+function listPublishedEvents(app) {
+  const pageSize = 200;
+  const records = [];
+  let offset = 0;
+  while (true) {
+    const batch = app.findRecordsByFilter("events", "published = true", "", pageSize, offset);
+    records.push(...batch);
+    if (batch.length < pageSize) break;
+    offset += pageSize;
+  }
+  records.sort((a, b) => {
+    const startDelta = Date.parse(a.getString("start")) - Date.parse(b.getString("start"));
+    if (startDelta) return startDelta;
+    const createdDelta = Date.parse(a.getString("created")) - Date.parse(b.getString("created"));
+    if (createdDelta) return createdDelta;
+    return String(a.id).localeCompare(String(b.id));
+  });
+  return records;
+}
 function publicEvents(app, e, detailId) {
   if (!requireAuthenticatedReader(e)) return { forbidden: true };
   if (detailId) {
     const record = event(app, detailId);
-    if (!record.getBool("published") || !["MEMBERS_ONLY", "OPEN_TO_ALL"].includes(record.getString("status")) || !venue(app, record.getString("venue")).getBool("active")) throw new ApiError(404, "Event nicht gefunden", {});
+    if (!record.getBool("published")) throw new ApiError(404, "Event nicht gefunden", {});
     return eventDtoForUser(app, record, e.auth);
   }
-  const now = Date.now();
-  const records = app.findRecordsByFilter("events", "published = true", "start", 100, 0)
-    .filter((record) => Date.parse(record.getString("start")) >= now && ["MEMBERS_ONLY", "OPEN_TO_ALL"].includes(record.getString("status")) && venue(app, record.getString("venue")).getBool("active"));
+  const records = listPublishedEvents(app);
   return { items: records.map((record) => eventDtoForUser(app, record, e.auth)), totalItems: records.length };
 }
 function parseVenue(value, existing) {
@@ -131,4 +148,4 @@ function appendChangelog(app, eventRecord, actorRecord, changes, action) {
   record.set("actorName", actorRecord.getString("displayName")); record.set("actorRole", actorRecord.getString("role"));
   record.set("changes", changes); record.set("correlationId", correlationId()); app.save(record);
 }
-module.exports = { requireAuthenticatedReader, requireAdminActor, actor, user, payload, venue, event, venueDto, eventDto, eventDtoForUser, idOf, listVenues, publicEvents, parseVenue, parseEvent, registrationCount, roleCanRegister, nowIso, appendChangelog };
+module.exports = { requireAuthenticatedReader, requireAdminActor, actor, user, payload, venue, event, venueDto, eventDto, eventDtoForUser, idOf, listVenues, listPublishedEvents, publicEvents, parseVenue, parseEvent, registrationCount, roleCanRegister, nowIso, appendChangelog };
