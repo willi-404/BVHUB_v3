@@ -82,12 +82,13 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
         : emptyVenue,
     )
   }
-  async function saveEvent(status = eventForm.status) {
+  async function saveEvent(options: { published?: boolean } = {}) {
+    const published = options.published ?? (editingEvent ? eventForm.published : false)
     await eventMutation.mutateAsync({
       id: editingEvent?.id,
       input: {
         ...eventForm,
-        status,
+        published,
         start: new Date(eventForm.start).toISOString(),
         end: new Date(eventForm.end).toISOString(),
       },
@@ -182,8 +183,8 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
             onCreate={() => navigate("/admin/events/new")}
             onEdit={(event) => navigate(`/admin/events/${encodeURIComponent(event.id)}`)}
             onChange={setEventForm}
-            onSave={() => void saveEvent()}
-            onPublishForm={() => void saveEvent(eventForm.status)}
+            onSave={() => void saveEvent({ published: false })}
+            onPublishForm={() => void saveEvent({ published: true })}
             onStatusChange={(event, status) => {
               if (status === "CANCELLED" && !window.confirm(t("admin.events.confirmCancel"))) return
               void eventMutation.mutateAsync({ id: event.id, input: { status } })
