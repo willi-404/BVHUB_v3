@@ -12,6 +12,9 @@ export default function EventListPage() {
     <div className="min-h-full bg-[var(--background)] px-4 py-6 lg:px-8">
       <div className="mx-auto max-w-5xl">
         <div className="mb-6">
+          <Link className="mb-4 inline-flex h-10 items-center rounded-[var(--radius)] border border-[var(--border)] px-4 text-sm font-600" to="/dashboard">
+            {t("events.backToDashboard")}
+          </Link>
           <h1 className="text-2xl font-700">{t("events.title")}</h1>
           <p className="mt-1 text-sm text-[var(--muted-foreground)]">
             {t("events.listDescription")}

@@ -1,5 +1,5 @@
 import { pb } from "../../../lib/pocketbase"
-import type { EventInput, EventRecord, Venue } from "../types"
+import type { EventInput, EventParticipant, EventRecord, Venue } from "../types"
 export async function getEvents(): Promise<EventRecord[]> {
   const result = await pb.send<{ items: EventRecord[] }>("/api/bvhub/events", {
     method: "GET",
@@ -42,16 +42,60 @@ export async function deleteOrCancelEvent(
   )
 }
 export async function getRegistration(id: string) {
-  return pb.send<{ status: "REGISTERED" | "CANCELLED" | null }>(`/api/bvhub/events/${encodeURIComponent(id)}/registration`, { method: "GET" })
+  return pb.send<{ status: "REGISTERED" | "CANCELLED" | null }>(
+    `/api/bvhub/events/${encodeURIComponent(id)}/registration`,
+    { method: "GET" },
+  )
 }
-export async function registerEvent(id: string, input: { checkoutRegion: "ER" | "NUE"; termsVersion: string }) {
-  return pb.send(`/api/bvhub/events/${encodeURIComponent(id)}/registrations`, { method: "POST", body: input })
+export async function registerEvent(
+  id: string,
+  input: { checkoutRegion: "ER" | "NUE"; termsVersion: string },
+) {
+  return pb.send(`/api/bvhub/events/${encodeURIComponent(id)}/registrations`, {
+    method: "POST",
+    body: input,
+  })
 }
 export async function cancelRegistration(id: string) {
-  return pb.send(`/api/bvhub/events/${encodeURIComponent(id)}/registrations/me`, { method: "DELETE" })
+  return pb.send(
+    `/api/bvhub/events/${encodeURIComponent(id)}/registrations/me`,
+    { method: "DELETE" },
+  )
+}
+export async function getParticipants(
+  id: string,
+): Promise<{ items: EventParticipant[]; totalItems: number }> {
+  return pb.send<{ items: EventParticipant[]; totalItems: number }>(
+    `/api/bvhub/events/${encodeURIComponent(id)}/participants`,
+    { method: "GET" },
+  )
+}
+export async function addParticipant(id: string, userId: string) {
+  return pb.send(
+    `/api/bvhub/admin/events/${encodeURIComponent(id)}/participants`,
+    { method: "POST", body: { userId } },
+  )
+}
+export async function removeParticipant(id: string, userId: string) {
+  return pb.send(
+    `/api/bvhub/admin/events/${encodeURIComponent(id)}/participants/${encodeURIComponent(userId)}`,
+    { method: "DELETE" },
+  )
 }
 export async function getEventChangelog(id: string) {
-  return pb.send<{ items: Array<{ id: string; action: string; actorName: string; actorRole: string; changes: Record<string, { old: unknown; new: unknown }>; correlationId: string; created: string }> }>(`/api/bvhub/admin/events/${encodeURIComponent(id)}/changelog`, { method: "GET" })
+  return pb.send<{
+    items: Array<{
+      id: string
+      action: string
+      actorName: string
+      actorRole: string
+      changes: Record<string, { old: unknown; new: unknown }>
+      correlationId: string
+      created: string
+    }>
+  }>(`/api/bvhub/admin/events/${encodeURIComponent(id)}/changelog`, {
+    method: "GET",
+  })
 }
 export async function getVenues(
   scope: "public" | "admin" = "public",
@@ -63,7 +107,9 @@ export async function getVenues(
   return result.items
 }
 export async function createVenue(
-  input: Pick<Venue, "name" | "address" | "description" | "checkoutRegion"> & { active?: boolean },
+  input: Pick<Venue, "name" | "address" | "description" | "checkoutRegion"> & {
+    active?: boolean
+  },
 ): Promise<Venue> {
   return pb.send<Venue>("/api/bvhub/admin/venues", {
     method: "POST",

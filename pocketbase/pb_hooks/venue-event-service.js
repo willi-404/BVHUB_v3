@@ -57,6 +57,10 @@ function status(value) {
 
 function venue(app, id) { try { return app.findRecordById("venues", id); } catch (_) { throw new ApiError(404, "Veranstaltungsort nicht gefunden", {}); } }
 function event(app, id) { try { return app.findRecordById("events", id); } catch (_) { throw new ApiError(404, "Event nicht gefunden", {}); } }
+function userRecord(app, id) {
+  if (typeof id !== "string" || !/^[a-z0-9]{15}$/.test(id)) throw new BadRequestError("Ungültige Benutzer-ID");
+  try { return app.findRecordById("users", id); } catch (_) { throw new ApiError(404, "Benutzer nicht gefunden", {}); }
+}
 function venueDto(record) { return { id: record.id, name: record.getString("name"), address: record.getString("address"), description: record.getString("description"), checkoutRegion: record.getString("checkoutRegion"), active: record.getBool("active"), created: record.getString("created"), updated: record.getString("updated") }; }
 function registrationCount(app, eventId) {
   return app.findRecordsByFilter("event_registrations", `event = '${eventId}' && status = 'REGISTERED'`, "", 100000, 0).length;
@@ -148,4 +152,4 @@ function appendChangelog(app, eventRecord, actorRecord, changes, action) {
   record.set("actorName", actorRecord.getString("displayName")); record.set("actorRole", actorRecord.getString("role"));
   record.set("changes", changes); record.set("correlationId", correlationId()); app.save(record);
 }
-module.exports = { requireAuthenticatedReader, requireAdminActor, actor, user, payload, venue, event, venueDto, eventDto, eventDtoForUser, idOf, listVenues, listPublishedEvents, publicEvents, parseVenue, parseEvent, registrationCount, roleCanRegister, nowIso, appendChangelog };
+module.exports = { requireAuthenticatedReader, requireAdminActor, actor, user, userRecord, payload, venue, event, venueDto, eventDto, eventDtoForUser, idOf, listVenues, listPublishedEvents, publicEvents, parseVenue, parseEvent, registrationCount, roleCanRegister, nowIso, appendChangelog };

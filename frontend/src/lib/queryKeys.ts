@@ -12,6 +12,7 @@ export const eventKeys = {
   list: (filters: Record<string, unknown>) =>
     [...eventKeys.lists(), filters] as const,
   detail: (id: string) => [...eventKeys.all, "detail", id] as const,
+  participants: (id: string) => [...eventKeys.all, "participants", id] as const,
 }
 export const venueKeys = {
   all: ["venues"] as const,

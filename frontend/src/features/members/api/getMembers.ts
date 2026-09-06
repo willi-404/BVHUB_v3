@@ -26,7 +26,7 @@ export async function getMembers(filters: MemberFilters = {}): Promise<MemberLis
   const items = records.slice((page - 1) * perPage, page * perPage).map((record) => {
     const role = String(record.role ?? "GUEST");
     const group: Group = role === "ADMIN" ? "Admin" : role === "MEMBER" ? "MemberER" : "guest";
-    return { id: String(record.id), username: String(record.username ?? record.email ?? ""), vorname: String(record.firstName ?? ""), nachname: String(record.lastName ?? ""), email: String(record.email ?? ""), gruppe: group, role: role as Member["role"], groups: Array.isArray(record.groups) ? record.groups as Member["groups"] : [], memberSince: String(record.created ?? "").slice(0, 10), adresse: "", geburtstag: "", phone: "", accountCreated: String(record.created ?? ""), accountUpdated: String(record.updated ?? ""), avatarColor: role === "ADMIN" ? "#7c3aed" : role === "MEMBER" ? "#15803d" : "#b45309" } satisfies Member;
+    return { id: String(record.id), displayName: String(record.displayName ?? ""), username: String(record.username ?? record.email ?? ""), vorname: String(record.firstName ?? ""), nachname: String(record.lastName ?? ""), email: String(record.email ?? ""), gruppe: group, role: role as Member["role"], groups: Array.isArray(record.groups) ? record.groups as Member["groups"] : [], memberSince: String(record.created ?? "").slice(0, 10), adresse: "", geburtstag: "", phone: "", accountCreated: String(record.created ?? ""), accountUpdated: String(record.updated ?? ""), avatarColor: role === "ADMIN" ? "#7c3aed" : role === "MEMBER" ? "#15803d" : "#b45309" } satisfies Member;
   });
   return { items, page, perPage, totalItems: records.length, totalPages: Math.max(1, Math.ceil(records.length / perPage)) };
 }

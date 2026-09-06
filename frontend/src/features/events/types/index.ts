@@ -28,6 +28,14 @@ export interface EventRecord {
   created: string
   updated: string
 }
+export interface EventParticipant {
+  registrationId?: string
+  userId?: string
+  displayName: string
+  firstName?: string
+  lastName?: string
+  registeredAt?: string
+}
 export interface EventInput {
   title: string
   description?: string
