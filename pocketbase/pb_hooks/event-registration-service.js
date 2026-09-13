@@ -13,16 +13,18 @@ function registrationPayload(e) {
   return { checkoutRegion: value.checkoutRegion, termsVersion: value.termsVersion.trim().slice(0, 80) };
 }
 
-function queueNotification(app, registration, user, event, venue, kind, now, extra) {
+function queueNotification(app, registration, user, event, venue, kind, now, extra, deliveryIds) {
   const stateAt = now || new Date().toISOString();
   const dedupeKey = `${registration.id}:${kind}:${stateAt}`;
   const existing = app.findRecordsByFilter("notification_outbox", `dedupeKey = '${dedupeKey}'`, "", 1, 0)[0];
   if (existing) return existing;
   const record = new Record(app.findCollectionByNameOrId("notification_outbox"));
   record.set("kind", kind); record.set("registration", registration.id); record.set("recipient", user.getString("email"));
-  record.set("payload", { eventTitle: event.getString("title"), venue: venue.getString("name"), address: venue.getString("address"), start: event.getString("start"), end: event.getString("end"), displayName: user.getString("displayName") || user.getString("firstName"), locale: "de", ...(extra || {}) });
+  const payload = { eventTitle: event.getString("title"), venue: venue.getString("name"), address: venue.getString("address"), start: event.getString("start"), end: event.getString("end"), displayName: user.getString("displayName") || user.getString("firstName"), locale: "de", ...(extra || {}) };
+  record.set("payload", JSON.stringify(payload));
   record.set("status", "PENDING"); record.set("attempts", 1); record.set("dedupeKey", dedupeKey); record.set("nextAttemptAt", stateAt); record.set("lastError", ""); record.set("processingStartedAt", "");
   app.save(record);
+  if (Array.isArray(deliveryIds)) deliveryIds.push(record.id);
   return record;
 }
 
@@ -33,24 +35,30 @@ function setStatus(record, status, now, waiting) {
   else record.set("cancelledAt", now);
 }
 
-function promoteNextWaiting(app, event, now) {
+function promoteNextWaiting(app, event, now, deliveryIds) {
   const waiting = app.findRecordsByFilter("event_registrations", `event = '${event.id}' && status = 'WAITING'`, "waitingAt,created,id", 1, 0)[0] || null;
   if (!waiting) return null;
   const user = app.findRecordById("users", waiting.getString("user"));
   const venue = app.findRecordById("venues", event.getString("venue"));
   setStatus(waiting, "REGISTERED", now); app.save(waiting);
-  queueNotification(app, waiting, user, event, venue, "EVENT_WAITING_LIST_PROMOTED", now, {});
+  queueNotification(app, waiting, user, event, venue, "EVENT_WAITING_LIST_PROMOTED", now, {}, deliveryIds);
   return waiting;
 }
 
-function cancelRegistration(app, event, user, record, now) {
+function cancelRegistration(app, event, user, record, now, deliveryIds) {
   const previous = record ? record.getString("status") : null;
   if (!record || !["REGISTERED", "WAITING"].includes(previous)) return { record, previous, promoted: null };
   record.set("status", "CANCELLED"); record.set("cancelledAt", now); app.save(record);
   const venue = app.findRecordById("venues", event.getString("venue"));
-  queueNotification(app, record, user, event, venue, previous === "WAITING" ? "EVENT_WAITING_LIST_LEFT" : "EVENT_REGISTRATION_CANCELLED", now, {});
-  const promoted = previous === "REGISTERED" ? promoteNextWaiting(app, event, now) : null;
+  queueNotification(app, record, user, event, venue, previous === "WAITING" ? "EVENT_WAITING_LIST_LEFT" : "EVENT_REGISTRATION_CANCELLED", now, {}, deliveryIds);
+  const promoted = previous === "REGISTERED" ? promoteNextWaiting(app, event, now, deliveryIds) : null;
   return { record, previous, promoted };
 }
 
-module.exports = { registrationFor, registrationDto, registrationPayload, queueNotification, setStatus, promoteNextWaiting, cancelRegistration };
+function deliverNotifications(app, ids) {
+  if (!Array.isArray(ids) || !ids.length) return;
+  const service = require(`${__hooks}/notification-service.js`);
+  ids.forEach((id) => service.deliver(app, id));
+}
+
+module.exports = { registrationFor, registrationDto, registrationPayload, queueNotification, setStatus, promoteNextWaiting, cancelRegistration, deliverNotifications };

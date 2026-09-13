@@ -18,8 +18,14 @@ function formatTime(value) {
 }
 
 function parsePayload(entry) {
+  const serialized = entry.getString("payload");
+  if (serialized) {
+    try { return JSON.parse(serialized); } catch (_) {}
+  }
   const raw = entry.get("payload");
-  if (raw && typeof raw === "object") return raw;
+  if (raw && typeof raw === "object") {
+    try { return JSON.parse(JSON.stringify(raw)); } catch (_) {}
+  }
   try { return JSON.parse(String(raw || "{}")); } catch (_) { return {}; }
 }
 
@@ -66,6 +72,37 @@ function send(entry) {
   $app.newMailClient().send(message);
 }
 
+function deliver(app, id) {
+  let entry;
+  try {
+    entry = app.findRecordById("notification_outbox", id);
+    if (entry.getString("status") === "SENT") return;
+    entry.set("status", "PROCESSING");
+    entry.set("processingStartedAt", new Date().toISOString());
+    app.save(entry);
+    send(entry);
+    entry.set("status", "SENT");
+    entry.set("sentAt", new Date().toISOString());
+    entry.set("lastError", "");
+    entry.set("processingStartedAt", "");
+    app.save(entry);
+    app.logger().info("[bvhub notifications] email sent", "notificationId", id, "kind", entry.getString("kind"));
+  } catch (error) {
+    try { entry = entry || app.findRecordById("notification_outbox", id); } catch (_) { return; }
+    const attempts = entry.getInt("attempts") + 1;
+    const message = String(error && error.message || error).slice(0, 500);
+    entry.set("attempts", attempts);
+    entry.set("lastError", message);
+    entry.set("processingStartedAt", "");
+    // There is intentionally no background consumer: delivery is attempted
+    // synchronously after the business transaction. Keep failures terminal so
+    // operators can inspect and manually retry the outbox record.
+    entry.set("status", "FAILED");
+    try { app.save(entry); } catch (saveError) { app.logger().error("[bvhub notifications] failed to persist delivery error", "notificationId", id, "err", saveError); }
+    app.logger().error("[bvhub notifications] email send failed", "notificationId", id, "kind", entry.getString("kind"), "attempts", attempts, "err", message);
+  }
+}
+
 function retryDelayMinutes(attempts) { return RETRY_MINUTES[Math.min(Math.max(attempts - 1, 0), RETRY_MINUTES.length - 1)]; }
 
-module.exports = { MAX_ATTEMPTS, send, retryDelayMinutes, subjectFor, renderHtml };
+module.exports = { MAX_ATTEMPTS, send, deliver, retryDelayMinutes, subjectFor, renderHtml };

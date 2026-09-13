@@ -446,6 +446,12 @@ const publishedEvent = expectStatus(await request("PATCH", `/api/bvhub/admin/eve
   token: adminLogin.token, body: { published: true },
 }), 200, "admin publishes event");
 assert.equal(publishedEvent.published, true);
+const adminAddMailBefore = smtpMessages.length;
+expectStatus(await request("POST", `/api/bvhub/admin/events/${validEvent.id}/participants`, { token: adminLogin.token, body: { userId: member.id } }), 201, "admin add participant immediate mail");
+assert.match(await waitForMail(adminAddMailBefore), /hinzugef/);
+const adminRemoveMailBefore = smtpMessages.length;
+expectStatus(await request("DELETE", `/api/bvhub/admin/events/${validEvent.id}/participants/${member.id}`, { token: adminLogin.token }), 200, "admin remove participant immediate mail");
+assert.match(await waitForMail(adminRemoveMailBefore), /abgemeldet/);
 const publicEventList = expectStatus(await request("GET", "/api/bvhub/events", { token: memberLoginToken }), 200, "member reads published events");
 assert.ok(publicEventList.items.some((item) => item.id === validEvent.id), "published future event appears in public event list");
 expectStatus(await request("GET", `/api/bvhub/events/${validEvent.id}`, { token: guestLoginToken }), 200, "guest reads published event detail");
@@ -455,26 +461,65 @@ expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrat
 expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrations`, {
   token: memberLoginToken, body: { checkoutRegion: "NUE", termsVersion: "NUE-v1" },
 }), 409, "registration rejects wrong checkout region");
+const eventRegistrationMailBefore = smtpMessages.length;
 const wuRegistration = expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrations`, {
   token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" },
 }), 201, "member registers for event");
 assert.equal(wuRegistration.status, "REGISTERED");
+assert.match(await waitForMail(eventRegistrationMailBefore), /Anmeldung best/);
+assert.match(smtpMessages.at(-1), /WU-05 Integration Event/);
 const repeatedRegistration = expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrations`, {
   token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" },
 }), 201, "repeated registration is idempotent");
 assert.equal(repeatedRegistration.id, wuRegistration.id);
 expectStatus(await request("GET", `/api/bvhub/events/${validEvent.id}/registration`, { token: memberLoginToken }), 200, "member reads own registration");
+const adminRemoveAgainMailBefore = smtpMessages.length;
+expectStatus(await request("DELETE", `/api/bvhub/admin/events/${validEvent.id}/participants/${member.id}`, { token: adminLogin.token }), 200, "admin removes participant immediate mail");
+assert.match(await waitForMail(adminRemoveAgainMailBefore), /abgemeldet/);
+const rejoinMailBefore = smtpMessages.length;
+expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrations`, { token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" } }), 201, "member re-registers after admin remove");
+assert.match(await waitForMail(rejoinMailBefore), /Anmeldung best/);
+const cancellationMailBefore = smtpMessages.length;
 expectStatus(await request("DELETE", `/api/bvhub/events/${validEvent.id}/registrations/me`, { token: memberLoginToken }), 200, "member cancels own registration");
+assert.match(await waitForMail(cancellationMailBefore), /Anmeldung storniert/);
+const reRegistrationMailBefore = smtpMessages.length;
 expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrations`, {
   token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" },
 }), 201, "member registers again after cancellation");
+assert.match(await waitForMail(reRegistrationMailBefore), /Anmeldung best/);
 const outbox = expectStatus(await request("GET", `/api/collections/notification_outbox/records?filter=${encodeURIComponent(`registration = "${wuRegistration.id}"`)}`, { token: rootToken }), 200, "registration creates notification outbox");
-assert.equal(outbox.items.length, 3, "each registration state transition creates one notification outbox item");
+assert.equal(outbox.items.length, 7, "each registration state transition creates one notification outbox item");
 assert.deepEqual(outbox.items.map((item) => item.kind).sort(), [
+  "EVENT_ADMIN_ADDED",
+  "EVENT_ADMIN_REMOVED",
+  "EVENT_ADMIN_REMOVED",
   "EVENT_REGISTRATION_CANCELLED",
   "EVENT_REGISTRATION_CONFIRMED",
   "EVENT_REGISTRATION_CONFIRMED",
+  "EVENT_REGISTRATION_CONFIRMED",
 ].sort(), "registration, cancellation, and re-registration are notified once each");
+
+const waitingEvent = expectStatus(await request("POST", "/api/bvhub/admin/events", { token: adminLogin.token, body: { ...eventPayload, title: "WU-05 Waiting Event", capacity: 1, published: true, status: "OPEN_TO_ALL" } }), 201, "create waiting-list event");
+expectStatus(await request("POST", `/api/bvhub/events/${waitingEvent.id}/registrations`, { token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" } }), 201, "fill waiting-list event");
+const waitingMailBefore = smtpMessages.length;
+const waitingRegistration = expectStatus(await request("POST", `/api/bvhub/events/${waitingEvent.id}/registrations`, { token: guestLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" } }), 201, "join waiting list");
+assert.equal(waitingRegistration.status, "WAITING");
+assert.match(await waitForMail(waitingMailBefore), /Warteliste/);
+const promotionMailBefore = smtpMessages.length;
+expectStatus(await request("DELETE", `/api/bvhub/events/${waitingEvent.id}/registrations/me`, { token: memberLoginToken }), 200, "cancel and promote waiting member");
+assert.match(await waitForMail(promotionMailBefore), /nachger/);
+assert.match(smtpMessages.at(-1), /WU-05 Waiting Event/);
+const promotedRegistration = expectStatus(await request("GET", `/api/bvhub/events/${waitingEvent.id}/registration`, { token: guestLoginToken }), 200, "read promoted registration");
+assert.equal(promotedRegistration.status, "REGISTERED");
+const promotedOutbox = expectStatus(await request("GET", `/api/collections/notification_outbox/records?filter=${encodeURIComponent(`registration = "${waitingRegistration.id}"`)}`, { token: rootToken }), 200, "waiting-list outbox");
+assert.deepEqual(promotedOutbox.items.map((item) => item.kind).sort(), ["EVENT_WAITING_LIST_JOINED", "EVENT_WAITING_LIST_PROMOTED"].sort());
+
+const voluntaryEvent = expectStatus(await request("POST", "/api/bvhub/admin/events", { token: adminLogin.token, body: { ...eventPayload, title: "WU-05 Voluntary Waiting Event", capacity: 1, published: true, status: "OPEN_TO_ALL" } }), 201, "create voluntary waiting event");
+expectStatus(await request("POST", `/api/bvhub/events/${voluntaryEvent.id}/registrations`, { token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" } }), 201, "fill voluntary event");
+const voluntary = expectStatus(await request("POST", `/api/bvhub/events/${voluntaryEvent.id}/registrations`, { token: guestLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" } }), 201, "voluntarily join waiting list");
+const voluntaryMailBefore = smtpMessages.length;
+expectStatus(await request("DELETE", `/api/bvhub/events/${voluntaryEvent.id}/registrations/me`, { token: guestLoginToken }), 200, "leave waiting list");
+assert.match(await waitForMail(voluntaryMailBefore), /Warteliste verlassen/);
 
 const cancelledEvent = expectStatus(await request("PATCH", `/api/bvhub/admin/events/${validEvent.id}`, {
   token: adminLogin.token, body: { status: "CANCELLED" },
