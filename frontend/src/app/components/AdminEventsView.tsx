@@ -116,7 +116,7 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
       <div className="mx-auto max-w-6xl">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-700">{t("admin.title")}</h1>
+            <h1 className="text-2xl font-bold">{t("admin.title")}</h1>
             <p className="mt-1 text-sm text-[var(--muted-foreground)]">
               {tab === "events"
                 ? t("admin.events.title")
@@ -131,7 +131,7 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
         </div>
         <div className="mt-5 flex gap-2 border-b border-[var(--border)]">
           <button
-            className={`px-3 py-2 text-sm font-600 ${
+            className={`px-3 py-2 text-sm font-semibold ${
               tab === "events"
                 ? "border-b-2 border-[var(--primary)] text-[var(--primary)]"
                 : "text-[var(--muted-foreground)]"
@@ -141,7 +141,7 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
             {t("admin.events.title")}
           </button>
           <button
-            className={`px-3 py-2 text-sm font-600 ${
+            className={`px-3 py-2 text-sm font-semibold ${
               tab === "venues"
                 ? "border-b-2 border-[var(--primary)] text-[var(--primary)]"
                 : "text-[var(--muted-foreground)]"
@@ -265,7 +265,7 @@ function VenuePanel({
           <Card key={venue.id} className="p-4">
             <div className="flex justify-between gap-3">
               <div>
-                <h2 className="font-700">{venue.name}</h2>
+                <h2 className="font-bold">{venue.name}</h2>
                 <p className="text-sm text-[var(--muted-foreground)]">
                   {venue.address}
                 </p>
@@ -310,13 +310,13 @@ function VenuePanel({
       </div>
       {formOpen && (
         <form
-          className="mt-5 grid gap-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4"
+          className="mt-5 grid gap-3 rounded-lg border border-[var(--border)] bg-[var(--card)] p-4"
           onSubmit={(e) => {
             e.preventDefault()
             onSave()
           }}
         >
-          <h2 className="font-700">
+          <h2 className="font-bold">
             {editing ? t("admin.venues.edit") : t("admin.venues.create")}
           </h2>
           <label className="grid gap-1 text-sm">
@@ -439,7 +439,7 @@ function EventPanel({
           <Card key={event.id} className="p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h2 className="font-700">{event.title}</h2>
+                <h2 className="font-bold">{event.title}</h2>
                 <p className="text-xs text-[var(--muted-foreground)]">
                   {event.venue.name} ·{" "}
                   {event.start.slice(0, 16).replace("T", " ")}
@@ -481,13 +481,13 @@ function EventPanel({
       </div>
       {formOpen && (
         <form
-          className="mt-5 grid gap-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4"
+          className="mt-5 grid gap-3 rounded-lg border border-[var(--border)] bg-[var(--card)] p-4"
           onSubmit={(e) => {
             e.preventDefault()
             onSave()
           }}
         >
-          <h2 className="font-700">
+          <h2 className="font-bold">
             {editing ? t("admin.events.title") : t("admin.events.create")}
           </h2>
           <label className="grid gap-1 text-sm">

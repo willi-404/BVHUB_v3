@@ -131,7 +131,7 @@ export default function AdminEventDetailPage() {
         </Link>
         <Card className="mt-4 p-5 lg:p-8">
           <div className="flex items-center justify-between gap-3">
-            <h1 className="text-2xl font-700">
+            <h1 className="text-2xl font-bold">
               {t("common.edit")}: {event.title}
             </h1>
             <span className="text-xs">
@@ -296,13 +296,13 @@ export default function AdminEventDetailPage() {
           <AdminParticipants eventId={event.id} />
           {changelog.data?.items?.length ? (
             <section className="mt-8">
-              <h2 className="text-sm font-700">
+              <h2 className="text-sm font-bold">
                 {t("admin.events.changelog")}
               </h2>
               <div className="mt-3 grid gap-2">
                 {changelog.data.items.map((entry) => (
                   <div key={entry.id} className="rounded border p-3 text-xs">
-                    <div className="font-600">
+                    <div className="font-semibold">
                       {entry.action} · {entry.actorName} ({entry.actorRole})
                     </div>
                     <time dateTime={entry.created}>
@@ -340,7 +340,7 @@ function AdminParticipants({ eventId }: { eventId: string }) {
   return (
     <section className="mt-8 border-t border-[var(--border)] pt-6">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-lg font-700">{t("events.participantsTitle")}</h2>
+        <h2 className="text-lg font-bold">{t("events.participantsTitle")}</h2>
         <span className="text-sm text-[var(--muted-foreground)]">
           {participants.data?.totalItems ?? 0}
         </span>
@@ -389,7 +389,7 @@ function AdminParticipants({ eventId }: { eventId: string }) {
         </p>
       )}
       <div className="mt-5">
-        <h3 className="text-sm font-700">{t("events.addParticipant")}</h3>
+        <h3 className="text-sm font-bold">{t("events.addParticipant")}</h3>
         <Input
           className="mt-2 h-10 w-full"
           value={search}

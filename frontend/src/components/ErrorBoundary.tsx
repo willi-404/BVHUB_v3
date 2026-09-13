@@ -28,10 +28,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   render(): ReactNode {
     if (!this.state.hasError) return this.props.children;
     return (
-      <main role="alert" className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 bg-[var(--background)] text-[var(--foreground)]">
-        <h1 className="text-xl font-700">{this.props.translate?.("errors.unexpected_title") ?? "Something went wrong"}</h1>
-        <p className="text-sm text-[var(--muted-foreground)]">{this.props.translate?.("errors.unexpected_message") ?? "An unexpected error occurred."}</p>
-        <button type="button" onClick={() => window.location.reload()} className="h-10 px-4 rounded-[var(--radius)] bg-[var(--primary)] text-[var(--primary-foreground)] font-500">
+      <main role="alert" className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-6 text-foreground">
+        <h1 className="text-xl font-bold">{this.props.translate?.("errors.unexpected_title") ?? "Something went wrong"}</h1>
+        <p className="text-sm text-muted-foreground">{this.props.translate?.("errors.unexpected_message") ?? "An unexpected error occurred."}</p>
+        <button type="button" onClick={() => window.location.reload()} className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90">
           {this.props.translate?.("common.reload") ?? "Reload"}
         </button>
       </main>

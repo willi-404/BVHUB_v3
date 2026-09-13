@@ -214,7 +214,7 @@ function MemberCardOverlay({ onClose }: { onClose: () => void }) {
         >
           <Icon d={icons.chevronLeft} size={20} />
         </button>
-        <span className="text-white/60 text-sm font-500">{t("profile.memberCard")}</span>
+        <span className="text-white/60 text-sm font-medium">{t("profile.memberCard")}</span>
         <div className="w-9" />
       </div>
 
@@ -223,7 +223,7 @@ function MemberCardOverlay({ onClose }: { onClose: () => void }) {
         <div className="h-20 w-20 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center mb-3 backdrop-blur-sm overflow-hidden p-1">
           <img src={logoSrc} alt={t("brand.logoAlt")} className="h-full w-full object-contain" />
         </div>
-        <p className="text-white font-700 text-base leading-tight text-center">{t("brand.name")}</p>
+        <p className="text-white font-bold text-base leading-tight text-center">{t("brand.name")}</p>
         <p className="text-white/50 text-xs mt-0.5">{t("brand.established")}</p>
       </div>
 
@@ -249,7 +249,7 @@ function MemberCardOverlay({ onClose }: { onClose: () => void }) {
               );
             })}
           </div>
-          <p className="text-[10px] text-gray-400 font-500 text-center leading-snug">{t("profile.scanToVerify")}</p>
+          <p className="text-[10px] text-gray-400 font-medium text-center leading-snug">{t("profile.scanToVerify")}</p>
         </div>
         <p className="text-white/35 text-[10px] mt-4 text-center">{memberId}</p>
       </div>
@@ -287,8 +287,8 @@ function EditProfileOverlay({ onClose }: { onClose: () => void }) {
   }
   const field = (key: keyof ProfilePatch, label: string, type = "text") => (
     <label className="flex flex-col gap-1.5" key={key}>
-      <span className="text-xs font-600 text-[var(--muted-foreground)] uppercase tracking-wide">{label}</span>
-      <input type={type} value={String(values[key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))} className="w-full h-11 px-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 transition-all" />
+      <span className="text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">{label}</span>
+      <input type={type} value={String(values[key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))} className="w-full h-11 px-3 rounded-lg border border-[var(--border)] bg-[var(--card)] text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 transition-all" />
     </label>
   );
 
@@ -299,11 +299,11 @@ function EditProfileOverlay({ onClose }: { onClose: () => void }) {
         <button onClick={close} className="h-9 w-9 flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)]" aria-label={t("common.close")}>
           <Icon d={icons.x} size={18} />
         </button>
-        <span className="text-sm font-600">{t("profile.edit")}</span>
+        <span className="text-sm font-semibold">{t("profile.edit")}</span>
         <button
           onClick={save}
           disabled={mutation.isPending || isLoading || !initialized}
-          className="text-sm font-600 text-[var(--primary)] px-2 py-1 rounded hover:bg-[var(--secondary)] transition-colors"
+          className="text-sm font-semibold text-[var(--primary)] px-2 py-1 rounded hover:bg-[var(--secondary)] transition-colors"
         >
           {mutation.isPending ? t("common.saving") : saved ? t("common.saved") : t("common.save")}
         </button>
@@ -321,7 +321,7 @@ function EditProfileOverlay({ onClose }: { onClose: () => void }) {
             <div className="grid md:grid-cols-2 gap-4">{field("birthDate", t("profile.birthDate"), "date")}{field("phone", t("profile.phone"))}</div>
             {field("contactInfo", t("profile.contactInfo"))}
           </div>
-          <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] divide-y divide-[var(--border)]">
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)] divide-y divide-[var(--border)]">
             {[
               { label: t("profile.userId"), value: data.user.id },
               { label: t("auth.email"), value: data.user.email },
@@ -330,7 +330,7 @@ function EditProfileOverlay({ onClose }: { onClose: () => void }) {
             ].map(({ label, value }) => (
               <div key={label} className="flex items-center justify-between px-3 py-2.5">
                 <span className="text-xs text-[var(--muted-foreground)]">{label}</span>
-                <span className="text-xs font-500 text-[var(--foreground)]">{value}</span>
+                <span className="text-xs font-medium text-[var(--foreground)]">{value}</span>
               </div>
             ))}
           </div>
@@ -352,8 +352,8 @@ function StatBar() {
         { label: t("dashboard.registered"), value: "2", sub: t("dashboard.byYou"), color: "hsl(217,91%,60%)" },
       ].map((stat) => (
         <Card key={stat.label} className="text-center py-3 px-2">
-          <div className="text-2xl font-700" style={{ color: stat.color }}>{stat.value}</div>
-          <div className="text-xs font-600 text-[var(--foreground)] mt-0.5">{stat.label}</div>
+          <div className="text-2xl font-bold" style={{ color: stat.color }}>{stat.value}</div>
+          <div className="text-xs font-semibold text-[var(--foreground)] mt-0.5">{stat.label}</div>
           <div className="text-[10px] text-[var(--muted-foreground)] mt-0.5">{stat.sub}</div>
         </Card>
       ))}
@@ -371,11 +371,11 @@ function QuickActions() {
   return (
     <div className="grid grid-cols-3 gap-2">
       {actions.map((a) => (
-        <button key={a.label} className="flex flex-col items-center gap-2 p-3 rounded-[var(--radius)] bg-[var(--card)] border border-[var(--border)] active:scale-95 transition-all duration-150 cursor-pointer hover:border-[var(--primary)] hover:shadow-sm">
+        <button key={a.label} className="flex flex-col items-center gap-2 p-3 rounded-lg bg-[var(--card)] border border-[var(--border)] active:scale-95 transition-all duration-150 cursor-pointer hover:border-[var(--primary)] hover:shadow-sm">
           <div className="h-11 w-11 rounded-full flex items-center justify-center" style={{ background: a.bg, color: a.color }}>
             <Icon d={a.icon} size={20} />
           </div>
-          <span className="text-[11px] font-500 text-[var(--foreground)] text-center leading-tight">{a.label}</span>
+          <span className="text-[11px] font-medium text-[var(--foreground)] text-center leading-tight">{a.label}</span>
         </button>
       ))}
     </div>
@@ -387,8 +387,8 @@ function NewsSection() {
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-600 text-[var(--foreground)]">{t("dashboard.news")}</h2>
-        <button className="text-xs text-[var(--primary)] font-500 flex items-center gap-0.5">
+        <h2 className="text-sm font-semibold text-[var(--foreground)]">{t("dashboard.news")}</h2>
+        <button className="text-xs text-[var(--primary)] font-medium flex items-center gap-0.5">
           {t("common.seeAll")} <Icon d={icons.chevronRight} size={12} />
         </button>
       </div>
@@ -399,9 +399,9 @@ function NewsSection() {
               <Badge variant={item.tagColor}>{t("demo.news.tag")}</Badge>
               <span className="text-[10px] text-[var(--muted-foreground)]">{formatLocaleDate(item.date, locale)}</span>
             </div>
-            <h3 className="font-600 text-sm text-[var(--foreground)] leading-snug mb-1">{t("demo.news.title")}</h3>
+            <h3 className="font-semibold text-sm text-[var(--foreground)] leading-snug mb-1">{t("demo.news.title")}</h3>
             <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">{t("demo.news.excerpt")}</p>
-            <button className="mt-2 text-xs text-[var(--primary)] font-500 flex items-center gap-0.5">
+            <button className="mt-2 text-xs text-[var(--primary)] font-medium flex items-center gap-0.5">
               {t("common.readMore")} <Icon d={icons.chevronRight} size={11} />
             </button>
           </div>
@@ -423,7 +423,7 @@ function EventCard({ event, onToggle }: { event: Event; onToggle: (id: number) =
           <Badge variant="outline">{t(levelKeys[event.level])}</Badge>
           {event.isRegistered && <Badge variant="success">{t("events.registered")}</Badge>}
         </div>
-        <h3 className="font-600 text-sm text-[var(--foreground)] leading-tight mb-2">{t(eventTitleKeys[event.title] ?? "demo.event.social")}</h3>
+        <h3 className="font-semibold text-sm text-[var(--foreground)] leading-tight mb-2">{t(eventTitleKeys[event.title] ?? "demo.event.social")}</h3>
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]">
             <Icon d={icons.calendar} size={12} />
@@ -443,7 +443,7 @@ function EventCard({ event, onToggle }: { event: Event; onToggle: (id: number) =
               <Icon d={icons.users} size={12} />
               <span>{t("events.participantCount", { registered: event.registered, capacity: event.capacity })}</span>
             </div>
-            <span className={`text-xs font-500 ${isFull ? "text-red-500" : spotsLeft <= 4 ? "text-amber-600" : "text-[var(--muted-foreground)]"}`}>
+            <span className={`text-xs font-medium ${isFull ? "text-red-500" : spotsLeft <= 4 ? "text-amber-600" : "text-[var(--muted-foreground)]"}`}>
               {isFull ? t("events.full") : t("events.spotsLeft", { count: spotsLeft })}
             </span>
           </div>
@@ -475,7 +475,7 @@ function PaymentCard({ payment, onPay }: { payment: Payment; onPay: (id: number)
             {payment.paid ? t("payments.paid") : t("payments.unpaid")}
           </Badge>
         </div>
-        <h3 className="font-600 text-sm text-[var(--foreground)] leading-tight mb-2">{t(eventTitleKeys[payment.eventTitle] ?? "demo.event.social")}</h3>
+        <h3 className="font-semibold text-sm text-[var(--foreground)] leading-tight mb-2">{t(eventTitleKeys[payment.eventTitle] ?? "demo.event.social")}</h3>
         <div className="flex flex-col gap-1 mb-3">
           <div className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]">
             <Icon d={icons.calendar} size={12} />
@@ -487,11 +487,11 @@ function PaymentCard({ payment, onPay }: { payment: Payment; onPay: (id: number)
         </div>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wide font-500">{t("payments.amount")}</p>
-            <p className="text-xl font-700 text-[var(--foreground)] mt-0.5">€{payment.price.toFixed(2)}</p>
+            <p className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wide font-medium">{t("payments.amount")}</p>
+            <p className="text-xl font-bold text-[var(--foreground)] mt-0.5">€{payment.price.toFixed(2)}</p>
           </div>
           {payment.paid ? (
-            <div className="flex items-center gap-1.5 text-emerald-600 text-sm font-600">
+            <div className="flex items-center gap-1.5 text-emerald-600 text-sm font-semibold">
               <Icon d={icons.check} size={16} />
               {t("common.done")}
             </div>
@@ -544,7 +544,7 @@ function DashboardView({ events, liveEvents, onToggle, onOpenCard, profile }: { 
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs text-[var(--muted-foreground)]">{t("dashboard.welcome")}</p>
-          <h1 className="text-xl font-700 text-[var(--foreground)]">{displayName}</h1>
+          <h1 className="text-xl font-bold text-[var(--foreground)]">{displayName}</h1>
         </div>
         <div className="flex items-center gap-2">
           <button className="relative h-9 w-9 rounded-full flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
@@ -566,7 +566,7 @@ function DashboardView({ events, liveEvents, onToggle, onOpenCard, profile }: { 
       <StatBar />
 
       <div>
-        <h2 className="text-sm font-600 text-[var(--foreground)] mb-3">{t("dashboard.quickActions")}</h2>
+        <h2 className="text-sm font-semibold text-[var(--foreground)] mb-3">{t("dashboard.quickActions")}</h2>
         <QuickActions />
       </div>
 
@@ -574,8 +574,8 @@ function DashboardView({ events, liveEvents, onToggle, onOpenCard, profile }: { 
 
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-600 text-[var(--foreground)]">{t("dashboard.upcomingEvents")}</h2>
-          <button className="text-xs text-[var(--primary)] font-500 flex items-center gap-0.5">
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">{t("dashboard.upcomingEvents")}</h2>
+          <button className="text-xs text-[var(--primary)] font-medium flex items-center gap-0.5">
             {t("common.seeAll")} <Icon d={icons.chevronRight} size={12} />
           </button>
         </div>
@@ -583,7 +583,7 @@ function DashboardView({ events, liveEvents, onToggle, onOpenCard, profile }: { 
       </div>
 
       <div>
-        <h2 className="text-sm font-600 text-[var(--foreground)] mb-1">{t("dashboard.recentActivity")}</h2>
+        <h2 className="text-sm font-semibold text-[var(--foreground)] mb-1">{t("dashboard.recentActivity")}</h2>
         <Card>
           <CardContent className="pt-0 px-4 pb-2">
             <ActivityFeed />
@@ -599,7 +599,7 @@ function EventsView({ events, loading, error }: { events: EventRecord[]; loading
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-xl font-700 text-[var(--foreground)]">{t("events.title")}</h1>
+        <h1 className="text-xl font-bold text-[var(--foreground)]">{t("events.title")}</h1>
         <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{t("events.subtitle")}</p>
       </div>
       {loading && <p className="text-sm text-[var(--muted-foreground)]">{t("common.loading")}</p>}
@@ -612,7 +612,7 @@ function EventsView({ events, loading, error }: { events: EventRecord[]; loading
 function LiveEventCards({ events }: { events: EventRecord[] }) {
   const { t, locale } = useI18n();
   if (!events.length) return <p className="text-sm text-[var(--muted-foreground)]">{t("events.empty")}</p>;
-  return <div className="flex max-h-[min(62vh,44rem)] flex-col gap-3 overflow-y-auto pr-1">{events.map((event) => <Card key={event.id} className="p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="font-700 text-[var(--foreground)]">{event.title}</h3><p className="mt-1 text-xs text-[var(--muted-foreground)]">{event.venue.name}</p></div><Badge variant={event.status === "CANCELLED" || event.status === "COMPLETED" ? "destructive" : "success"}>{t(`events.status.${event.status}` as MessageKey)}</Badge></div><div className="mt-3 grid gap-1 text-xs text-[var(--muted-foreground)] sm:grid-cols-2"><span>{formatLocaleDateTime(event.start, locale)} - {formatLocaleDateTime(event.end, locale)}</span><span>{t("events.capacity")}: {event.registeredCount}/{event.capacity} ({event.spotsLeft} {t("events.spotsLeftLabel")})</span></div><Link className="mt-3 inline-flex text-xs font-600 text-[var(--primary)] underline" to={`/events/${encodeURIComponent(event.id)}`}>{t("events.details")}</Link></Card>)}</div>;
+  return <div className="flex max-h-[min(62vh,44rem)] flex-col gap-3 overflow-y-auto pr-1">{events.map((event) => <Card key={event.id} className="p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="font-bold text-[var(--foreground)]">{event.title}</h3><p className="mt-1 text-xs text-[var(--muted-foreground)]">{event.venue.name}</p></div><Badge variant={event.status === "CANCELLED" || event.status === "COMPLETED" ? "destructive" : "success"}>{t(`events.status.${event.status}` as MessageKey)}</Badge></div><div className="mt-3 grid gap-1 text-xs text-[var(--muted-foreground)] sm:grid-cols-2"><span>{formatLocaleDateTime(event.start, locale)} - {formatLocaleDateTime(event.end, locale)}</span><span>{t("events.capacity")}: {event.registeredCount}/{event.capacity} ({event.spotsLeft} {t("events.spotsLeftLabel")})</span></div><Link className="mt-3 inline-flex text-xs font-semibold text-[var(--primary)] underline" to={`/events/${encodeURIComponent(event.id)}`}>{t("events.details")}</Link></Card>)}</div>;
 }
 
 function PaymentsView({ payments, onPay }: { payments: Payment[]; onPay: (id: number) => void }) {
@@ -620,13 +620,13 @@ function PaymentsView({ payments, onPay }: { payments: Payment[]; onPay: (id: nu
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-xl font-700 text-[var(--foreground)]">{t("payments.title")}</h1>
+        <h1 className="text-xl font-bold text-[var(--foreground)]">{t("payments.title")}</h1>
         <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{t("payments.subtitle")}</p>
       </div>
       {payments.length === 0 ? (
         <div className="flex flex-col items-center py-16 text-[var(--muted-foreground)]">
           <Icon d={icons.creditCard} size={32} />
-          <p className="text-sm mt-3 font-500">{t("payments.empty")}</p>
+          <p className="text-sm mt-3 font-medium">{t("payments.empty")}</p>
           <p className="text-xs mt-1">{t("payments.emptyHint")}</p>
         </div>
       ) : (
@@ -661,7 +661,7 @@ function AdminDrawer({ onClose, onAdminMembers, onAdminPayments, onAdminEvents }
           <div className="h-7 w-7 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700">
             <Icon d={icons.shieldAdmin} size={14} />
           </div>
-          <span className="text-sm font-700 text-[var(--foreground)]">{t("admin.area")}</span>
+          <span className="text-sm font-bold text-[var(--foreground)]">{t("admin.area")}</span>
           <button onClick={onClose} className="ml-auto text-[var(--muted-foreground)] hover:text-[var(--foreground)] h-8 w-8 flex items-center justify-center rounded-full hover:bg-[var(--muted)]">
             <Icon d={icons.x} size={16} />
           </button>
@@ -673,7 +673,7 @@ function AdminDrawer({ onClose, onAdminMembers, onAdminPayments, onAdminEvents }
             <button
               key={item.label}
               onClick={() => { onClose(); if (item.label === "Members") onAdminMembers(); else if (item.label === "Payments") onAdminPayments(); else if (item.label === "Event Manage") onAdminEvents(); }}
-              className="flex items-center gap-3 px-4 py-3.5 rounded-[var(--radius)] bg-amber-50 border border-amber-100 text-amber-800 font-500 text-sm hover:bg-amber-100 active:scale-[0.98] transition-all w-full"
+              className="flex items-center gap-3 px-4 py-3.5 rounded-lg bg-amber-50 border border-amber-100 text-amber-800 font-medium text-sm hover:bg-amber-100 active:scale-[0.98] transition-all w-full"
             >
               <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700 shrink-0">
                 <Icon d={item.icon} size={17} />
@@ -692,7 +692,7 @@ function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, onAdmin
   const { t, locale } = useI18n();
   const [adminOpen, setAdminOpen] = useState(false);
 
-  if (!profile) return <div className="flex flex-col gap-4"><Card><CardContent className="p-5"><h1 className="text-lg font-700">{t("profile.title")}</h1><p className="text-sm text-[var(--muted-foreground)] mt-2">{t("profile.incompleteDetails")}</p><Button className="mt-4" onClick={onEditProfile}>{t("profile.edit")}</Button></CardContent></Card><Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 gap-2" onClick={onLogout}><Icon d={icons.logout} size={15} /> {t("auth.signOut")}</Button></div>;
+  if (!profile) return <div className="flex flex-col gap-4"><Card><CardContent className="p-5"><h1 className="text-lg font-bold">{t("profile.title")}</h1><p className="text-sm text-[var(--muted-foreground)] mt-2">{t("profile.incompleteDetails")}</p><Button className="mt-4" onClick={onEditProfile}>{t("profile.edit")}</Button></CardContent></Card><Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 gap-2" onClick={onLogout}><Icon d={icons.logout} size={15} /> {t("auth.signOut")}</Button></div>;
   const initials = `${profile.user.firstName[0] || ""}${profile.user.lastName[0] || ""}`.toUpperCase() || "?";
   const address = profile.profile ? `${profile.profile.street} ${profile.profile.houseNumber}, ${profile.profile.postalCode} ${profile.profile.city}` : t("profile.incomplete");
   const localizedBirthDate = profile.profile?.birthDate ? formatLocaleDate(`${profile.profile.birthDate}T12:00:00Z`, locale) : "-";
@@ -701,7 +701,7 @@ function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, onAdmin
     <div className="flex flex-col gap-4">
       <div className="flex flex-col items-center pt-4 pb-2">
         <Avatar fallback={initials} size="lg" className="h-16 w-16 text-lg mb-3" />
-        <h1 className="text-lg font-700">{profile.user.displayName}</h1>
+        <h1 className="text-lg font-bold">{profile.user.displayName}</h1>
         <p className="text-xs text-[var(--muted-foreground)]">{profile.user.email}</p>
         <Badge variant={profile.user.active ? "success" : "outline"} className="mt-2">{profile.user.role === "SUPER_ADMIN" ? t("roles.superAdmin") : profile.user.role === "ADMIN" ? t("roles.admin") : profile.user.role === "MEMBER" ? t("roles.member") : t("roles.guest")}</Badge>
       </div>
@@ -717,7 +717,7 @@ function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, onAdmin
             <div key={item.label}>
               <button onClick={item.action} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--muted)] text-left transition-colors">
                 <span className="text-[var(--muted-foreground)]"><Icon d={item.icon} size={16} /></span>
-                <span className="flex-1 text-sm font-500">{item.label}</span>
+                <span className="flex-1 text-sm font-medium">{item.label}</span>
                 <span className="text-[var(--muted-foreground)]"><Icon d={icons.chevronRight} size={14} /></span>
               </button>
               {i < arr.length - 1 && <Separator />}
@@ -785,12 +785,12 @@ function BottomNav({
             <div className="relative">
               <Icon d={item.icon} size={20} />
               {showDot && (
-                <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-red-500 border-2 border-[var(--card)] text-[8px] text-white font-700 flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-red-500 border-2 border-[var(--card)] text-[8px] text-white font-bold flex items-center justify-center">
                   {unpaidCount}
                 </span>
               )}
             </div>
-            <span className="text-[10px] font-500">{t(primaryNavMessageKey(item.key))}</span>
+            <span className="text-[10px] font-medium">{t(primaryNavMessageKey(item.key))}</span>
           </button>
         );
       })}
@@ -832,7 +832,7 @@ function Sidebar({
           <img src={logoSrc} alt={t("brand.logoAlt")} className="h-full w-full object-contain p-0.5" />
           </div>
           <div className="min-w-0">
-            <p className="font-700 text-xs leading-tight truncate">{t("brand.name")}</p>
+            <p className="font-bold text-xs leading-tight truncate">{t("brand.name")}</p>
             <p className="text-[10px] text-[var(--muted-foreground)] truncate">{t("brand.legalSuffix")}</p>
           </div>
         </div>
@@ -843,7 +843,7 @@ function Sidebar({
         <div className="flex items-center gap-3">
           <Avatar fallback={displayName.slice(0, 2).toUpperCase()} size="md" />
           <div className="min-w-0">
-            <p className="text-sm font-600 truncate">{displayName}</p>
+            <p className="text-sm font-semibold truncate">{displayName}</p>
             <p className="text-[10px] text-[var(--muted-foreground)]">{role}</p>
             <div className="text-[10px] text-[var(--muted-foreground)]/75 leading-tight">{groups.length ? groups.map((group) => <p key={group} className="truncate">{group}</p>) : <p>-</p>}</div>
           </div>
@@ -862,12 +862,12 @@ function Sidebar({
             <button
               key={item.key}
               onClick={() => onChange(item.key)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius)] text-sm font-500 transition-all duration-150 w-full ${isActive ? "bg-[var(--secondary)] text-[var(--primary)]" : "text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"}`}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 w-full ${isActive ? "bg-[var(--secondary)] text-[var(--primary)]" : "text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"}`}
             >
               <div className="relative">
                 <Icon d={item.icon} size={17} />
                 {showDot && (
-                  <span className="absolute -top-1.5 -right-1.5 h-3.5 w-3.5 rounded-full bg-red-500 text-white text-[8px] font-700 flex items-center justify-center">
+                  <span className="absolute -top-1.5 -right-1.5 h-3.5 w-3.5 rounded-full bg-red-500 text-white text-[8px] font-bold flex items-center justify-center">
                     {unpaidCount}
                   </span>
                 )}
@@ -883,14 +883,14 @@ function Sidebar({
       {canAccessAdmin && <div className="px-3 pb-2 pt-3 border-t border-[var(--border)]">
         <div className="flex items-center gap-2 px-3 mb-2">
           <div className="h-px flex-1 bg-[var(--border)]" />
-          <span className="text-[10px] font-600 text-[var(--muted-foreground)] uppercase tracking-widest">{t("admin.title")}</span>
+          <span className="text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-widest">{t("admin.title")}</span>
           <div className="h-px flex-1 bg-[var(--border)]" />
         </div>
         {ADMIN_ITEMS.map((item) => (
           <button
             key={item.label}
             onClick={item.label === "Members" ? onAdminMembers : item.label === "Payments" ? onAdminPayments : item.label === "Event Manage" ? onAdminEvents : undefined}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius)] text-sm font-500 w-full text-[var(--muted-foreground)] hover:bg-amber-50 hover:text-amber-700 transition-all duration-150"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium w-full text-[var(--muted-foreground)] hover:bg-amber-50 hover:text-amber-700 transition-all duration-150"
           >
             <Icon d={item.icon} size={17} />
             {t(item.label === "Members" ? "admin.members.title" : item.label === "Payments" ? "admin.payments.title" : "admin.events.title")}
@@ -900,7 +900,7 @@ function Sidebar({
 
       {/* Bottom */}
       <div className="p-3 border-t border-[var(--border)] flex flex-col gap-1">
-        <button onClick={onLogout} className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius)] text-sm font-500 text-red-500 hover:bg-red-50 transition-colors w-full">
+        <button onClick={onLogout} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 transition-colors w-full">
           <Icon d={icons.logout} size={17} />
           {t("auth.signOut")}
         </button>
@@ -963,12 +963,12 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
   }
 
   return (
-    <div className="h-full flex bg-[var(--background)]" style={{ fontFamily: "'Outfit', system-ui, sans-serif" }}>
+    <div className="h-full flex bg-[var(--background)]" style={{ fontFamily: "var(--font-sans)" }}>
       <Sidebar active={tab} onChange={setTab} unpaidCount={unpaidCount} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} canAccessAdmin={canAccessAdmin} profile={profile || null} />
 
       <main className="flex-1 overflow-y-auto">
         <div className="hidden lg:flex items-center justify-between px-8 py-5 border-b border-[var(--border)] bg-[var(--card)] sticky top-0 z-10">
-          <h1 className="text-base font-600 text-[var(--foreground)]">{tabLabel[tab]}</h1>
+          <h1 className="text-base font-semibold text-[var(--foreground)]">{tabLabel[tab]}</h1>
           <div className="flex items-center gap-3">
             <LanguageSwitcher className="text-[var(--foreground)]" />
             <button className="relative h-9 w-9 rounded-full flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
@@ -980,7 +980,7 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
         </div>
 
         <div className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--card)] sticky top-0 z-10">
-          <span className="text-sm font-600 text-[var(--foreground)]">{tabLabel[tab]}</span>
+          <span className="text-sm font-semibold text-[var(--foreground)]">{tabLabel[tab]}</span>
           <LanguageSwitcher className="text-[var(--foreground)]" />
         </div>
         <div className="px-4 py-5 lg:px-8 lg:py-7 pb-24 lg:pb-8 max-w-2xl lg:max-w-none">

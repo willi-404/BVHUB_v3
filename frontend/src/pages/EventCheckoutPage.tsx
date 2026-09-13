@@ -54,8 +54,8 @@ export default function EventCheckoutPage() {
     <main className="min-h-full bg-[var(--background)] px-4 py-6 lg:px-8">
       <div className="mx-auto max-w-3xl">
         <Navigation t={t} detailId={event.data.id} />
-        <article className="mt-4 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-5">
-          <h1 className="text-2xl font-700">{t("events.checkoutTitle")}</h1>
+        <article className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--card)] p-5">
+          <h1 className="text-2xl font-bold">{t("events.checkoutTitle")}</h1>
           <p className="mt-2 text-sm text-[var(--muted-foreground)]">
             {event.data.title}
           </p>

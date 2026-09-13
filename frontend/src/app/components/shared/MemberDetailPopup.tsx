@@ -56,7 +56,7 @@ function CopyButton({ text }: { text: string }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-[10px] font-700 text-[var(--muted-foreground)] uppercase tracking-widest mb-2">{title}</p>
+      <p className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-widest mb-2">{title}</p>
       <div className="flex flex-col gap-2">{children}</div>
     </div>
   );
@@ -69,7 +69,7 @@ function Row({ icon, label, value, mono = false, action }: { icon: string; label
       <div className="min-w-0 flex-1">
         <p className="text-[10px] text-[var(--muted-foreground)]">{label}</p>
         <div className="flex items-center gap-1.5">
-          <p className={`text-xs font-500 text-[var(--foreground)] break-all flex-1 ${mono ? "font-mono" : ""}`}>{value}</p>
+          <p className={`text-xs font-medium text-[var(--foreground)] break-all flex-1 ${mono ? "font-mono" : ""}`}>{value}</p>
           {action}
         </div>
       </div>
@@ -135,16 +135,16 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
         {/* Avatar */}
         <div className="flex flex-col items-center -mt-9 px-5 shrink-0">
           <div
-            className="h-18 w-18 rounded-full border-4 border-[var(--card)] flex items-center justify-center text-white text-xl font-700 shadow-lg"
+            className="h-18 w-18 rounded-full border-4 border-[var(--card)] flex items-center justify-center text-white text-xl font-bold shadow-lg"
             style={{ background: member.avatarColor, height: 72, width: 72 }}
           >
             {initials(member)}
           </div>
           <div className="mt-2 text-center">
-            <p className="font-700 text-base">{member.vorname} {member.nachname}</p>
+            <p className="font-bold text-base">{member.vorname} {member.nachname}</p>
             <p className="text-xs text-[var(--muted-foreground)]">@{member.username}</p>
             <span
-              className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-600 mt-1.5"
+              className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold mt-1.5"
               style={{ background: cfg.bg, color: cfg.color }}
             >
               {t("profile.role")}: {localizedRole}
@@ -186,7 +186,7 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
                     })}
                     {canManageGroups && <Button size="sm" onClick={() => void saveGroups()} disabled={saving}>{saving ? t("common.saving") : t("admin.groups.save")}</Button>}
                     {canManageRole && <>
-                      <label className="text-xs font-600" htmlFor="member-role">{t("profile.role")}</label>
+                      <label className="text-xs font-semibold" htmlFor="member-role">{t("profile.role")}</label>
                       <Select id="member-role" value={roleDraft} onChange={(event) => setRoleDraft(event.target.value as Role)} disabled={saving} className="h-9">
                         <option value="GUEST">{t("roles.guest")}</option>
                         <option value="MEMBER">{t("roles.member")}</option>

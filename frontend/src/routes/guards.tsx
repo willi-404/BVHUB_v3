@@ -7,7 +7,7 @@ import { useI18n } from "../i18n";
 function LoadingView() {
   const { t } = useI18n();
   return (
-    <div className="min-h-full flex items-center justify-center bg-[var(--background)] text-sm text-[var(--muted-foreground)]">
+    <div className="flex min-h-full items-center justify-center bg-background text-sm text-muted-foreground">
       {t("auth.checkingSession")}
     </div>
   );

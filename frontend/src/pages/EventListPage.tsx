@@ -16,7 +16,7 @@ export default function EventListPage() {
           <Link className="mb-4 inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground" to="/dashboard">
             {t("events.backToDashboard")}
           </Link>
-          <h1 className="text-2xl font-700">{t("events.title")}</h1>
+          <h1 className="text-2xl font-bold">{t("events.title")}</h1>
           <p className="mt-1 text-sm text-[var(--muted-foreground)]">
             {t("events.listDescription")}
           </p>
@@ -29,7 +29,7 @@ export default function EventListPage() {
         {query.isError && (
           <div
             role="alert"
-            className="rounded-[var(--radius)] border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+            className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
           >
             {t("events.loadError")}{" "}
             <Button
@@ -43,7 +43,7 @@ export default function EventListPage() {
           </div>
         )}
         {query.isSuccess && query.data.length === 0 && (
-          <p className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-6 text-sm text-[var(--muted-foreground)]">
+          <p className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-6 text-sm text-[var(--muted-foreground)]">
             {t("events.empty")}
           </p>
         )}
@@ -51,7 +51,7 @@ export default function EventListPage() {
           {query.data?.map((event) => (
             <Card key={event.id} className="p-5">
               <div className="flex items-start justify-between gap-3">
-                <h2 className="text-lg font-700">{event.title}</h2>
+                <h2 className="text-lg font-bold">{event.title}</h2>
                 <Badge
                   variant={
                     event.status !== "CANCELLED" && event.status !== "COMPLETED"
@@ -69,7 +69,7 @@ export default function EventListPage() {
                 {formatLocaleDateTime(event.end, locale)}
               </p>
               <p className="mt-2 text-sm">
-                <span className="font-600">{event.venue.name}</span>
+                <span className="font-semibold">{event.venue.name}</span>
                 <br />
                 <span className="text-[var(--muted-foreground)]">
                   {event.venue.address}

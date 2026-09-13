@@ -27,7 +27,7 @@ export default function FramePreview() {
       style={{
         minHeight: "100vh",
         background: "#1a1a2e",
-        fontFamily: "'Outfit', system-ui, sans-serif",
+        fontFamily: "var(--font-sans)",
         display: "flex",
         flexDirection: "column",
       }}

@@ -110,7 +110,7 @@ export default function EventDetailPage() {
         )}
         <Card className="mt-4 p-5 lg:p-8">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <h1 className="text-2xl font-700">{event.title}</h1>
+            <h1 className="text-2xl font-bold">{event.title}</h1>
             <Badge
               variant={
                 event.status === "CANCELLED" || event.status === "COMPLETED"
@@ -123,7 +123,7 @@ export default function EventDetailPage() {
           </div>
           {event.description && (
             <section className="mt-6">
-              <h2 className="text-sm font-700">{t("events.description")}</h2>
+              <h2 className="text-sm font-bold">{t("events.description")}</h2>
               <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--muted-foreground)]">
                 {event.description}
               </p>
@@ -131,7 +131,7 @@ export default function EventDetailPage() {
           )}
           <dl className="mt-6 grid gap-4 sm:grid-cols-2">
             <div>
-              <dt className="text-xs font-600 text-[var(--muted-foreground)]">
+              <dt className="text-xs font-semibold text-[var(--muted-foreground)]">
                 {t("start")}
               </dt>
               <dd className="mt-1 text-sm">
@@ -139,7 +139,7 @@ export default function EventDetailPage() {
               </dd>
             </div>
             <div>
-              <dt className="text-xs font-600 text-[var(--muted-foreground)]">
+              <dt className="text-xs font-semibold text-[var(--muted-foreground)]">
                 {t("end")}
               </dt>
               <dd className="mt-1 text-sm">
@@ -147,25 +147,25 @@ export default function EventDetailPage() {
               </dd>
             </div>
             <div>
-              <dt className="text-xs font-600 text-[var(--muted-foreground)]">
+              <dt className="text-xs font-semibold text-[var(--muted-foreground)]">
                 {t("events.venue")}
               </dt>
-              <dd className="mt-1 text-sm font-600">{event.venue.name}</dd>
+              <dd className="mt-1 text-sm font-semibold">{event.venue.name}</dd>
             </div>
             <div>
-              <dt className="text-xs font-600 text-[var(--muted-foreground)]">
+              <dt className="text-xs font-semibold text-[var(--muted-foreground)]">
                 {t("events.address")}
               </dt>
               <dd className="mt-1 text-sm">{event.venue.address}</dd>
             </div>
             <div>
-              <dt className="text-xs font-600 text-[var(--muted-foreground)]">
+              <dt className="text-xs font-semibold text-[var(--muted-foreground)]">
                 {t("events.capacity")}
               </dt>
               <dd className="mt-1 text-sm">{event.capacity}</dd>
             </div>
           </dl>
-          <div className="mt-6 rounded-[var(--radius)] bg-[var(--muted)] p-4 text-sm">
+          <div className="mt-6 rounded-lg bg-[var(--muted)] p-4 text-sm">
             <p>
               {event.status === "MEMBERS_ONLY"
                 ? t("events.membersOnly")
@@ -209,7 +209,7 @@ export default function EventDetailPage() {
           </div>
           <section className="mt-8">
             <div className="flex items-baseline justify-between gap-3">
-              <h2 className="text-lg font-700">
+              <h2 className="text-lg font-bold">
                 {t("events.participantsTitle")}
               </h2>
               <span className="text-sm text-[var(--muted-foreground)]">

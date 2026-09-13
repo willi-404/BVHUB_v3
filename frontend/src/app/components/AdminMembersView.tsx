@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
+import { Input } from "./ui/input";
 import { Member, Group, groupConfig, initials } from "./shared/MemberTypes";
 import { MemberDetailPopup } from "./shared/MemberDetailPopup";
 import { useMembers } from "../../features/members/hooks/useMembers";
@@ -46,8 +47,8 @@ function FilterSheet({ selected, onApply, onClose }: { selected: Group[]; onAppl
       <div className="fixed bottom-0 left-0 right-0 z-[111] bg-[var(--card)] rounded-t-2xl border-t border-[var(--border)] pb-8 max-w-2xl mx-auto" style={{ boxShadow: "0 -8px 40px rgba(0,0,0,0.15)" }}>
         <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-[var(--border)]" /></div>
         <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
-          <p className="font-700 text-sm">{t("admin.members.filterByGroup")}</p>
-          <button onClick={() => setLocal([])} className="text-xs text-[var(--primary)] font-500">{t("common.clearAll")}</button>
+          <p className="font-bold text-sm">{t("admin.members.filterByGroup")}</p>
+          <button onClick={() => setLocal([])} className="text-xs text-[var(--primary)] font-medium">{t("common.clearAll")}</button>
         </div>
         <div className="px-5 py-4 flex flex-col gap-2">
           {ALL_GROUPS.map((g) => {
@@ -55,10 +56,10 @@ function FilterSheet({ selected, onApply, onClose }: { selected: Group[]; onAppl
             const on = local.includes(g);
             return (
               <button key={g} onClick={() => toggle(g)}
-                className="flex items-center gap-3 px-4 py-3 rounded-[var(--radius)] border transition-all duration-150 w-full text-left"
+                className="flex items-center gap-3 px-4 py-3 rounded-lg border transition-all duration-150 w-full text-left"
                 style={{ background: on ? cfg.bg : "var(--card)", borderColor: on ? cfg.color : "var(--border)" }}>
-                <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-700" style={{ background: cfg.bg, color: cfg.color }}>{g[0]}</div>
-                <span className="flex-1 text-sm font-500" style={{ color: on ? cfg.color : "var(--foreground)" }}>{g === "MemberER" ? t("groups.memberER") : g === "MemberNUE" ? t("groups.memberNUE") : g === "guest" ? t("groups.guest") : t("groups.admin")}</span>
+                <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: cfg.bg, color: cfg.color }}>{g[0]}</div>
+                <span className="flex-1 text-sm font-medium" style={{ color: on ? cfg.color : "var(--foreground)" }}>{g === "MemberER" ? t("groups.memberER") : g === "MemberNUE" ? t("groups.memberNUE") : g === "guest" ? t("groups.guest") : t("groups.admin")}</span>
                 {on && <div className="h-5 w-5 rounded-full flex items-center justify-center" style={{ background: cfg.color }}><Icon d={ic.check} size={11} className="text-white" /></div>}
               </button>
             );
@@ -97,14 +98,14 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
             <Icon d={ic.chevronLeft} size={18} />
           </button>
           <div className="flex-1">
-            <h1 className="font-700 text-base text-[var(--foreground)]">{t("admin.members.title")}</h1>
+            <h1 className="font-bold text-base text-[var(--foreground)]">{t("admin.members.title")}</h1>
             <p className="text-[10px] text-[var(--muted-foreground)]">{t("admin.members.count", { count: membersQuery.data?.totalItems ?? 0 })}</p>
           </div>
           <button onClick={() => setFilterOpen(true)} aria-label={t("common.filter")}
             className={`relative h-9 w-9 rounded-full flex items-center justify-center transition-colors ${hasFilter ? "bg-[var(--primary)] text-white" : "hover:bg-[var(--muted)] text-[var(--muted-foreground)]"}`}>
             <Icon d={ic.filter} size={16} />
             {hasFilter && (
-              <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-amber-500 text-white text-[9px] font-700 flex items-center justify-center border-2 border-[var(--card)]">
+              <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-[var(--card)]">
                 {filterGroups.length}
               </span>
             )}
@@ -113,8 +114,8 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
         <div className="px-4 pb-3">
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]"><Icon d={ic.search} size={15} /></span>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("admin.members.searchPlaceholder")}
-              className="w-full h-10 pl-9 pr-9 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/15 transition-all" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("admin.members.searchPlaceholder")}
+              className="h-10 pl-9 pr-9" />
             {search && <button onClick={() => setSearch("")} aria-label={t("common.clearSearch")} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"><Icon d={ic.x} size={14} /></button>}
           </div>
           {hasFilter && (
@@ -123,7 +124,7 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
                 const cfg = groupConfig[g];
                 return (
                   <button key={g} onClick={() => setFilterGroups((prev) => prev.filter((x) => x !== g))}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-600" style={{ background: cfg.bg, color: cfg.color }}>
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold" style={{ background: cfg.bg, color: cfg.color }}>
                     {g === "MemberER" ? t("groups.memberER") : g === "MemberNUE" ? t("groups.memberNUE") : g === "guest" ? t("groups.guest") : t("groups.admin")}<Icon d={ic.x} size={9} />
                   </button>
                 );
@@ -140,7 +141,7 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center py-16 text-[var(--muted-foreground)]">
             <Icon d={ic.user} size={32} />
-            <p className="text-sm mt-3 font-500">{t("admin.members.empty")}</p>
+            <p className="text-sm mt-3 font-medium">{t("admin.members.empty")}</p>
           </div>
         ) : (
           <>
@@ -150,7 +151,7 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
                 <thead>
                   <tr className="border-b border-[var(--border)] bg-[var(--muted)]/50">
                     {["admin.members.avatar", "admin.members.memberId", "admin.members.displayName", "profile.firstName", "profile.lastName", "auth.email", "profile.role", "profile.groups", "admin.members.memberSince"].map((h) => (
-                      <th key={h} className="text-left text-[10px] font-700 text-[var(--muted-foreground)] uppercase tracking-wide px-4 py-3">{t(h as MessageKey)}</th>
+                      <th key={h} className="text-left text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wide px-4 py-3">{t(h as MessageKey)}</th>
                     ))}
                   </tr>
                 </thead>
@@ -160,17 +161,17 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
                     return (
                       <tr key={m.id} className={`border-b border-[var(--border)] hover:bg-[var(--muted)]/40 transition-colors ${i % 2 === 0 ? "" : "bg-[var(--background)]"}`}>
                         <td className="px-4 py-3">
-                          <button onClick={() => setSelected(m)} className="h-9 w-9 rounded-full flex items-center justify-center text-white text-xs font-700 hover:scale-110 transition-transform" style={{ background: m.avatarColor }}>
+                          <button onClick={() => setSelected(m)} className="h-9 w-9 rounded-full flex items-center justify-center text-white text-xs font-bold hover:scale-110 transition-transform" style={{ background: m.avatarColor }}>
                             {initials(m)}
                           </button>
                         </td>
-                        <td className="px-4 py-3"><button onClick={() => setSelected(m)} className="font-mono text-xs text-[var(--primary)] hover:underline font-600">{m.id}</button></td>
-                        <td className="px-4 py-3"><button onClick={() => setSelected(m)} className="text-sm font-500 hover:text-[var(--primary)] hover:underline transition-colors">{m.displayName || m.username}</button></td>
+                        <td className="px-4 py-3"><button onClick={() => setSelected(m)} className="font-mono text-xs text-[var(--primary)] hover:underline font-semibold">{m.id}</button></td>
+                        <td className="px-4 py-3"><button onClick={() => setSelected(m)} className="text-sm font-medium hover:text-[var(--primary)] hover:underline transition-colors">{m.displayName || m.username}</button></td>
                         <td className="px-4 py-3 text-sm">{m.vorname}</td>
                         <td className="px-4 py-3 text-sm">{m.nachname}</td>
                         <td className="px-4 py-3 text-xs text-[var(--muted-foreground)]">{m.email}</td>
-                        <td className="px-4 py-3"><span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-600" style={{ background: roleCfg.bg, color: roleCfg.color }}>{t(roleCfg.key)}</span></td>
-                        <td className="px-4 py-3"><div className="flex flex-wrap gap-1">{m.groups?.length ? m.groups.map((group) => <span key={group.id} className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-500 bg-[var(--muted)]">{group.name}</span>) : <span className="text-xs text-[var(--muted-foreground)]">-</span>}</div></td>
+                        <td className="px-4 py-3"><span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: roleCfg.bg, color: roleCfg.color }}>{t(roleCfg.key)}</span></td>
+                        <td className="px-4 py-3"><div className="flex flex-wrap gap-1">{m.groups?.length ? m.groups.map((group) => <span key={group.id} className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-[var(--muted)]">{group.name}</span>) : <span className="text-xs text-[var(--muted-foreground)]">-</span>}</div></td>
                         <td className="px-4 py-3 text-xs text-[var(--muted-foreground)]">{m.memberSince}</td>
                       </tr>
                     );
@@ -186,13 +187,13 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
                 return (
                   <button key={m.id} onClick={() => setSelected(m)}
                     className="flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--muted)]/40 transition-colors text-left w-full active:bg-[var(--muted)]">
-                    <div className="h-10 w-10 rounded-full flex items-center justify-center text-white text-sm font-700 shrink-0" style={{ background: m.avatarColor }}>
+                    <div className="h-10 w-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0" style={{ background: m.avatarColor }}>
                       {initials(m)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-600 truncate">{m.vorname} {m.nachname}</p>
-                        <span className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-700" style={{ background: roleCfg.bg, color: roleCfg.color }}>{t(roleCfg.key)}</span>
+                        <p className="text-sm font-semibold truncate">{m.vorname} {m.nachname}</p>
+                        <span className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ background: roleCfg.bg, color: roleCfg.color }}>{t(roleCfg.key)}</span>
                       </div>
                       <p className="text-[11px] text-[var(--muted-foreground)] truncate">{m.displayName || m.username} · {m.id}</p>
                       <p className="text-[11px] text-[var(--muted-foreground)] truncate">{m.email}</p>

@@ -142,13 +142,13 @@ export function LanguageSwitcher({ className = "" }: { className?: string }) {
         value={locale}
         onChange={(event) => setLocale(event.target.value as Locale)}
         aria-label={t("language.label")}
-        className="h-9 rounded-[var(--radius)] border border-current/20 bg-white/10 px-2 text-current outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
+        className="h-9 rounded-md border border-current/20 bg-background/10 px-2 text-current outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
       >
         {LOCALES.map((option) => (
           <option
             key={option}
             value={option}
-            className="bg-[var(--card)] text-[var(--foreground)]"
+            className="bg-card text-card-foreground"
           >
             {LOCALE_LABELS[option]}
           </option>
