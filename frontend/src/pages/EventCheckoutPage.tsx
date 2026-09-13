@@ -4,6 +4,7 @@ import erTerms from "../imports/event_checkout_ER.md?raw"
 import nueTerms from "../imports/event_checkout_NUE.md?raw"
 import { useEvent, useRegisterEvent } from "../features/events/hooks/useEvents"
 import { useI18n } from "../i18n"
+import { Button } from "../app/components/ui/button"
 
 export default function EventCheckoutPage() {
   const { eventId } = useParams()
@@ -66,13 +67,14 @@ export default function EventCheckoutPage() {
               {t("events.checkoutUnavailable")}
             </p>
           )}
-          <button
-            className="mt-8 h-12 w-full rounded-[var(--radius)] bg-[var(--primary)] px-5 font-600 text-white disabled:opacity-50"
+          <Button
+            size="lg"
+            className="mt-8 w-full"
             disabled={!terms || mutation.isPending || !event.data.canRegister}
             onClick={() => void accept()}
           >
             {mutation.isPending ? t("common.saving") : t("events.acceptTerms")}
-          </button>
+          </Button>
           {mutation.isError && (
             <p role="alert" className="mt-3 text-sm text-red-700">
               {t("events.registrationError")}

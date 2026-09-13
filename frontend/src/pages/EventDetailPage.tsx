@@ -1,6 +1,7 @@
 import { Link, useLocation, useParams } from "react-router-dom"
 import { Badge } from "../app/components/ui/badge"
 import { Card } from "../app/components/ui/card"
+import { Button } from "../app/components/ui/button"
 import { isAdminRole } from "../features/auth/policy"
 import { useAuthUser } from "../features/auth/AuthProvider"
 import {
@@ -16,13 +17,13 @@ function NavigationLinks() {
   return (
     <div className="flex flex-wrap gap-3">
       <Link
-        className="inline-flex h-10 items-center rounded-[var(--radius)] border border-[var(--border)] px-4 text-sm font-600"
+        className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground"
         to="/events"
       >
         {t("events.backToList")}
       </Link>
       <Link
-        className="inline-flex h-10 items-center rounded-[var(--radius)] border border-[var(--border)] px-4 text-sm font-600"
+        className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground"
         to="/dashboard"
       >
         {t("events.backToDashboard")}
@@ -178,7 +179,7 @@ export default function EventDetailPage() {
             <div className="mt-4 flex flex-wrap gap-2">
               {event.canRegister ? (
                 <Link
-                  className="rounded bg-[var(--primary)] px-4 py-2 text-white"
+                  className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
                   to={`/events/${encodeURIComponent(event.id)}/checkout`}
                 >
                   {t("events.registerNow")}
@@ -190,13 +191,14 @@ export default function EventDetailPage() {
               )}
               {(event.myRegistrationStatus === "REGISTERED" ||
                 event.canCancel) && (
-                <button
-                  className="rounded border px-4 py-2"
+                <Button
+                  variant="outline"
+                  className="h-9"
                   disabled={cancel.isPending}
                   onClick={() => void handleCancel()}
                 >
                   {t("events.cancelRegistration")}
-                </button>
+                </Button>
               )}
             </div>
             {cancel.isError && (

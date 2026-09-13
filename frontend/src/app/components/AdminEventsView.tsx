@@ -2,6 +2,10 @@ import { useEffect, useState } from "react"
 import { useLocation, useNavigate, Link } from "react-router-dom"
 import { Button } from "./ui/button"
 import { Card } from "./ui/card"
+import { Input } from "./ui/input"
+import { Select } from "./ui/select"
+import { Textarea } from "./ui/textarea"
+import { Checkbox } from "./ui/checkbox"
 import {
   useAdminEvents,
   useCancelEvent,
@@ -317,39 +321,39 @@ function VenuePanel({
           </h2>
           <label className="grid gap-1 text-sm">
             {t("admin.venues.name")}
-            <input
+            <Input
               required
               maxLength={160}
               value={form.name}
               onChange={(e) => onChange({ ...form, name: e.target.value })}
-              className="h-10 rounded border p-2"
+              className="h-10"
             />
           </label>
           <label className="grid gap-1 text-sm">
             {t("admin.venues.address")}
-            <input
+            <Input
               required
               maxLength={300}
               value={form.address}
               onChange={(e) => onChange({ ...form, address: e.target.value })}
-              className="h-10 rounded border p-2"
+              className="h-10"
             />
           </label>
           <label className="grid gap-1 text-sm">
             {t("admin.venues.checkoutRegion")}
-            <select value={form.checkoutRegion} onChange={(e) => onChange({ ...form, checkoutRegion: e.target.value as typeof form.checkoutRegion })} className="h-10 rounded border p-2">
+            <Select value={form.checkoutRegion} onChange={(e) => onChange({ ...form, checkoutRegion: e.target.value as typeof form.checkoutRegion })} className="h-10">
               <option value="">{t("common.selectPlaceholder")}</option><option value="ER">ER</option><option value="NUE">NUE</option>
-            </select>
+            </Select>
           </label>
           <label className="grid gap-1 text-sm">
             {t("admin.venues.description")}
-            <textarea
+            <Textarea
               maxLength={2000}
               value={form.description}
               onChange={(e) =>
                 onChange({ ...form, description: e.target.value })
               }
-              className="min-h-20 rounded border p-2"
+              className="min-h-20"
             />
           </label>
           <div className="flex gap-2">
@@ -414,13 +418,13 @@ function EventPanel({
         <Button onClick={onCreate}>{t("admin.events.create")}</Button>
         <label className="grid gap-1 text-sm">
           {t("admin.events.filter")}
-          <select value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)} className="h-10 rounded border p-2">
+          <Select value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)} className="h-10">
             <option value="ALL">{t("admin.events.filterAll")}</option>
             <option value="MEMBERS_ONLY">{t("admin.events.filterMembers")}</option>
             <option value="OPEN_TO_ALL">{t("admin.events.filterOpen")}</option>
             <option value="CANCELLED">{t("admin.events.filterCancelled")}</option>
             <option value="COMPLETED">{t("admin.events.filterCompleted")}</option>
-          </select>
+          </Select>
         </label>
       </div>
       <div className="mt-4 grid gap-3">
@@ -446,10 +450,10 @@ function EventPanel({
               </span>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <select aria-label={t("admin.events.status")} value={event.status} disabled={saving} onChange={(e) => onStatusChange(event, e.target.value as EventStatus)} className="h-9 rounded border px-2 text-sm">
+              <Select aria-label={t("admin.events.status")} value={event.status} disabled={saving} onChange={(e) => onStatusChange(event, e.target.value as EventStatus)} className="h-9 w-auto px-2 text-sm">
                 {(["MEMBERS_ONLY", "OPEN_TO_ALL", "CANCELLED", "COMPLETED"] as EventStatus[]).map((status) => <option key={status} value={status}>{t(`events.status.${status}` as MessageKey)}</option>)}
-              </select>
-              <label className="flex items-center gap-1 text-sm" title={!event.venue.active || !event.venue.checkoutRegion ? t("admin.events.publishVenueRequired") : undefined}><input type="checkbox" checked={event.published} disabled={saving || (!event.published && (!event.venue.active || !event.venue.checkoutRegion))} onChange={(e) => onPublishedChange(event, e.target.checked)} />{event.published ? t("admin.events.published") : t("admin.events.unpublished")}</label>
+              </Select>
+              <label className="flex items-center gap-2 text-sm" title={!event.venue.active || !event.venue.checkoutRegion ? t("admin.events.publishVenueRequired") : undefined}><Checkbox checked={event.published} disabled={saving || (!event.published && (!event.venue.active || !event.venue.checkoutRegion))} onChange={(e) => onPublishedChange(event, e.target.checked)} />{event.published ? t("admin.events.published") : t("admin.events.unpublished")}</label>
               {!event.published && (!event.venue.active || !event.venue.checkoutRegion) && <span className="text-xs text-amber-700">{t("admin.events.publishVenueRequired")}</span>}
               <Button size="sm" variant="outline" onClick={() => onEdit(event)}>{t("common.edit")}</Button>
               {event.published && event.status !== "CANCELLED" && (
@@ -488,32 +492,32 @@ function EventPanel({
           </h2>
           <label className="grid gap-1 text-sm">
             {t("admin.events.titleLabel")}
-            <input
+            <Input
               required
               maxLength={200}
               value={form.title}
               onChange={(e) => onChange({ ...form, title: e.target.value })}
-              className="h-10 rounded border p-2"
+              className="h-10"
             />
           </label>
           <label className="grid gap-1 text-sm">
             {t("admin.events.description")}
-            <textarea
+            <Textarea
               maxLength={10000}
               value={form.description}
               onChange={(e) =>
                 onChange({ ...form, description: e.target.value })
               }
-              className="min-h-20 rounded border p-2"
+              className="min-h-20"
             />
           </label>
           <label className="grid gap-1 text-sm">
             {t("admin.venues.title")}
-            <select
+            <Select
               required
               value={form.venue}
               onChange={(e) => onChange({ ...form, venue: e.target.value })}
-              className="h-10 rounded border p-2"
+              className="h-10"
             >
               <option value="">{t("common.selectPlaceholder")}</option>
               {venues
@@ -523,33 +527,33 @@ function EventPanel({
                     {v.name}{v.checkoutRegion ? ` (${v.checkoutRegion})` : ` - ${t("admin.venues.checkoutRegionMissing")}`}
                   </option>
                 ))}
-            </select>
+            </Select>
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1 text-sm">
               {t("start")}
-              <input
+              <Input
                 required
                 type="datetime-local"
                 value={form.start}
                 onChange={(e) => onChange({ ...form, start: e.target.value })}
-                className="h-10 rounded border p-2"
+                className="h-10"
               />
             </label>
             <label className="grid gap-1 text-sm">
               {t("end")}
-              <input
+              <Input
                 required
                 type="datetime-local"
                 value={form.end}
                 onChange={(e) => onChange({ ...form, end: e.target.value })}
-                className="h-10 rounded border p-2"
+                className="h-10"
               />
             </label>
           </div>
           <label className="grid gap-1 text-sm">
             {t("admin.events.capacity")}
-            <input
+            <Input
               required
               min={1}
               max={100000}
@@ -558,11 +562,11 @@ function EventPanel({
               onChange={(e) =>
                 onChange({ ...form, capacity: Number(e.target.value) })
               }
-              className="h-10 rounded border p-2"
+              className="h-10"
             />
           </label>
           <label className="flex items-center gap-2 text-sm">
-            <input
+            <Checkbox
               type="checkbox"
               checked={form.published}
               onChange={(e) =>

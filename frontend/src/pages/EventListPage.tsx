@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom"
 import { Badge } from "../app/components/ui/badge"
 import { Card } from "../app/components/ui/card"
+import { Button } from "../app/components/ui/button"
 import { useEvents, useEventRealtime } from "../features/events/hooks/useEvents"
 import { formatLocaleDateTime, useI18n, type MessageKey } from "../i18n"
 
@@ -12,7 +13,7 @@ export default function EventListPage() {
     <div className="min-h-full bg-[var(--background)] px-4 py-6 lg:px-8">
       <div className="mx-auto max-w-5xl">
         <div className="mb-6">
-          <Link className="mb-4 inline-flex h-10 items-center rounded-[var(--radius)] border border-[var(--border)] px-4 text-sm font-600" to="/dashboard">
+          <Link className="mb-4 inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground" to="/dashboard">
             {t("events.backToDashboard")}
           </Link>
           <h1 className="text-2xl font-700">{t("events.title")}</h1>
@@ -31,12 +32,14 @@ export default function EventListPage() {
             className="rounded-[var(--radius)] border border-red-200 bg-red-50 p-4 text-sm text-red-700"
           >
             {t("events.loadError")}{" "}
-            <button
-              className="ml-2 underline"
+            <Button
+              variant="link"
+              size="sm"
+              className="ml-2 h-auto px-0 underline"
               onClick={() => void query.refetch()}
             >
               {t("common.retry")}
-            </button>
+            </Button>
           </div>
         )}
         {query.isSuccess && query.data.length === 0 && (
@@ -76,7 +79,7 @@ export default function EventListPage() {
                 {t("events.capacity")}: {event.capacity}
               </p>
               <Link
-                className="mt-4 inline-flex h-10 items-center rounded-[var(--radius)] bg-[var(--primary)] px-4 text-sm font-600 text-white"
+                className="mt-4 inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
                 to={`/events/${encodeURIComponent(event.id)}`}
               >
                 {t("common.showDetails")}

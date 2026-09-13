@@ -4,28 +4,28 @@ interface CardProps { children: ReactNode; className?: string; }
 
 export function Card({ children, className = "" }: CardProps) {
   return (
-    <div className={`bg-[var(--card)] rounded-[var(--radius)] border border-[var(--border)] ${className}`}>
+    <div data-slot="card" className={`rounded-xl border bg-card text-card-foreground shadow-sm ${className}`}>
       {children}
     </div>
   );
 }
 
 export function CardHeader({ children, className = "" }: CardProps) {
-  return <div className={`p-4 pb-2 ${className}`}>{children}</div>;
+  return <div data-slot="card-header" className={`flex flex-col gap-1.5 p-6 ${className}`}>{children}</div>;
 }
 
 export function CardTitle({ children, className = "" }: CardProps) {
-  return <h3 className={`font-600 text-sm text-[var(--foreground)] ${className}`}>{children}</h3>;
+  return <h3 data-slot="card-title" className={`font-semibold leading-none tracking-tight ${className}`}>{children}</h3>;
 }
 
 export function CardDescription({ children, className = "" }: CardProps) {
-  return <p className={`text-xs text-[var(--muted-foreground)] mt-0.5 ${className}`}>{children}</p>;
+  return <p data-slot="card-description" className={`text-sm text-muted-foreground ${className}`}>{children}</p>;
 }
 
 export function CardContent({ children, className = "" }: CardProps) {
-  return <div className={`px-4 pb-4 ${className}`}>{children}</div>;
+  return <div data-slot="card-content" className={`px-6 pb-6 ${className}`}>{children}</div>;
 }
 
 export function CardFooter({ children, className = "" }: CardProps) {
-  return <div className={`px-4 pb-4 pt-2 border-t border-[var(--border)] flex items-center ${className}`}>{children}</div>;
+  return <div data-slot="card-footer" className={`flex items-center border-t px-6 py-4 ${className}`}>{children}</div>;
 }

@@ -17,6 +17,7 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-border: var(--border);
+  --color-input: var(--input);
   --color-ring: var(--ring);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
@@ -41,6 +42,7 @@
   --accent-foreground: hsl(220, 20%, 12%);
   --border: hsl(220, 13%, 90%);
   --ring: hsl(142, 71%, 29%);
+  --input: hsl(220, 13%, 86%);
   --destructive: hsl(0, 84%, 60%);
   --destructive-foreground: hsl(0, 0%, 100%);
   --radius: 0.625rem;
@@ -51,6 +53,37 @@ html, body, #root {
   height: 100%;
   font-family: 'Outfit', system-ui, sans-serif;
 }
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+
+input:not([data-slot]), select:not([data-slot]), textarea:not([data-slot]) {
+  border: 1px solid var(--input);
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--background);
+  color: var(--foreground);
+  outline: none;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+input:not([data-slot]), select:not([data-slot]) { min-height: 2.5rem; padding: 0.5rem 0.75rem; }
+textarea:not([data-slot]) { min-height: 5rem; padding: 0.625rem 0.75rem; }
+input:not([data-slot]):focus-visible, select:not([data-slot]):focus-visible, textarea:not([data-slot]):focus-visible {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 18%, transparent);
+}
+input[type="checkbox"]:not([data-slot]) { min-height: auto; accent-color: var(--primary); }
+
+a { color: inherit; }
 
 * {
   box-sizing: border-box;

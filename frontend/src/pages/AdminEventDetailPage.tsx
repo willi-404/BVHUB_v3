@@ -2,6 +2,10 @@ import { useEffect, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { Button } from "../app/components/ui/button"
 import { Card } from "../app/components/ui/card"
+import { Input } from "../app/components/ui/input"
+import { Select } from "../app/components/ui/select"
+import { Textarea } from "../app/components/ui/textarea"
+import { Checkbox } from "../app/components/ui/checkbox"
 import {
   useAddParticipant,
   useAdminEvents,
@@ -151,32 +155,32 @@ export default function AdminEventDetailPage() {
           >
             <label className="grid gap-1 text-sm">
               {t("admin.events.titleLabel")}
-              <input
+              <Input
                 required
                 maxLength={200}
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
-                className="h-10 rounded border p-2"
+                className="h-10"
               />
             </label>
             <label className="grid gap-1 text-sm">
               {t("admin.events.description")}
-              <textarea
+              <Textarea
                 maxLength={10000}
                 value={form.description}
                 onChange={(e) =>
                   setForm({ ...form, description: e.target.value })
                 }
-                className="min-h-24 rounded border p-2"
+                className="min-h-24"
               />
             </label>
             <label className="grid gap-1 text-sm">
               {t("admin.venues.title")}
-              <select
+              <Select
                 required
                 value={form.venue}
                 onChange={(e) => setForm({ ...form, venue: e.target.value })}
-                className="h-10 rounded border p-2"
+                className="h-10"
               >
                 {venues.data
                   ?.filter((venue) => venue.active)
@@ -185,33 +189,33 @@ export default function AdminEventDetailPage() {
                       {venue.name}
                     </option>
                   ))}
-              </select>
+              </Select>
             </label>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="grid gap-1 text-sm">
                 {t("start")}
-                <input
+                <Input
                   required
                   type="datetime-local"
                   value={form.start}
                   onChange={(e) => setForm({ ...form, start: e.target.value })}
-                  className="h-10 rounded border p-2"
+                  className="h-10"
                 />
               </label>
               <label className="grid gap-1 text-sm">
                 {t("end")}
-                <input
+                <Input
                   required
                   type="datetime-local"
                   value={form.end}
                   onChange={(e) => setForm({ ...form, end: e.target.value })}
-                  className="h-10 rounded border p-2"
+                  className="h-10"
                 />
               </label>
             </div>
             <label className="grid gap-1 text-sm">
               {t("admin.events.capacity")}
-              <input
+              <Input
                 required
                 min={1}
                 max={100000}
@@ -220,17 +224,17 @@ export default function AdminEventDetailPage() {
                 onChange={(e) =>
                   setForm({ ...form, capacity: Number(e.target.value) })
                 }
-                className="h-10 rounded border p-2"
+                className="h-10"
               />
             </label>
             <label className="grid gap-1 text-sm">
               {t("admin.events.status")}
-              <select
+              <Select
                 value={form.status}
                 onChange={(e) =>
                   setForm({ ...form, status: e.target.value as EventStatus })
                 }
-                className="h-10 rounded border p-2"
+                className="h-10"
               >
                 {([
                   "MEMBERS_ONLY",
@@ -242,7 +246,7 @@ export default function AdminEventDetailPage() {
                     {t(`events.status.${status}` as MessageKey)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
             <label
               className="flex items-center gap-3 text-sm"
@@ -252,7 +256,7 @@ export default function AdminEventDetailPage() {
                   : undefined
               }
             >
-              <input
+                <Checkbox
                 type="checkbox"
                 checked={form.published}
                 disabled={!form.published && publishBlocked}
@@ -386,8 +390,8 @@ function AdminParticipants({ eventId }: { eventId: string }) {
       )}
       <div className="mt-5">
         <h3 className="text-sm font-700">{t("events.addParticipant")}</h3>
-        <input
-          className="mt-2 h-10 w-full rounded border p-2"
+        <Input
+          className="mt-2 h-10 w-full"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={t("events.participantSearch")}

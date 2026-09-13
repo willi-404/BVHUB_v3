@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
 import logoSrc from "../../imports/logo1-high-resolution.png";
 import { useAuth } from "../../features/auth/AuthProvider";
 import { LanguageSwitcher, useI18n } from "../../i18n";
@@ -131,12 +132,12 @@ export default function LoginView({ onLogin, sessionExpired = false }: LoginView
                 <label className="text-xs font-600 text-[var(--muted-foreground)] uppercase tracking-wide">{mode === "otp" ? t("auth.email") : t("auth.identity")}</label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]"><Icon d={icons.mail} size={15} /></span>
-                  <input
+                  <Input
                     type="text"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     autoComplete="username"
-                    className="w-full h-11 pl-9 pr-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] outline-none transition-all focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/15"
+                    className="h-11 pl-9 pr-3"
                   />
                 </div>
               </div>
@@ -144,12 +145,12 @@ export default function LoginView({ onLogin, sessionExpired = false }: LoginView
               {mode === "otp" && otpId && (
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-600 text-[var(--muted-foreground)] uppercase tracking-wide">{t("auth.code")}</label>
-                  <input
+                  <Input
                     inputMode="numeric"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 8))}
                     autoComplete="one-time-code"
-                    className="w-full h-11 px-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] outline-none transition-all focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/15"
+                    className="h-11"
                   />
                 </div>
               )}
@@ -159,12 +160,12 @@ export default function LoginView({ onLogin, sessionExpired = false }: LoginView
                   <label className="text-xs font-600 text-[var(--muted-foreground)] uppercase tracking-wide">{t("auth.password")}</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]"><Icon d={icons.lock} size={15} /></span>
-                    <input
+                    <Input
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       autoComplete="current-password"
-                      className="w-full h-11 pl-9 pr-10 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] outline-none transition-all focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/15"
+                      className="h-11 pl-9 pr-10"
                     />
                     <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" aria-label={t("auth.togglePassword")}>
                       <Icon d={showPassword ? icons.eyeOff : icons.eye} size={15} />

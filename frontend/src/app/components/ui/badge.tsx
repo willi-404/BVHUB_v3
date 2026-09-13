@@ -9,18 +9,19 @@ interface BadgeProps {
 }
 
 const variants: Record<BadgeVariant, string> = {
-  default: "bg-[var(--primary)] text-[var(--primary-foreground)]",
-  secondary: "bg-[var(--secondary)] text-[var(--secondary-foreground)]",
-  success: "bg-emerald-100 text-emerald-700",
-  warning: "bg-amber-100 text-amber-700",
-  destructive: "bg-red-100 text-red-700",
-  outline: "border border-[var(--border)] text-[var(--muted-foreground)] bg-transparent",
+  default: "border-transparent bg-primary text-primary-foreground",
+  secondary: "border-transparent bg-secondary text-secondary-foreground",
+  success: "border-transparent bg-emerald-100 text-emerald-800",
+  warning: "border-transparent bg-amber-100 text-amber-800",
+  destructive: "border-transparent bg-destructive/10 text-destructive",
+  outline: "border-border text-foreground bg-transparent",
 };
 
 export function Badge({ children, variant = "default", className = "" }: BadgeProps) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-500 ${variants[variant]} ${className}`}
+      data-slot="badge"
+      className={`inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-md border px-2 py-0.5 text-xs font-medium whitespace-nowrap ${variants[variant]} ${className}`}
     >
       {children}
     </span>
