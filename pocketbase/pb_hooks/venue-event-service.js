@@ -99,8 +99,8 @@ function eventDtoForUser(app, record, userRecord) {
   const mine = app.findRecordsByFilter("event_registrations", `event = '${record.id}' && user = '${userRecord.id}'`, "", 1, 0)[0];
   dto.myRegistrationStatus = mine ? mine.getString("status") : null;
   const now = Date.now();
-  dto.canRegister = dto.published === true && roleCanRegister(userRecord.getString("role"), dto.status) && dto.venue.active === true && Boolean(dto.venue.checkoutRegion) && Date.parse(dto.end) > now && dto.spotsLeft > 0 && dto.myRegistrationStatus !== "REGISTERED";
-  dto.canCancel = dto.myRegistrationStatus === "REGISTERED";
+  dto.canRegister = dto.published === true && roleCanRegister(userRecord.getString("role"), dto.status) && dto.venue.active === true && Boolean(dto.venue.checkoutRegion) && Date.parse(dto.end) > now && dto.myRegistrationStatus !== "REGISTERED" && dto.myRegistrationStatus !== "WAITING";
+  dto.canCancel = ["REGISTERED", "WAITING"].includes(dto.myRegistrationStatus);
   return dto;
 }
 function idOf(e) {

@@ -21,14 +21,20 @@ routerAdd("POST", "/api/bvhub/events/{id}/registrations", (e) => {
   if (!event.getBool("published") || !api.roleCanRegister(user.getString("role"), event.getString("status")) || ["CANCELLED", "COMPLETED"].includes(event.getString("status")) || Date.parse(event.getString("end")) <= Date.now() || !venue.getBool("active") || !venue.getString("checkoutRegion") || venue.getString("checkoutRegion") !== body.checkoutRegion) return e.json(409, { message: "Event ist nicht registrierbar" });
   let result;
   $app.runInTransaction((txApp) => {
-    const current = registrations.registrationFor(txApp, event, user);
-    if (current && current.getString("status") === "REGISTERED") { result = current; return; }
-    const count = api.registrationCount(txApp, event.id);
-    if (count >= event.getInt("capacity")) throw new ApiError(409, "Event ist ausgebucht", {});
+    const txEvent = api.event(txApp, event.id);
+    const txUser = api.userRecord(txApp, user.id);
+    const txVenue = api.venue(txApp, txEvent.getString("venue"));
+    const current = registrations.registrationFor(txApp, txEvent, txUser);
+    if (current && ["REGISTERED", "WAITING"].includes(current.getString("status"))) { result = current; return; }
+    const previousStatus = current ? current.getString("status") : null;
+    const count = api.registrationCount(txApp, txEvent.id);
+    const now = api.nowIso();
     const record = current || new Record(txApp.findCollectionByNameOrId("event_registrations"));
-    record.set("event", event.id); record.set("user", user.id); record.set("status", "REGISTERED"); record.set("registeredAt", api.nowIso()); record.set("cancelledAt", ""); record.set("checkoutRegion", body.checkoutRegion); record.set("termsVersion", body.termsVersion); record.set("termsAcceptedAt", api.nowIso());
+    const status = count >= txEvent.getInt("capacity") ? "WAITING" : "REGISTERED";
+    record.set("event", txEvent.id); record.set("user", txUser.id); record.set("checkoutRegion", body.checkoutRegion); record.set("termsVersion", body.termsVersion); record.set("termsAcceptedAt", now);
+    registrations.setStatus(record, status, now);
     txApp.save(record); result = record;
-    if (!current) { const outbox = new Record(txApp.findCollectionByNameOrId("notification_outbox")); outbox.set("kind", "EVENT_REGISTRATION_CONFIRMED"); outbox.set("registration", record.id); outbox.set("recipient", user.getString("email")); outbox.set("payload", JSON.stringify({ eventTitle: event.getString("title"), venue: venue.getString("name"), start: event.getString("start"), end: event.getString("end"), locale: "en" })); outbox.set("status", "PENDING"); outbox.set("attempts", 1); txApp.save(outbox); }
+    if (!current || previousStatus === "CANCELLED") registrations.queueNotification(txApp, record, txUser, txEvent, txVenue, status === "WAITING" ? "EVENT_WAITING_LIST_JOINED" : "EVENT_REGISTRATION_CONFIRMED", now, {});
   });
   return e.json(201, registrations.registrationDto(result));
 }, $apis.requireAuth("users"));
@@ -39,10 +45,15 @@ routerAdd("DELETE", "/api/bvhub/events/{id}/registrations/me", (e) => {
   const user = api.requireAuthenticatedReader(e);
   if (!user) throw new ForbiddenError("Zugriff nicht erlaubt");
   const event = api.event($app, api.idOf(e));
-  const record = registrations.registrationFor($app, event, user);
-  if (!record || record.getString("status") !== "REGISTERED") return e.json(200, { status: "CANCELLED" });
-  record.set("status", "CANCELLED"); record.set("cancelledAt", api.nowIso()); $app.save(record);
-  return e.json(200, registrations.registrationDto(record));
+  let result;
+  $app.runInTransaction((txApp) => {
+    const txEvent = api.event(txApp, event.id);
+    const txUser = api.userRecord(txApp, user.id);
+    const record = registrations.registrationFor(txApp, txEvent, txUser);
+    const now = api.nowIso();
+    result = registrations.cancelRegistration(txApp, txEvent, txUser, record, now).record;
+  });
+  return e.json(200, result ? registrations.registrationDto(result) : { status: "CANCELLED" });
 }, $apis.requireAuth("users"));
 
 routerAdd("GET", "/api/bvhub/events/{id}/participants", (e) => {
@@ -78,12 +89,17 @@ routerAdd("POST", "/api/bvhub/admin/events/{id}/participants", (e) => {
   let result;
   $app.runInTransaction((txApp) => {
     const txEvent = api.event(txApp, event.id);
-    const current = txApp.findRecordsByFilter("event_registrations", `event = '${txEvent.id}' && user = '${target.id}'`, "", 1, 0)[0] || null;
+    const txTarget = api.userRecord(txApp, target.id);
+    const txVenue = api.venue(txApp, txEvent.getString("venue"));
+    const current = txApp.findRecordsByFilter("event_registrations", `event = '${txEvent.id}' && user = '${txTarget.id}'`, "", 1, 0)[0] || null;
     if (current && current.getString("status") === "REGISTERED") { result = current; return; }
     if (api.registrationCount(txApp, txEvent.id) >= txEvent.getInt("capacity")) throw new ApiError(409, "Event ist ausgebucht", {});
     const registration = current || new Record(txApp.findCollectionByNameOrId("event_registrations"));
-    registration.set("event", txEvent.id); registration.set("user", target.id); registration.set("status", "REGISTERED"); registration.set("registeredAt", api.nowIso()); registration.set("cancelledAt", ""); registration.set("checkoutRegion", venue.getString("checkoutRegion")); registration.set("termsVersion", "ADMIN-MANUAL"); registration.set("termsAcceptedAt", api.nowIso());
+    const now = api.nowIso();
+    registration.set("event", txEvent.id); registration.set("user", txTarget.id); registration.set("checkoutRegion", txVenue.getString("checkoutRegion")); registration.set("termsVersion", "ADMIN-MANUAL"); registration.set("termsAcceptedAt", now);
+    registrations.setStatus(registration, "REGISTERED", now);
     txApp.save(registration); result = registration;
+    registrations.queueNotification(txApp, registration, txTarget, txEvent, txVenue, "EVENT_ADMIN_ADDED", now, {});
     const audit = new Record(txApp.findCollectionByNameOrId("audit_events")); audit.set("eventType", "PARTICIPANT_ADDED"); audit.set("actorUser", admin.id); audit.set("targetUser", target.id); audit.set("metadata", JSON.stringify({ eventId: txEvent.id })); txApp.save(audit);
   });
   return e.json(201, { registrationId: result.id, userId: target.id, status: result.getString("status") });
@@ -94,14 +110,21 @@ routerAdd("DELETE", "/api/bvhub/admin/events/{id}/participants/{userId}", (e) =>
   const admin = api.requireAdminActor(e);
   if (!admin) throw new ForbiddenError("Verwaltungszugriff nicht erlaubt");
   const event = api.event($app, api.idOf(e));
+  const pathValue = e.request && typeof e.request.pathValue === "function" ? e.request.pathValue("userId") : "";
   const path = String(e.request && e.request.url && e.request.url.path || "");
-  const userId = path.split("/").filter(Boolean).at(-1) || "";
+  const userId = pathValue || path.split("/").filter(Boolean).at(-1) || "";
   const target = api.userRecord($app, userId);
   let result = null;
   $app.runInTransaction((txApp) => {
-    const current = txApp.findRecordsByFilter("event_registrations", `event = '${event.id}' && user = '${target.id}'`, "", 1, 0)[0] || null;
+    const txEvent = api.event(txApp, event.id);
+    const txTarget = api.userRecord(txApp, target.id);
+    const txVenue = api.venue(txApp, txEvent.getString("venue"));
+    const current = txApp.findRecordsByFilter("event_registrations", `event = '${txEvent.id}' && user = '${txTarget.id}'`, "", 1, 0)[0] || null;
     if (!current || current.getString("status") !== "REGISTERED") { result = current; return; }
-    current.set("status", "CANCELLED"); current.set("cancelledAt", api.nowIso()); txApp.save(current); result = current;
+    const now = api.nowIso();
+    current.set("status", "CANCELLED"); current.set("cancelledAt", now); txApp.save(current); result = current;
+    registrations.queueNotification(txApp, current, txTarget, txEvent, txVenue, "EVENT_ADMIN_REMOVED", now, {});
+    registrations.promoteNextWaiting(txApp, txEvent, now);
     const audit = new Record(txApp.findCollectionByNameOrId("audit_events")); audit.set("eventType", "PARTICIPANT_REMOVED"); audit.set("actorUser", admin.id); audit.set("targetUser", target.id); audit.set("metadata", JSON.stringify({ eventId: event.id })); txApp.save(audit);
   });
   return e.json(200, { status: result ? result.getString("status") : "CANCELLED" });

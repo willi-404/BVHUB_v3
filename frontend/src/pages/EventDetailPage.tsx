@@ -39,6 +39,8 @@ function registrationReason(
 ) {
   if (event.myRegistrationStatus === "REGISTERED")
     return t("events.registrationReason.alreadyRegistered")
+  if (event.myRegistrationStatus === "WAITING")
+    return t("events.registrationReason.waiting")
   if (event.status === "CANCELLED")
     return t("events.registrationReason.cancelled")
   if (event.status === "COMPLETED")

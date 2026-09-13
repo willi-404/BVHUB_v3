@@ -46,7 +46,7 @@ export async function cancelEvent(id: string): Promise<EventRecord> {
   )
 }
 export async function getRegistration(id: string) {
-  return pb.send<{ status: "REGISTERED" | "CANCELLED" | null }>(
+  return pb.send<{ status: "REGISTERED" | "WAITING" | "CANCELLED" | null }>(
     `/api/bvhub/events/${encodeURIComponent(id)}/registration`,
     { method: "GET" },
   )

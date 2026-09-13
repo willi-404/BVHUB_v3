@@ -19,7 +19,7 @@ export interface EventRecord {
   capacity: number
   registeredCount: number
   spotsLeft: number
-  myRegistrationStatus: "REGISTERED" | "CANCELLED" | null
+  myRegistrationStatus: "REGISTERED" | "WAITING" | "CANCELLED" | null
   canRegister: boolean
   canCancel: boolean
   published: boolean

@@ -332,6 +332,7 @@
   "events.status.MEMBERS_ONLY": "Nur für Mitglieder",
   "events.status.OPEN_TO_ALL": "Für alle geöffnet",
   "events.status.COMPLETED": "Abgeschlossen",
+  "events.registrationReason.waiting": "Du stehst auf der Warteliste",
   "admin.venues.title": "Veranstaltungsorte",
   "admin.venues.create": "Veranstaltungsort hinzufügen",
   "admin.venues.name": "Name",

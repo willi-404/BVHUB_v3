@@ -332,6 +332,7 @@
   "events.status.MEMBERS_ONLY": "仅限会员",
   "events.status.OPEN_TO_ALL": "向所有人开放",
   "events.status.COMPLETED": "已完成",
+  "events.registrationReason.waiting": "你目前在候补名单中",
   "admin.venues.title": "活动地点",
   "admin.venues.create": "添加地点",
   "admin.venues.name": "名称",

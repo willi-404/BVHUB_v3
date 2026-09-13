@@ -469,7 +469,13 @@ expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrat
   token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" },
 }), 201, "member registers again after cancellation");
 const outbox = expectStatus(await request("GET", `/api/collections/notification_outbox/records?filter=${encodeURIComponent(`registration = "${wuRegistration.id}"`)}`, { token: rootToken }), 200, "registration creates notification outbox");
-assert.equal(outbox.items.length, 1, "idempotent registration creates one confirmation outbox item");
+assert.equal(outbox.items.length, 3, "each registration state transition creates one notification outbox item");
+assert.deepEqual(outbox.items.map((item) => item.kind).sort(), [
+  "EVENT_REGISTRATION_CANCELLED",
+  "EVENT_REGISTRATION_CONFIRMED",
+  "EVENT_REGISTRATION_CONFIRMED",
+].sort(), "registration, cancellation, and re-registration are notified once each");
+
 const cancelledEvent = expectStatus(await request("PATCH", `/api/bvhub/admin/events/${validEvent.id}`, {
   token: adminLogin.token, body: { status: "CANCELLED" },
 }), 200, "admin cancels published event");

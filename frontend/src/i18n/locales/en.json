@@ -332,6 +332,7 @@
   "events.status.MEMBERS_ONLY": "Members only",
   "events.status.OPEN_TO_ALL": "Open to all",
   "events.status.COMPLETED": "Completed",
+  "events.registrationReason.waiting": "You are on the waiting list",
   "admin.venues.title": "Venues",
   "admin.venues.create": "Add venue",
   "admin.venues.name": "Name",
