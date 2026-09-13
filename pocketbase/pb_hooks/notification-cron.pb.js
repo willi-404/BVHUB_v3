@@ -1,9 +1,5 @@
 /// <reference path="../pb_data/types.d.ts" />
 
-const notifications = require(`${__hooks}/notification-service.js`);
-const BATCH_SIZE = 25;
-const PROCESSING_TIMEOUT_MS = 10 * 60 * 1000;
-
 function due(entry, now) {
   const status = entry.getString("status");
   if (status === "PENDING") {
@@ -12,7 +8,7 @@ function due(entry, now) {
   }
   if (status === "PROCESSING") {
     const started = Date.parse(entry.getString("processingStartedAt") || "");
-    return Number.isNaN(started) || started <= now - PROCESSING_TIMEOUT_MS;
+    return Number.isNaN(started) || started <= now - (10 * 60 * 1000);
   }
   return false;
 }
@@ -32,6 +28,7 @@ function claim(id, nowIso) {
 }
 
 function processOne(id) {
+  const notifications = require(`${__hooks}/notification-service.js`);
   const now = new Date();
   const nowIso = now.toISOString();
   if (!claim(id, nowIso)) return;
@@ -65,7 +62,7 @@ function processOne(id) {
 
 cronAdd("bvhub-notification-outbox", "* * * * *", () => {
   const now = Date.now();
-  const entries = $app.findRecordsByFilter("notification_outbox", "status = 'PENDING' || status = 'PROCESSING'", "created", BATCH_SIZE, 0);
+  const entries = $app.findRecordsByFilter("notification_outbox", "status = 'PENDING' || status = 'PROCESSING'", "created", 25, 0);
   let processed = 0;
   entries.forEach((entry) => { if (due(entry, now)) { processOne(entry.id); processed += 1; } });
   if (processed) $app.logger().info("[bvhub notifications] outbox run", "processed", processed);
