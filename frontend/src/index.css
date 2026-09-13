@@ -50,7 +50,13 @@
 
 html, body, #root {
   height: 100%;
+  width: 100%;
+  max-width: 100%;
   font-family: var(--font-sans);
+}
+
+html, body {
+  overflow-x: hidden;
 }
 
 body {
@@ -63,6 +69,15 @@ body {
 }
 
 button, input, select, textarea { font: inherit; }
+/* Keep icon/text-only native buttons consistent across browsers. Component
+   buttons provide their own surface; all other buttons should start from a
+   transparent, inherited baseline instead of the user-agent button face. */
+button:not([data-slot]) {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
 
@@ -82,7 +97,13 @@ input:not([data-slot]):focus-visible, select:not([data-slot]):focus-visible, tex
 }
 input[type="checkbox"]:not([data-slot]) { min-height: auto; accent-color: var(--primary); }
 
+/* Keep plain links aligned with the surrounding copy while preserving the
+   semantic shadcn text colors used by link-style actions. */
 a { color: inherit; }
+a.text-primary { color: var(--primary); }
+a.text-primary-foreground { color: var(--primary-foreground); }
+a.text-secondary-foreground { color: var(--secondary-foreground); }
+a.text-accent-foreground { color: var(--accent-foreground); }
 
 * {
   box-sizing: border-box;

@@ -94,7 +94,7 @@ export default function FramePreview() {
             {/* Device shell */}
             <div
               style={{
-                width: 390,
+                width: "min(390px, calc(100vw - 32px))",
                 height: 844,
                 borderRadius: 44,
                 border: "2px solid rgba(255,255,255,0.12)",

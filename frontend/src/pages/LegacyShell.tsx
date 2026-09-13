@@ -979,7 +979,7 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
     <div className="h-full flex bg-[var(--background)]" style={{ fontFamily: "var(--font-sans)" }}>
       <Sidebar active={tab} onChange={setTab} unpaidCount={unpaidCount} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} canAccessAdmin={canAccessAdmin} profile={profile || null} />
 
-      <main className="flex-1 overflow-y-auto">
+      <main className="min-w-0 w-full max-w-full flex-1 overflow-x-hidden overflow-y-auto">
         <div className="hidden lg:flex items-center justify-between px-8 py-5 border-b border-[var(--border)] bg-[var(--card)] sticky top-0 z-10">
           <h1 className="text-base font-semibold text-[var(--foreground)]">{tabLabel[tab]}</h1>
           <div className="flex items-center gap-3">
@@ -996,7 +996,7 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
           <span className="text-sm font-semibold text-[var(--foreground)]">{tabLabel[tab]}</span>
           <LanguageSwitcher className="text-[var(--foreground)]" />
         </div>
-        <div className="px-4 py-5 lg:px-8 lg:py-7 pb-24 lg:pb-8 max-w-2xl lg:max-w-none">
+        <div className="min-w-0 w-full max-w-2xl px-4 py-5 pb-24 lg:max-w-none lg:px-8 lg:py-7 lg:pb-8">
           {renderView()}
         </div>
       </main>
