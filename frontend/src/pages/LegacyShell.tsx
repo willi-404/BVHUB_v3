@@ -362,22 +362,35 @@ function StatBar() {
 }
 
 function QuickActions() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const websiteLocale = locale === "zh-CN" ? "zh" : "de";
   const actions = [
-    { label: t("dashboard.joinTraining"), icon: icons.calendar, color: "hsl(217,91%,60%)", bg: "hsl(217,91%,95%)" },
-    { label: t("dashboard.viewRules"), icon: icons.shield, color: "hsl(271,81%,56%)", bg: "hsl(271,81%,95%)" },
-    { label: t("dashboard.contactUs"), icon: icons.bell, color: "hsl(38,92%,50%)", bg: "hsl(38,92%,94%)" },
+    { label: t("dashboard.joinTraining"), icon: icons.calendar, color: "hsl(217,91%,60%)", bg: "hsl(217,91%,95%)", href: "/events" },
+    { label: t("dashboard.viewRules"), icon: icons.shield, color: "hsl(271,81%,56%)", bg: "hsl(271,81%,95%)", href: `https://bv-erlangen2025.de/${websiteLocale}/dokumente/` },
+    { label: t("dashboard.contactUs"), icon: icons.bell, color: "hsl(38,92%,50%)", bg: "hsl(38,92%,94%)", href: `https://bv-erlangen2025.de/${websiteLocale}/kontakt/` },
   ];
   return (
     <div className="grid grid-cols-3 gap-2">
-      {actions.map((a) => (
-        <button key={a.label} className="flex flex-col items-center gap-2 p-3 rounded-lg bg-[var(--card)] border border-[var(--border)] active:scale-95 transition-all duration-150 cursor-pointer hover:border-[var(--primary)] hover:shadow-sm">
+      {actions.map((a) => {
+        const content = (
           <div className="h-11 w-11 rounded-full flex items-center justify-center" style={{ background: a.bg, color: a.color }}>
             <Icon d={a.icon} size={20} />
           </div>
-          <span className="text-[11px] font-medium text-[var(--foreground)] text-center leading-tight">{a.label}</span>
-        </button>
-      ))}
+        );
+        const label = <span className="text-[11px] font-medium text-[var(--foreground)] text-center leading-tight">{a.label}</span>;
+        const className = "flex flex-col items-center gap-2 p-3 rounded-lg bg-[var(--card)] border border-[var(--border)] active:scale-95 transition-all duration-150 cursor-pointer hover:border-[var(--primary)] hover:shadow-sm";
+        return a.href === "/events" ? (
+          <Link key={a.label} to={a.href} className={className}>
+            {content}
+            {label}
+          </Link>
+        ) : (
+          <a key={a.label} href={a.href} className={className}>
+            {content}
+            {label}
+          </a>
+        );
+      })}
     </div>
   );
 }
