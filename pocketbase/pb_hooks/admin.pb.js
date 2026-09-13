@@ -9,8 +9,15 @@ routerAdd("GET", "/api/bvhub/admin/groups", (e) => {
 routerAdd("GET", "/api/bvhub/admin/users", (e) => {
   const service = require(`${__hooks}/admin-service.js`);
   service.actor(e);
-  const users = $app.findRecordsByFilter("users", "role != 'SUPER_ADMIN'", "displayName,firstName,lastName", 500, 0);
-  return e.json(200, { items: users.map((user) => service.userDto($app, user)), totalItems: users.length });
+  const query = e.requestInfo().query || {};
+  const search = String(query.search || "").trim().toLocaleLowerCase();
+  const page = Math.max(1, Number.parseInt(String(query.page || "1"), 10) || 1);
+  const perPage = Math.min(100, Math.max(1, Number.parseInt(String(query.perPage || "50"), 10) || 50));
+  let users = $app.findRecordsByFilter("users", "role != 'SUPER_ADMIN'", "displayName,firstName,lastName,email", 10000, 0);
+  if (search) users = users.filter((user) => ["email", "displayName", "firstName", "lastName"].some((field) => user.getString(field).toLocaleLowerCase().includes(search)));
+  const totalItems = users.length;
+  const items = users.slice((page - 1) * perPage, page * perPage).map((user) => service.userDto($app, user));
+  return e.json(200, { items, page, perPage, totalItems, totalPages: Math.max(1, Math.ceil(totalItems / perPage)) });
 }, $apis.requireAuth("users"));
 
 routerAdd("PUT", "/api/bvhub/admin/users/{id}/groups", (e) => {

@@ -149,7 +149,7 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-[var(--border)] bg-[var(--muted)]/50">
-                    {["admin.members.avatar", "admin.members.memberId", "admin.members.username", "profile.firstName", "profile.lastName", "auth.email", "profile.role", "profile.groups", "admin.members.memberSince"].map((h) => (
+                    {["admin.members.avatar", "admin.members.memberId", "admin.members.displayName", "profile.firstName", "profile.lastName", "auth.email", "profile.role", "profile.groups", "admin.members.memberSince"].map((h) => (
                       <th key={h} className="text-left text-[10px] font-700 text-[var(--muted-foreground)] uppercase tracking-wide px-4 py-3">{t(h as MessageKey)}</th>
                     ))}
                   </tr>
@@ -165,7 +165,7 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
                           </button>
                         </td>
                         <td className="px-4 py-3"><button onClick={() => setSelected(m)} className="font-mono text-xs text-[var(--primary)] hover:underline font-600">{m.id}</button></td>
-                        <td className="px-4 py-3"><button onClick={() => setSelected(m)} className="text-sm font-500 hover:text-[var(--primary)] hover:underline transition-colors">@{m.username}</button></td>
+                        <td className="px-4 py-3"><button onClick={() => setSelected(m)} className="text-sm font-500 hover:text-[var(--primary)] hover:underline transition-colors">{m.displayName || m.username}</button></td>
                         <td className="px-4 py-3 text-sm">{m.vorname}</td>
                         <td className="px-4 py-3 text-sm">{m.nachname}</td>
                         <td className="px-4 py-3 text-xs text-[var(--muted-foreground)]">{m.email}</td>
@@ -194,7 +194,7 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
                         <p className="text-sm font-600 truncate">{m.vorname} {m.nachname}</p>
                         <span className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-700" style={{ background: roleCfg.bg, color: roleCfg.color }}>{t(roleCfg.key)}</span>
                       </div>
-                      <p className="text-[11px] text-[var(--muted-foreground)] truncate">@{m.username} · {m.id}</p>
+                      <p className="text-[11px] text-[var(--muted-foreground)] truncate">{m.displayName || m.username} · {m.id}</p>
                       <p className="text-[11px] text-[var(--muted-foreground)] truncate">{m.email}</p>
                       <p className="text-[11px] text-[var(--muted-foreground)] truncate">{t("profile.groups")}: {m.groups?.map((group) => group.name).join(", ") || "-"}</p>
                     </div>

@@ -33,12 +33,16 @@ export async function updateEvent(
     { method: "PATCH", body: input },
   )
 }
-export async function deleteOrCancelEvent(
-  id: string,
-): Promise<EventRecord | null> {
-  return pb.send<EventRecord | null>(
+export async function deleteEventDraft(id: string): Promise<void> {
+  await pb.send<void>(
     `/api/bvhub/admin/events/${encodeURIComponent(id)}`,
     { method: "DELETE" },
+  )
+}
+export async function cancelEvent(id: string): Promise<EventRecord> {
+  return pb.send<EventRecord>(
+    `/api/bvhub/admin/events/${encodeURIComponent(id)}`,
+    { method: "PATCH", body: { status: "CANCELLED" } },
   )
 }
 export async function getRegistration(id: string) {

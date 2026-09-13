@@ -147,8 +147,20 @@ export function useEventMutation() {
 export function useCancelEvent() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: api.deleteOrCancelEvent,
+    mutationFn: api.cancelEvent,
     onSuccess: () => invalidate(client),
+  })
+}
+export function useDeleteEventDraft() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: api.deleteEventDraft,
+    onSuccess: async (_data, id) => {
+      client.removeQueries({ queryKey: eventKeys.detail(id) })
+      client.removeQueries({ queryKey: eventKeys.participants(id) })
+      client.removeQueries({ queryKey: [...eventKeys.detail(id), "changelog"] })
+      await client.invalidateQueries({ queryKey: eventKeys.all })
+    },
   })
 }
 export function useVenueMutation() {

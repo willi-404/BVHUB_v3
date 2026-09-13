@@ -1,5 +1,16 @@
 /// <reference path="../pb_data/types.d.ts" />
 
+// PocketBase dashboard/collection deletes do not pass through the custom
+// bvHub route. Enforce the same safety policy there and remove audit rows for
+// a genuine, never-published draft before the required relation is checked.
+onRecordDeleteRequest((e) => {
+  const record = e.record;
+  if (!record || record.collection().name !== "events") return;
+  const service = require(`${__hooks}/venue-event-service.js`);
+  service.purgeEventDependencies($app, record.id);
+  e.next();
+}, "events");
+
 routerAdd(
   "GET",
   "/api/bvhub/venues",
@@ -146,6 +157,7 @@ routerAdd(
     const record = new Record($app.findCollectionByNameOrId("events"));
     Object.keys(data).forEach((key) => record.set(key, data[key]));
     record.set("createdBy", current.id);
+    if (data.published) record.set("firstPublishedAt", service.nowIso());
     $app.save(record);
     service.appendChangelog($app, record, current, {
       title: { old: null, new: data.title }, description: { old: null, new: data.description }, venue: { old: null, new: data.venue }, start: { old: null, new: data.start }, end: { old: null, new: data.end }, capacity: { old: null, new: data.capacity }, status: { old: null, new: data.status }, published: { old: null, new: data.published },
@@ -178,9 +190,9 @@ routerAdd(
     if (data.published && (!v.getBool("active") || !v.getString("checkoutRegion")))
       throw new ApiError(409, "Aktiver Veranstaltungsort erforderlich", {});
     const changes = {};
-    Object.keys(data).forEach((key) => { const old = key === "venue" ? record.getString(key) : key === "published" ? record.getBool(key) : key === "capacity" ? record.getInt(key) : record.getString(key); const equal = ["start", "end"].includes(key) ? Date.parse(old) === Date.parse(data[key]) : old === data[key]; if (!equal) changes[key] = { old, new: data[key] }; record.set(key, data[key]); });
-    $app.runInTransaction((txApp) => { txApp.save(record); service.appendChangelog(txApp, record, e.auth, changes); });
-    return e.json(200, service.eventDto($app, record));
+    Object.keys(data).forEach((key) => { const old = key === "venue" ? record.getString(key) : key === "published" ? record.getBool(key) : key === "capacity" ? record.getInt(key) : record.getString(key); const equal = ["start", "end"].includes(key) ? Date.parse(old) === Date.parse(data[key]) : old === data[key]; if (!equal) changes[key] = { old, new: data[key] }; });
+    $app.runInTransaction((txApp) => { const txRecord = txApp.findRecordById("events", record.id); Object.keys(data).forEach((key) => txRecord.set(key, data[key])); if (data.published && !txRecord.getString("firstPublishedAt")) txRecord.set("firstPublishedAt", service.nowIso()); txApp.save(txRecord); service.appendChangelog(txApp, txRecord, e.auth, changes); });
+    return e.json(200, service.eventDto($app, service.event($app, record.id)));
   },
   $apis.requireAuth("users"),
 );
@@ -190,15 +202,15 @@ routerAdd(
   (e) => {
     const service = require(`${__hooks}/venue-event-service.js`);
     if (!service.requireAdminActor(e)) throw new ForbiddenError("Zugriff nicht erlaubt");
-    const record = service.event($app, service.idOf(e));
-    if (record.getBool("published") && record.getString("status") !== "CANCELLED") {
-      const previous = record.getString("status");
-      record.set("status", "CANCELLED");
-      $app.runInTransaction((txApp) => { txApp.save(record); service.appendChangelog(txApp, record, e.auth, { status: { old: previous, new: "CANCELLED" } }, "CANCELLED"); });
-      return e.json(200, service.eventDto($app, record));
-    }
-    $app.delete(record);
-    return e.json(204, {});
+    const id = service.validateEventId(service.idOf(e));
+    const record = service.event($app, id);
+    $app.runInTransaction((txApp) => {
+      service.purgeEventDependencies(txApp, id);
+      let txRecord;
+      try { txRecord = txApp.findRecordById("events", id); } catch (_) { throw new ApiError(404, "Event nicht gefunden", {}); }
+      txApp.delete(txRecord);
+    });
+    return e.noContent(204);
   },
   $apis.requireAuth("users"),
 );

@@ -95,12 +95,13 @@
   "admin.members.empty": "未找到会员。",
   "admin.members.loading": "正在加载会员…",
   "admin.members.loadError": "无法加载会员。",
-  "admin.members.searchPlaceholder": "搜索会员",
+  "admin.members.searchPlaceholder": "搜索邮箱、显示名称或姓名",
   "admin.members.filterByGroup": "按组筛选",
   "admin.members.groups": "群组",
   "admin.members.memberId": "会员编号",
   "admin.members.memberSince": "加入时间",
-  "admin.members.username": "用户名",
+  "admin.members.username": "显示名称",
+  "admin.members.displayName": "显示名称",
   "admin.members.avatar": "头像",
   "admin.members.eventsCount": "{count} 个活动",
   "admin.groups.loadError": "无法加载群组。",
@@ -356,7 +357,7 @@
   "admin.events.cancel": "取消活动",
   "admin.events.delete": "删除草稿",
   "admin.events.confirmCancel": "取消此已发布活动？",
-  "admin.events.confirmDelete": "永久删除此草稿？",
+  "admin.events.confirmDelete": "永久删除此活动及其报名和历史记录？",
   "admin.events.empty": "未找到活动。",
   "admin.events.loadError": "无法加载活动。",
   "admin.events.saved": "活动已保存。",
@@ -372,5 +373,6 @@
   "admin.events.publishVenueRequired": "发布前请配置带有结算区域的有效地点。",
   "admin.events.changelog": "变更记录",
   "errors.forbidden": "你没有执行此操作的权限。",
-  "errors.generic": "发生错误，请重试。"
+  "errors.generic": "发生错误，请重试。",
+  "errors.event_not_deletable": "此活动无法删除，因为它已发布、有人报名或已完成。"
 }

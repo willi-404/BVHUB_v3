@@ -23,6 +23,8 @@ export interface EventRecord {
   canRegister: boolean
   canCancel: boolean
   published: boolean
+  firstPublishedAt: string | null
+  canDelete: boolean
   status: EventStatus
   createdBy: string
   created: string

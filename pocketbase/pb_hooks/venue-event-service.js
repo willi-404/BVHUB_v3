@@ -57,6 +57,7 @@ function status(value) {
 
 function venue(app, id) { try { return app.findRecordById("venues", id); } catch (_) { throw new ApiError(404, "Veranstaltungsort nicht gefunden", {}); } }
 function event(app, id) { try { return app.findRecordById("events", id); } catch (_) { throw new ApiError(404, "Event nicht gefunden", {}); } }
+function validateEventId(id) { if (typeof id !== "string" || !/^[a-z0-9]{15}$/.test(id)) throw new BadRequestError("Ungültige Event-ID"); return id; }
 function userRecord(app, id) {
   if (typeof id !== "string" || !/^[a-z0-9]{15}$/.test(id)) throw new BadRequestError("Ungültige Benutzer-ID");
   try { return app.findRecordById("users", id); } catch (_) { throw new ApiError(404, "Benutzer nicht gefunden", {}); }
@@ -72,7 +73,26 @@ function eventDto(app, record) {
   const v = venue(app, record.getString("venue"));
   const registeredCount = registrationCount(app, record.id);
   const spotsLeft = Math.max(0, record.getInt("capacity") - registeredCount);
-  return { id: record.id, title: record.getString("title"), description: record.getString("description"), venue: venueDto(v), start: record.getString("start"), end: record.getString("end"), capacity: record.getInt("capacity"), registeredCount, spotsLeft, status: record.getString("status"), published: record.getBool("published"), createdBy: record.getString("createdBy"), created: record.getString("created"), updated: record.getString("updated") };
+  return { id: record.id, title: record.getString("title"), description: record.getString("description"), venue: venueDto(v), start: record.getString("start"), end: record.getString("end"), capacity: record.getInt("capacity"), registeredCount, spotsLeft, status: record.getString("status"), published: record.getBool("published"), firstPublishedAt: record.getString("firstPublishedAt") || null, canDelete: canDeleteEvent(app, record), createdBy: record.getString("createdBy"), created: record.getString("created"), updated: record.getString("updated") };
+}
+function canDeleteEvent(app, record) {
+  return Boolean(record && record.id);
+}
+function purgeEventDependencies(app, eventId) {
+  const registrations = app.findRecordsByFilter("event_registrations", `event = '${eventId}'`, "", 100000, 0);
+  registrations.forEach((registration) => {
+    app.findRecordsByFilter("notification_outbox", `registration = '${registration.id}'`, "", 100000, 0).forEach((entry) => app.delete(entry));
+    app.delete(registration);
+  });
+  app.findRecordsByFilter("event_changelog", `event = '${eventId}'`, "", 100000, 0).forEach((entry) => app.delete(entry));
+  try {
+    app.findAllRecords("audit_events").forEach((entry) => {
+      const raw = entry.get("metadata");
+      let metadata = raw;
+      if (typeof raw === "string") { try { metadata = JSON.parse(raw); } catch (_) {} }
+      if (metadata && metadata.eventId === eventId) app.delete(entry);
+    });
+  } catch (_) {}
 }
 function eventDtoForUser(app, record, userRecord) {
   const dto = eventDto(app, record);
@@ -152,4 +172,4 @@ function appendChangelog(app, eventRecord, actorRecord, changes, action) {
   record.set("actorName", actorRecord.getString("displayName")); record.set("actorRole", actorRecord.getString("role"));
   record.set("changes", changes); record.set("correlationId", correlationId()); app.save(record);
 }
-module.exports = { requireAuthenticatedReader, requireAdminActor, actor, user, userRecord, payload, venue, event, venueDto, eventDto, eventDtoForUser, idOf, listVenues, listPublishedEvents, publicEvents, parseVenue, parseEvent, registrationCount, roleCanRegister, nowIso, appendChangelog };
+module.exports = { requireAuthenticatedReader, requireAdminActor, actor, user, userRecord, payload, venue, event, validateEventId, venueDto, eventDto, eventDtoForUser, canDeleteEvent, purgeEventDependencies, idOf, listVenues, listPublishedEvents, publicEvents, parseVenue, parseEvent, registrationCount, roleCanRegister, nowIso, appendChangelog };

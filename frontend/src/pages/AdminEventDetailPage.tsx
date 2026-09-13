@@ -11,6 +11,8 @@ import {
   useRemoveParticipant,
   useEventRealtime,
   useVenues,
+  useCancelEvent,
+  useDeleteEventDraft,
 } from "../features/events/hooks/useEvents"
 import { useMembers } from "../features/members/hooks/useMembers"
 import type { EventStatus } from "../features/events/types"
@@ -64,6 +66,8 @@ export default function AdminEventDetailPage() {
   const events = useAdminEvents()
   const venues = useVenues("admin")
   const mutation = useEventMutation()
+  const cancelMutation = useCancelEvent()
+  const deleteMutation = useDeleteEventDraft()
   const changelog = useEventChangelog(eventId)
   const [form, setForm] = useState<Form>(empty)
   const event = events.data?.find((item) => item.id === eventId)
@@ -111,6 +115,7 @@ export default function AdminEventDetailPage() {
   }
   const selectedVenue = venues.data?.find((venue) => venue.id === form.venue)
   const publishBlocked = !selectedVenue?.active || !selectedVenue.checkoutRegion
+  const actionPending = mutation.isPending || cancelMutation.isPending || deleteMutation.isPending
   return (
     <div className="min-h-full bg-[var(--background)] px-4 py-6 lg:px-8">
       <div className="mx-auto max-w-3xl">
@@ -265,11 +270,17 @@ export default function AdminEventDetailPage() {
               </p>
             )}
             <div className="flex flex-wrap gap-2">
-              <Button disabled={mutation.isPending} type="submit">
+              <Button disabled={actionPending} type="submit">
                 {mutation.isPending ? t("common.saving") : t("common.save")}
               </Button>
+              {event.published && event.status !== "CANCELLED" && <Button type="button" variant="destructive" disabled={actionPending} onClick={() => { if (window.confirm(t("admin.events.confirmCancel"))) void cancelMutation.mutateAsync(event.id).then(() => navigate("/admin/events")) }}>
+                {t("admin.events.cancel")}
+              </Button>}
+              {event.canDelete === true && <Button type="button" variant="destructive" disabled={actionPending} onClick={() => { if (window.confirm(t("admin.events.confirmDelete"))) void deleteMutation.mutateAsync(event.id).then(() => navigate("/admin/events")) }}>
+                {t("admin.events.delete")}
+              </Button>}
               <Button
-                disabled={mutation.isPending}
+                disabled={actionPending}
                 type="button"
                 variant="outline"
                 onClick={() => navigate("/dashboard")}

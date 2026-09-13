@@ -95,12 +95,13 @@
   "admin.members.empty": "No members found.",
   "admin.members.loading": "Loading members…",
   "admin.members.loadError": "Members could not be loaded.",
-  "admin.members.searchPlaceholder": "Search members",
+  "admin.members.searchPlaceholder": "Search email, display name, or legal name",
   "admin.members.filterByGroup": "Filter by group",
   "admin.members.groups": "Groups",
   "admin.members.memberId": "Member ID",
   "admin.members.memberSince": "Member since",
-  "admin.members.username": "Username",
+  "admin.members.username": "Display name",
+  "admin.members.displayName": "Display name",
   "admin.members.avatar": "Avatar",
   "admin.members.eventsCount": "{count} events",
   "admin.groups.loadError": "Groups could not be loaded.",
@@ -356,7 +357,7 @@
   "admin.events.cancel": "Cancel event",
   "admin.events.delete": "Delete draft",
   "admin.events.confirmCancel": "Cancel this published event?",
-  "admin.events.confirmDelete": "Delete this draft permanently?",
+  "admin.events.confirmDelete": "Permanently delete this event, including registrations and history?",
   "admin.events.empty": "No events found.",
   "admin.events.loadError": "Events could not be loaded.",
   "admin.events.saved": "Event saved.",
@@ -372,5 +373,6 @@
   "admin.events.publishVenueRequired": "Set an active venue with a checkout region before publishing.",
   "admin.events.changelog": "Change history",
   "errors.forbidden": "You do not have permission for this action.",
-  "errors.generic": "Something went wrong. Please try again."
+  "errors.generic": "Something went wrong. Please try again.",
+  "errors.event_not_deletable": "This event cannot be deleted because it was published, registered, or completed."
 }

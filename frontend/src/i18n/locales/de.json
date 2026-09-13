@@ -95,12 +95,13 @@
   "admin.members.empty": "Keine Mitglieder gefunden.",
   "admin.members.loading": "Mitglieder werden geladen …",
   "admin.members.loadError": "Mitglieder konnten nicht geladen werden.",
-  "admin.members.searchPlaceholder": "Mitglieder suchen",
+  "admin.members.searchPlaceholder": "E-Mail, Anzeigename oder Name suchen",
   "admin.members.filterByGroup": "Nach Gruppe filtern",
   "admin.members.groups": "Gruppen",
   "admin.members.memberId": "Mitgliedsnummer",
   "admin.members.memberSince": "Mitglied seit",
-  "admin.members.username": "Benutzername",
+  "admin.members.username": "Anzeigename",
+  "admin.members.displayName": "Anzeigename",
   "admin.members.avatar": "Avatar",
   "admin.members.eventsCount": "{count} Veranstaltungen",
   "admin.groups.loadError": "Gruppen konnten nicht geladen werden.",
@@ -356,7 +357,7 @@
   "admin.events.cancel": "Veranstaltung absagen",
   "admin.events.delete": "Entwurf löschen",
   "admin.events.confirmCancel": "Diese veröffentlichte Veranstaltung absagen?",
-  "admin.events.confirmDelete": "Diesen Entwurf endgültig löschen?",
+  "admin.events.confirmDelete": "Dieses Event einschließlich Anmeldungen und Verlauf endgültig löschen?",
   "admin.events.empty": "Keine Veranstaltungen gefunden.",
   "admin.events.loadError": "Veranstaltungen konnten nicht geladen werden.",
   "admin.events.saved": "Veranstaltung gespeichert.",
@@ -372,5 +373,6 @@
   "admin.events.publishVenueRequired": "Vor dem Veröffentlichen eine aktive Venue mit Checkout-Region konfigurieren.",
   "admin.events.changelog": "Änderungsverlauf",
   "errors.forbidden": "Du hast keine Berechtigung für diese Aktion.",
-  "errors.generic": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
+  "errors.generic": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+  "errors.event_not_deletable": "Dieses Event kann nicht gelöscht werden (veröffentlicht, registriert oder bereits abgeschlossen)."
 }

@@ -5,6 +5,7 @@ import { Card } from "./ui/card"
 import {
   useAdminEvents,
   useCancelEvent,
+  useDeleteEventDraft,
   useEventMutation,
   useVenues,
   useVenueMutation,
@@ -16,6 +17,7 @@ import type {
   Venue,
 } from "../../features/events/types"
 import { useI18n, type MessageKey } from "../../i18n"
+import { mapPBError } from "../../lib/errorMapper"
 
 const emptyEvent = {
   title: "",
@@ -47,6 +49,8 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
   const venues = useVenues("admin")
   const eventMutation = useEventMutation()
   const cancelOrDelete = useCancelEvent()
+  const deleteDraft = useDeleteEventDraft()
+  const [actionError, setActionError] = useState<string | null>(null)
   const venueMutation = useVenueMutation()
   useEffect(() => { if (location.pathname.endsWith("/new")) openEvent() }, [location.pathname])
 
@@ -101,8 +105,7 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
     setVenueFormOpen(false)
     setEditingVenue(null)
   }
-  const failure =
-    eventMutation.isError || venueMutation.isError || cancelOrDelete.isError
+  const failure = eventMutation.isError || venueMutation.isError || cancelOrDelete.isError || deleteDraft.isError
 
   return (
     <div className="min-h-full bg-[var(--background)] px-4 py-5 lg:px-8">
@@ -149,7 +152,7 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
             role="alert"
             className="mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700"
           >
-            {t("errors.generic")}
+            {actionError ? t(actionError as MessageKey) : t("errors.generic")}
           </p>
         )}
         {tab === "venues" ? (
@@ -179,7 +182,7 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
             formOpen={eventFormOpen}
             form={eventForm}
             editing={editingEvent}
-            saving={eventMutation.isPending}
+            saving={eventMutation.isPending || cancelOrDelete.isPending || deleteDraft.isPending}
             onCreate={() => navigate("/admin/events/new")}
             onEdit={(event) => navigate(`/admin/events/${encodeURIComponent(event.id)}`)}
             onChange={setEventForm}
@@ -195,12 +198,16 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
             }}
             onClose={() => setEventFormOpen(false)}
             onCancel={(id) => {
-              if (window.confirm(t("admin.events.confirmCancel")))
-                void cancelOrDelete.mutateAsync(id)
+              if (window.confirm(t("admin.events.confirmCancel"))) {
+                setActionError(null)
+                void cancelOrDelete.mutateAsync(id).catch((error) => setActionError(mapPBError(error)))
+              }
             }}
             onDelete={(id) => {
-              if (window.confirm(t("admin.events.confirmDelete")))
-                void cancelOrDelete.mutateAsync(id)
+              if (window.confirm(t("admin.events.confirmDelete"))) {
+                setActionError(null)
+                void deleteDraft.mutateAsync(id).catch((error) => setActionError(mapPBError(error)))
+              }
             }}
           />
         )}
@@ -454,10 +461,11 @@ function EventPanel({
                   {t("admin.events.cancel")}
                 </Button>
               )}
-              {!event.published && (
+              {event.canDelete === true && (
                 <Button
                   size="sm"
                   variant="destructive"
+                  disabled={saving}
                   onClick={() => onDelete(event.id)}
                 >
                   {t("admin.events.delete")}

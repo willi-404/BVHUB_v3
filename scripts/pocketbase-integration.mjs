@@ -340,11 +340,13 @@ const adminLogin = expectStatus(await request("POST", "/api/collections/users/au
 
 // WU-05 routes must load their authorization helpers explicitly in the hook module.
 expectStatus(await request("GET", "/api/bvhub/admin/events"), 401, "unauthenticated admin event list");
+expectStatus(await request("DELETE", "/api/bvhub/admin/events/not-an-id"), 401, "unauthenticated draft delete");
 expectStatus(await request("GET", "/api/bvhub/admin/venues"), 401, "unauthenticated admin venue list");
 for (const [label, token] of [["guest", guestLoginToken], ["member", memberLoginToken]]) {
   expectStatus(await request("GET", "/api/bvhub/admin/events", { token }), 403, `${label} cannot list admin events`);
   expectStatus(await request("GET", "/api/bvhub/admin/venues", { token }), 403, `${label} cannot list admin venues`);
   expectStatus(await request("POST", "/api/bvhub/admin/events", { token, body: {} }), 403, `${label} cannot create admin events`);
+  expectStatus(await request("DELETE", "/api/bvhub/admin/events/not-an-id", { token }), 403, `${label} cannot delete events`);
   expectStatus(await request("POST", "/api/bvhub/admin/venues", { token, body: {} }), 403, `${label} cannot create admin venues`);
 }
 for (const [account, session] of [[inactiveAdmin, inactiveAdminSession], [unverifiedAdmin, unverifiedAdminSession]]) {
@@ -355,6 +357,12 @@ for (const [label, token] of [["admin", adminLogin.token], ["superadmin", superL
   expectStatus(await request("GET", "/api/bvhub/admin/events", { token }), 200, `${label} lists admin events`);
   expectStatus(await request("GET", "/api/bvhub/admin/venues", { token }), 200, `${label} lists admin venues`);
 }
+const searchByDisplayName = expectStatus(await request("GET", `/api/bvhub/admin/users?search=${encodeURIComponent("Test ADMIN")}`, { token: adminLogin.token }), 200, "search admin users by display name");
+assert.ok(searchByDisplayName.items.some((item) => item.displayName === "Test ADMIN"));
+const searchByEmail = expectStatus(await request("GET", `/api/bvhub/admin/users?search=${encodeURIComponent("admin@example.test")}`, { token: adminLogin.token }), 200, "search users by email");
+assert.ok(searchByEmail.items.some((item) => item.email === admin.email));
+const searchByFirstName = expectStatus(await request("GET", `/api/bvhub/admin/users?search=${encodeURIComponent("Synthetic")}`, { token: adminLogin.token }), 200, "search users by first name");
+assert.ok(searchByFirstName.items.length > 0);
 const venuePayload = {
   name: "  WU-05 Integration Venue  ",
   address: "Teststrasse 42, 91052 Erlangen",
@@ -400,6 +408,29 @@ assert.equal(validEvent.createdBy, admin.id, "event creator is set from authenti
 assert.equal(validEvent.status, "MEMBERS_ONLY");
 const initialChangelog = expectStatus(await request("GET", `/api/bvhub/admin/events/${validEvent.id}/changelog`, { token: adminLogin.token }), 200, "admin reads event changelog");
 assert.equal(initialChangelog.items.length, 1, "event creation creates one changelog entry");
+
+// Regression: a never-published draft with its CREATED audit row is physically
+// deletable. The venue and a control event must remain intact.
+const draftEvent = expectStatus(await request("POST", "/api/bvhub/admin/events", {
+  token: adminLogin.token,
+  body: { ...eventPayload, title: "WU-05 Draft Delete Regression" },
+}), 201, "create real draft");
+const draftChangelog = expectStatus(await request("GET", `/api/bvhub/admin/events/${draftEvent.id}/changelog`, { token: adminLogin.token }), 200, "draft changelog exists");
+assert.equal(draftChangelog.items.length, 1);
+assert.equal(draftEvent.canDelete, true);
+expectStatus(await request("DELETE", `/api/bvhub/admin/events/${draftEvent.id}`, { token: adminLogin.token }), 204, "delete real draft");
+expectStatus(await request("GET", `/api/collections/events/records/${draftEvent.id}`, { token: rootToken }), 404, "deleted draft is gone");
+const adminAfterDraftDelete = expectStatus(await request("GET", "/api/bvhub/admin/events", { token: adminLogin.token }), 200, "admin list after draft delete");
+assert.equal(adminAfterDraftDelete.items.some((item) => item.id === draftEvent.id), false);
+const orphanChangelog = expectStatus(await request("GET", `/api/collections/event_changelog/records?filter=${encodeURIComponent(`event = "${draftEvent.id}"`)}`, { token: rootToken }), 200, "draft changelog cleanup");
+assert.equal(orphanChangelog.items.length, 0);
+const superDraft = expectStatus(await request("POST", "/api/bvhub/admin/events", { token: superLogin.token, body: { ...eventPayload, title: "WU-05 Superadmin Draft Delete" } }), 201, "superadmin creates draft");
+expectStatus(await request("DELETE", `/api/bvhub/admin/events/${superDraft.id}`, { token: superLogin.token }), 204, "superadmin deletes draft");
+const dashboardDraft = expectStatus(await request("POST", "/api/bvhub/admin/events", { token: adminLogin.token, body: { ...eventPayload, title: "WU-05 Dashboard Draft Delete" } }), 201, "create dashboard draft");
+const dashboardDelete = await request("DELETE", `/api/collections/events/records/${dashboardDraft.id}`, { token: rootToken });
+assert.ok([200, 204].includes(dashboardDelete.status), `dashboard direct draft delete: ${dashboardDelete.status}`);
+expectStatus(await request("GET", `/api/collections/events/records/${dashboardDraft.id}`, { token: rootToken }), 404, "dashboard draft is gone");
+expectStatus(await request("GET", `/api/bvhub/admin/venues/${createdVenue.id}`, { token: adminLogin.token }), 404, "venue direct route unavailable");
 const noOpEvent = expectStatus(await request("PATCH", `/api/bvhub/admin/events/${validEvent.id}`, { token: adminLogin.token, body: eventPayload }), 200, "no-op event patch");
 assert.equal(noOpEvent.id, validEvent.id);
 const noOpChangelog = expectStatus(await request("GET", `/api/bvhub/admin/events/${validEvent.id}/changelog`, { token: adminLogin.token }), 200, "read changelog after no-op");
@@ -439,15 +470,15 @@ expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrat
 }), 201, "member registers again after cancellation");
 const outbox = expectStatus(await request("GET", `/api/collections/notification_outbox/records?filter=${encodeURIComponent(`registration = "${wuRegistration.id}"`)}`, { token: rootToken }), 200, "registration creates notification outbox");
 assert.equal(outbox.items.length, 1, "idempotent registration creates one confirmation outbox item");
-const cancelledEvent = expectStatus(await request("DELETE", `/api/bvhub/admin/events/${validEvent.id}`, {
-  token: adminLogin.token,
+const cancelledEvent = expectStatus(await request("PATCH", `/api/bvhub/admin/events/${validEvent.id}`, {
+  token: adminLogin.token, body: { status: "CANCELLED" },
 }), 200, "admin cancels published event");
 assert.equal(cancelledEvent.status, "CANCELLED");
-const publicCancelledEvent = expectStatus(await request("GET", `/api/bvhub/events/${validEvent.id}`, { token: memberLoginToken }), 200, "cancelled published event remains visible publicly");
-assert.equal(publicCancelledEvent.canRegister, false, "cancelled event cannot be registered");
-expectStatus(await request("DELETE", `/api/bvhub/admin/venues/${createdVenue.id}`, {
-  token: adminLogin.token,
-}), 409, "referenced venue cannot be deleted");
+assert.equal(cancelledEvent.canDelete, true, "cancelled event can be explicitly hard deleted");
+expectStatus(await request("DELETE", `/api/bvhub/admin/events/${validEvent.id}`, { token: adminLogin.token }), 204, "registered event hard delete purges dependencies");
+expectStatus(await request("GET", `/api/collections/events/records/${validEvent.id}`, { token: rootToken }), 404, "registered event is deleted");
+expectStatus(await request("DELETE", "/api/bvhub/admin/events/not-an-id", { token: adminLogin.token }), 400, "invalid event id");
+expectStatus(await request("DELETE", `/api/bvhub/admin/events/zzzzzzzzzzzzzzz`, { token: adminLogin.token }), 404, "unknown event id");
 for (const [label, token, displayName] of [["admin", adminLogin.token, "Updated Admin"], ["superadmin", superLogin.token, "Updated Superadmin"]]) {
   const updated = expectStatus(await request("PATCH", "/api/bvhub/me/profile", { token, body: { displayName } }), 200, `${label} updates own profile`);
   assert.equal(updated.user.displayName, displayName, `${label} profile response contains updated name`);

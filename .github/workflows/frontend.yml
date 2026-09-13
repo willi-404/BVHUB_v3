@@ -39,6 +39,25 @@ jobs:
         working-directory: frontend
         run: pnpm build
 
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Playwright E2E
+        working-directory: frontend
+        env:
+          VITE_POCKETBASE_URL: http://127.0.0.1:18102
+        run: pnpm exec playwright test
+        continue-on-error: false
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report
+          if-no-files-found: ignore
+
       - name: Validate shell scripts
         run: bash -n scripts/deploy-preview.sh scripts/setup-pocketbase.sh scripts/start-pocketbase.sh scripts/test-pocketbase-integration.sh
 
