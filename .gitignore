@@ -48,3 +48,5 @@ temp/
 *.db
 
 build_deploy.sh
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
