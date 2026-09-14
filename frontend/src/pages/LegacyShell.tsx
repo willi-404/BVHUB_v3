@@ -29,6 +29,7 @@ import { primaryNavMessageKey, type PrimaryNavTab } from "./navigationLabels";
 import { useEvents, useEventRealtime } from "../features/events/hooks/useEvents";
 import type { EventRecord } from "../features/events/types";
 import DashboardStatisticsPanel from "../features/dashboard/components/DashboardStatisticsPanel";
+import MemberQr from "../features/memberCard/components/MemberQr";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -239,21 +240,7 @@ function MemberCardOverlay({ onClose }: { onClose: () => void }) {
 
       {/* QR Code */}
       <div className="flex flex-col items-center mt-8 px-6 pb-12 shrink-0">
-        <div className="bg-white rounded-2xl p-5 flex flex-col items-center gap-3" style={{ width: "180px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(9,1fr)", gap: "2.5px", width: "110px", height: "110px" }}>
-            {Array.from({ length: 81 }).map((_, i) => {
-              const finderTL = [0,1,2,3,4,5,6,9,15,18,24,27,28,29,30,31,32,33,10,11,12,13,14,19,20,21,22,23].includes(i);
-              const finderTR = [2,3,4,5,6,7,8,11,17,20,26,29,30,31,32,33,34,35,12,13,14,15,16,21,22,23,24,25].map(x=>x+54).includes(i);
-              const finderBL = [54,55,56,57,58,59,60,63,69,72,78,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77].includes(i);
-              const seed = ((i * 1664525 + 1013904223) >>> 0) % 100;
-              const on = finderTL || finderTR || finderBL || seed < 55;
-              return (
-                <div key={i} style={{ borderRadius: "1.5px", background: on ? "#0f2d1a" : "transparent" }} />
-              );
-            })}
-          </div>
-          <p className="text-[10px] text-gray-400 font-medium text-center leading-snug">{t("profile.scanToVerify")}</p>
-        </div>
+        <MemberQr />
         <p className="text-white/35 text-[10px] mt-4 text-center">{memberId}</p>
       </div>
     </div>

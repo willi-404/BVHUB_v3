@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import LoginPage from "../pages/LoginPage";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { useI18n } from "../i18n";
+import MemberVerifyPage from "../pages/MemberVerifyPage";
 const DashboardPage = lazy(() => import("../pages/DashboardPage"));
 const MembersPage = lazy(() => import("../pages/MembersPage"));
 const EventsPage = lazy(() => import("../pages/EventsPage"));
@@ -21,6 +22,7 @@ function LoadingFallback() {
 const load = (element: ReactNode) => <Suspense fallback={<LoadingFallback />}>{element}</Suspense>;
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
+  { path: "/member/verify", element: <MemberVerifyPage /> },
   { element: <ProtectedRoute />, children: [
     { path: "/dashboard", element: load(<DashboardPage />) },
     { path: "/events", element: load(<EventsPage />) },
