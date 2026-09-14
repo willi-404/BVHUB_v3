@@ -2,6 +2,7 @@ export type Group = "MemberER" | "MemberNUE" | "guest" | "Admin";
 
 export interface Member {
   id: string;
+  displayName?: string;
   username: string;
   vorname: string;
   nachname: string;

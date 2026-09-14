@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BrowserRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useNavigate, Link } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Badge } from "../app/components/ui/badge";
 import { Button } from "../app/components/ui/button";
@@ -14,17 +14,20 @@ import RegisterSuccessView from "../app/components/RegisterSuccessView";
 import VerifyEmailView from "../app/components/VerifyEmailView";
 import AdminMembersView from "../app/components/AdminMembersView";
 import AdminPaymentsView from "../app/components/AdminPaymentsView";
-import AdminEventManageView from "../app/components/AdminEventManageView";
+import AdminEventManageView from "../app/components/AdminEventsView";
 import logoSrc from "../imports/logo1-high-resolution.png";
 import { AuthProvider, useAuth, useAuthUser } from "../features/auth/AuthProvider";
 import { isAdminRole } from "../features/auth/policy";
 import { queryClient } from "../lib/queryClient";
-import { I18nProvider, useI18n } from "../i18n";
+import { formatLocaleDate, formatLocaleDateTime, LanguageSwitcher, useI18n, type MessageKey } from "../i18n";
 import { AdminGuard, ProtectedRoute, PublicOnlyRoute } from "../routes/guards";
 import { useMyProfile, useUpdateMyProfile } from "../features/profile/hooks/useProfile";
 import { profileErrorStatus } from "../features/profile/api/profileApi";
 import { profilePatchFromDto } from "../features/profile/profilePatch";
 import type { ProfileDto, ProfilePatch } from "../features/profile/types";
+import { primaryNavMessageKey, type PrimaryNavTab } from "./navigationLabels";
+import { useEvents, useEventRealtime } from "../features/events/hooks/useEvents";
+import type { EventRecord } from "../features/events/types";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -66,7 +69,7 @@ const icons = {
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
-type NavTab = "dashboard" | "events" | "payments" | "profile";
+type NavTab = PrimaryNavTab;
 
 interface Event {
   id: number;
@@ -170,11 +173,23 @@ const typeColors: Record<Event["type"], string> = {
   social: "secondary",
   workshop: "outline",
 };
-const typeLabels: Record<Event["type"], string> = {
-  training: "Training",
-  tournament: "Tournament",
-  social: "Social",
-  workshop: "Workshop",
+const typeLabelKeys: Record<Event["type"], "events.training" | "events.tournament" | "events.social" | "events.workshop"> = {
+  training: "events.training",
+  tournament: "events.tournament",
+  social: "events.social",
+  workshop: "events.workshop",
+};
+const eventTitleKeys: Record<string, "demo.event.tuesday" | "demo.event.championship" | "demo.event.beginner" | "demo.event.social"> = {
+  "Tuesday Evening Training": "demo.event.tuesday",
+  "Club Singles Championship": "demo.event.championship",
+  "Beginners Coaching Session": "demo.event.beginner",
+  "End-of-Season Social Night": "demo.event.social",
+};
+const levelKeys: Record<string, "demo.level.intermediate" | "demo.level.open" | "demo.level.beginner" | "demo.level.all"> = {
+  Intermediate: "demo.level.intermediate", Open: "demo.level.open", Beginner: "demo.level.beginner", All: "demo.level.all",
+};
+const locationKeys: Record<string, "demo.location.court12" | "demo.location.allCourts" | "demo.location.court3" | "demo.location.clubHall"> = {
+  "Court 1 & 2": "demo.location.court12", "All Courts": "demo.location.allCourts", "Court 3": "demo.location.court3", "Club Hall": "demo.location.clubHall",
 };
 
 // ─── Full-screen Member Card overlay ──────────────────────────────────────────
@@ -199,7 +214,7 @@ function MemberCardOverlay({ onClose }: { onClose: () => void }) {
         >
           <Icon d={icons.chevronLeft} size={20} />
         </button>
-        <span className="text-white/60 text-sm font-500">{t("profile.memberCard")}</span>
+        <span className="text-white/60 text-sm font-medium">{t("profile.memberCard")}</span>
         <div className="w-9" />
       </div>
 
@@ -208,7 +223,7 @@ function MemberCardOverlay({ onClose }: { onClose: () => void }) {
         <div className="h-20 w-20 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center mb-3 backdrop-blur-sm overflow-hidden p-1">
           <img src={logoSrc} alt={t("brand.logoAlt")} className="h-full w-full object-contain" />
         </div>
-        <p className="text-white font-700 text-base leading-tight text-center">{t("brand.name")}</p>
+        <p className="text-white font-bold text-base leading-tight text-center">{t("brand.name")}</p>
         <p className="text-white/50 text-xs mt-0.5">{t("brand.established")}</p>
       </div>
 
@@ -234,7 +249,7 @@ function MemberCardOverlay({ onClose }: { onClose: () => void }) {
               );
             })}
           </div>
-          <p className="text-[10px] text-gray-400 font-500 text-center leading-snug">{t("profile.scanToVerify")}</p>
+          <p className="text-[10px] text-gray-400 font-medium text-center leading-snug">{t("profile.scanToVerify")}</p>
         </div>
         <p className="text-white/35 text-[10px] mt-4 text-center">{memberId}</p>
       </div>
@@ -272,8 +287,8 @@ function EditProfileOverlay({ onClose }: { onClose: () => void }) {
   }
   const field = (key: keyof ProfilePatch, label: string, type = "text") => (
     <label className="flex flex-col gap-1.5" key={key}>
-      <span className="text-xs font-600 text-[var(--muted-foreground)] uppercase tracking-wide">{label}</span>
-      <input type={type} value={String(values[key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))} className="w-full h-11 px-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 transition-all" />
+      <span className="text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">{label}</span>
+      <input type={type} value={String(values[key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))} className="w-full h-11 px-3 rounded-lg border border-[var(--border)] bg-[var(--card)] text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 transition-all" />
     </label>
   );
 
@@ -284,11 +299,11 @@ function EditProfileOverlay({ onClose }: { onClose: () => void }) {
         <button onClick={close} className="h-9 w-9 flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)]" aria-label={t("common.close")}>
           <Icon d={icons.x} size={18} />
         </button>
-        <span className="text-sm font-600">{t("profile.edit")}</span>
+        <span className="text-sm font-semibold">{t("profile.edit")}</span>
         <button
           onClick={save}
           disabled={mutation.isPending || isLoading || !initialized}
-          className="text-sm font-600 text-[var(--primary)] px-2 py-1 rounded hover:bg-[var(--secondary)] transition-colors"
+          className="text-sm font-semibold text-[var(--primary)] px-2 py-1 rounded hover:bg-[var(--secondary)] transition-colors"
         >
           {mutation.isPending ? t("common.saving") : saved ? t("common.saved") : t("common.save")}
         </button>
@@ -306,7 +321,7 @@ function EditProfileOverlay({ onClose }: { onClose: () => void }) {
             <div className="grid md:grid-cols-2 gap-4">{field("birthDate", t("profile.birthDate"), "date")}{field("phone", t("profile.phone"))}</div>
             {field("contactInfo", t("profile.contactInfo"))}
           </div>
-          <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--muted)] divide-y divide-[var(--border)]">
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)] divide-y divide-[var(--border)]">
             {[
               { label: t("profile.userId"), value: data.user.id },
               { label: t("auth.email"), value: data.user.email },
@@ -315,7 +330,7 @@ function EditProfileOverlay({ onClose }: { onClose: () => void }) {
             ].map(({ label, value }) => (
               <div key={label} className="flex items-center justify-between px-3 py-2.5">
                 <span className="text-xs text-[var(--muted-foreground)]">{label}</span>
-                <span className="text-xs font-500 text-[var(--foreground)]">{value}</span>
+                <span className="text-xs font-medium text-[var(--foreground)]">{value}</span>
               </div>
             ))}
           </div>
@@ -337,8 +352,8 @@ function StatBar() {
         { label: t("dashboard.registered"), value: "2", sub: t("dashboard.byYou"), color: "hsl(217,91%,60%)" },
       ].map((stat) => (
         <Card key={stat.label} className="text-center py-3 px-2">
-          <div className="text-2xl font-700" style={{ color: stat.color }}>{stat.value}</div>
-          <div className="text-xs font-600 text-[var(--foreground)] mt-0.5">{stat.label}</div>
+          <div className="text-2xl font-bold" style={{ color: stat.color }}>{stat.value}</div>
+          <div className="text-xs font-semibold text-[var(--foreground)] mt-0.5">{stat.label}</div>
           <div className="text-[10px] text-[var(--muted-foreground)] mt-0.5">{stat.sub}</div>
         </Card>
       ))}
@@ -347,33 +362,46 @@ function StatBar() {
 }
 
 function QuickActions() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const websiteLocale = locale === "zh-CN" ? "zh" : "de";
   const actions = [
-    { label: t("dashboard.joinTraining"), icon: icons.calendar, color: "hsl(217,91%,60%)", bg: "hsl(217,91%,95%)" },
-    { label: t("dashboard.viewRules"), icon: icons.shield, color: "hsl(271,81%,56%)", bg: "hsl(271,81%,95%)" },
-    { label: t("dashboard.contactUs"), icon: icons.bell, color: "hsl(38,92%,50%)", bg: "hsl(38,92%,94%)" },
+    { label: t("dashboard.joinTraining"), icon: icons.calendar, color: "hsl(217,91%,60%)", bg: "hsl(217,91%,95%)", href: "/events" },
+    { label: t("dashboard.viewRules"), icon: icons.shield, color: "hsl(271,81%,56%)", bg: "hsl(271,81%,95%)", href: `https://bv-erlangen2025.de/${websiteLocale}/dokumente/` },
+    { label: t("dashboard.contactUs"), icon: icons.bell, color: "hsl(38,92%,50%)", bg: "hsl(38,92%,94%)", href: `https://bv-erlangen2025.de/${websiteLocale}/kontakt/` },
   ];
   return (
     <div className="grid grid-cols-3 gap-2">
-      {actions.map((a) => (
-        <button key={a.label} className="flex flex-col items-center gap-2 p-3 rounded-[var(--radius)] bg-[var(--card)] border border-[var(--border)] active:scale-95 transition-all duration-150 cursor-pointer hover:border-[var(--primary)] hover:shadow-sm">
+      {actions.map((a) => {
+        const content = (
           <div className="h-11 w-11 rounded-full flex items-center justify-center" style={{ background: a.bg, color: a.color }}>
             <Icon d={a.icon} size={20} />
           </div>
-          <span className="text-[11px] font-500 text-[var(--foreground)] text-center leading-tight">{a.label}</span>
-        </button>
-      ))}
+        );
+        const label = <span className="text-[11px] font-medium text-[var(--foreground)] text-center leading-tight">{a.label}</span>;
+        const className = "flex flex-col items-center gap-2 p-3 rounded-lg bg-[var(--card)] border border-[var(--border)] active:scale-95 transition-all duration-150 cursor-pointer hover:border-[var(--primary)] hover:shadow-sm";
+        return a.href === "/events" ? (
+          <Link key={a.label} to={a.href} className={className}>
+            {content}
+            {label}
+          </Link>
+        ) : (
+          <a key={a.label} href={a.href} className={className}>
+            {content}
+            {label}
+          </a>
+        );
+      })}
     </div>
   );
 }
 
 function NewsSection() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-600 text-[var(--foreground)]">{t("dashboard.news")}</h2>
-        <button className="text-xs text-[var(--primary)] font-500 flex items-center gap-0.5">
+        <h2 className="text-sm font-semibold text-[var(--foreground)]">{t("dashboard.news")}</h2>
+        <button className="text-xs text-[var(--primary)] font-medium flex items-center gap-0.5">
           {t("common.seeAll")} <Icon d={icons.chevronRight} size={12} />
         </button>
       </div>
@@ -381,12 +409,12 @@ function NewsSection() {
         <Card key={item.id} className="overflow-hidden">
           <div className="p-4">
             <div className="flex items-center gap-2 mb-2">
-              <Badge variant={item.tagColor}>{item.tag}</Badge>
-              <span className="text-[10px] text-[var(--muted-foreground)]">{item.date}</span>
+              <Badge variant={item.tagColor}>{t("demo.news.tag")}</Badge>
+              <span className="text-[10px] text-[var(--muted-foreground)]">{formatLocaleDate(item.date, locale)}</span>
             </div>
-            <h3 className="font-600 text-sm text-[var(--foreground)] leading-snug mb-1">{item.title}</h3>
-            <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">{item.excerpt}</p>
-            <button className="mt-2 text-xs text-[var(--primary)] font-500 flex items-center gap-0.5">
+            <h3 className="font-semibold text-sm text-[var(--foreground)] leading-snug mb-1">{t("demo.news.title")}</h3>
+            <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">{t("demo.news.excerpt")}</p>
+            <button className="mt-2 text-xs text-[var(--primary)] font-medium flex items-center gap-0.5">
               {t("common.readMore")} <Icon d={icons.chevronRight} size={11} />
             </button>
           </div>
@@ -397,39 +425,39 @@ function NewsSection() {
 }
 
 function EventCard({ event, onToggle }: { event: Event; onToggle: (id: number) => void }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const spotsLeft = event.capacity - event.registered;
   const isFull = spotsLeft === 0;
   return (
     <Card className="overflow-hidden">
       <div className="p-4 pb-3">
         <div className="flex items-center gap-2 flex-wrap mb-2">
-          <Badge variant={typeColors[event.type] as Parameters<typeof Badge>[0]["variant"]}>{typeLabels[event.type]}</Badge>
-          <Badge variant="outline">{event.level}</Badge>
+              <Badge variant={typeColors[event.type] as Parameters<typeof Badge>[0]["variant"]}>{t(typeLabelKeys[event.type])}</Badge>
+          <Badge variant="outline">{t(levelKeys[event.level])}</Badge>
           {event.isRegistered && <Badge variant="success">{t("events.registered")}</Badge>}
         </div>
-        <h3 className="font-600 text-sm text-[var(--foreground)] leading-tight mb-2">{event.title}</h3>
+        <h3 className="font-semibold text-sm text-[var(--foreground)] leading-tight mb-2">{t(eventTitleKeys[event.title] ?? "demo.event.social")}</h3>
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]">
             <Icon d={icons.calendar} size={12} />
-            <span>{event.date}</span>
+            <span>{formatLocaleDate(event.date, locale)}</span>
             <span className="mx-1 opacity-30">·</span>
             <Icon d={icons.clock} size={12} />
             <span>{event.time}</span>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]">
             <Icon d={icons.mapPin} size={12} />
-            <span>{event.location}</span>
+            <span>{t(locationKeys[event.location])}</span>
           </div>
         </div>
         <div className="mt-3">
           <div className="flex items-center justify-between mb-1.5">
             <div className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]">
               <Icon d={icons.users} size={12} />
-              <span>{event.registered}/{event.capacity} {t("events.participants")}</span>
+              <span>{t("events.participantCount", { registered: event.registered, capacity: event.capacity })}</span>
             </div>
-            <span className={`text-xs font-500 ${isFull ? "text-red-500" : spotsLeft <= 4 ? "text-amber-600" : "text-[var(--muted-foreground)]"}`}>
-              {isFull ? t("events.full") : `${spotsLeft} ${t("events.left")}`}
+            <span className={`text-xs font-medium ${isFull ? "text-red-500" : spotsLeft <= 4 ? "text-amber-600" : "text-[var(--muted-foreground)]"}`}>
+              {isFull ? t("events.full") : t("events.spotsLeft", { count: spotsLeft })}
             </span>
           </div>
           <Progress value={event.registered} max={event.capacity} color={isFull ? "hsl(0,84%,60%)" : spotsLeft <= 4 ? "hsl(38,92%,50%)" : undefined} />
@@ -451,7 +479,7 @@ function EventCard({ event, onToggle }: { event: Event; onToggle: (id: number) =
 }
 
 function PaymentCard({ payment, onPay }: { payment: Payment; onPay: (id: number) => void }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   return (
     <Card className="overflow-hidden">
       <div className="p-4 pb-3">
@@ -460,11 +488,11 @@ function PaymentCard({ payment, onPay }: { payment: Payment; onPay: (id: number)
             {payment.paid ? t("payments.paid") : t("payments.unpaid")}
           </Badge>
         </div>
-        <h3 className="font-600 text-sm text-[var(--foreground)] leading-tight mb-2">{payment.eventTitle}</h3>
+        <h3 className="font-semibold text-sm text-[var(--foreground)] leading-tight mb-2">{t(eventTitleKeys[payment.eventTitle] ?? "demo.event.social")}</h3>
         <div className="flex flex-col gap-1 mb-3">
           <div className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]">
             <Icon d={icons.calendar} size={12} />
-            <span>{payment.date}</span>
+            <span>{formatLocaleDate(payment.date, locale)}</span>
             <span className="mx-1 opacity-30">·</span>
             <Icon d={icons.clock} size={12} />
             <span>{payment.time}</span>
@@ -472,11 +500,11 @@ function PaymentCard({ payment, onPay }: { payment: Payment; onPay: (id: number)
         </div>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wide font-500">{t("payments.amount")}</p>
-            <p className="text-xl font-700 text-[var(--foreground)] mt-0.5">€{payment.price.toFixed(2)}</p>
+            <p className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wide font-medium">{t("payments.amount")}</p>
+            <p className="text-xl font-bold text-[var(--foreground)] mt-0.5">€{payment.price.toFixed(2)}</p>
           </div>
           {payment.paid ? (
-            <div className="flex items-center gap-1.5 text-emerald-600 text-sm font-600">
+            <div className="flex items-center gap-1.5 text-emerald-600 text-sm font-semibold">
               <Icon d={icons.check} size={16} />
               {t("common.done")}
             </div>
@@ -492,7 +520,10 @@ function PaymentCard({ payment, onPay }: { payment: Payment; onPay: (id: number)
 }
 
 function ActivityFeed() {
+  const { t } = useI18n();
   const iconMap: Record<string, string> = { check: icons.check, shield: icons.shield, trophy: icons.trophy };
+  const activityText: Record<number, "demo.activity.registered" | "demo.activity.renewed" | "demo.activity.tournament"> = { 1: "demo.activity.registered", 2: "demo.activity.renewed", 3: "demo.activity.tournament" };
+  const activityTime: Record<number, "demo.activity.twoHours" | "demo.activity.aug28" | "demo.activity.aug27"> = { 1: "demo.activity.twoHours", 2: "demo.activity.aug28", 3: "demo.activity.aug27" };
   return (
     <div className="flex flex-col">
       {ACTIVITIES.map((a, i) => (
@@ -502,8 +533,8 @@ function ActivityFeed() {
               <Icon d={iconMap[a.icon]} size={13} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-[var(--foreground)] leading-snug">{a.text}</p>
-              <p className="text-[10px] text-[var(--muted-foreground)] mt-0.5">{a.time}</p>
+              <p className="text-xs text-[var(--foreground)] leading-snug">{t(activityText[a.id])}</p>
+              <p className="text-[10px] text-[var(--muted-foreground)] mt-0.5">{t(activityTime[a.id])}</p>
             </div>
           </div>
           {i < ACTIVITIES.length - 1 && <Separator />}
@@ -515,7 +546,7 @@ function ActivityFeed() {
 
 // ─── Page views ────────────────────────────────────────────────────────────────
 
-function DashboardView({ events, onToggle, onOpenCard, profile }: { events: Event[]; onToggle: (id: number) => void; onOpenCard: () => void; profile: ProfileDto | null }) {
+function DashboardView({ events, liveEvents, onToggle, onOpenCard, profile }: { events: Event[]; liveEvents: EventRecord[]; onToggle: (id: number) => void; onOpenCard: () => void; profile: ProfileDto | null }) {
   const { t } = useI18n();
   const displayName = profile?.user.displayName || t("profile.title");
   const memberId = profile?.user.id || "-";
@@ -526,7 +557,7 @@ function DashboardView({ events, onToggle, onOpenCard, profile }: { events: Even
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs text-[var(--muted-foreground)]">{t("dashboard.welcome")}</p>
-          <h1 className="text-xl font-700 text-[var(--foreground)]">{displayName}</h1>
+          <h1 className="text-xl font-bold text-[var(--foreground)]">{displayName}</h1>
         </div>
         <div className="flex items-center gap-2">
           <button className="relative h-9 w-9 rounded-full flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
@@ -548,7 +579,7 @@ function DashboardView({ events, onToggle, onOpenCard, profile }: { events: Even
       <StatBar />
 
       <div>
-        <h2 className="text-sm font-600 text-[var(--foreground)] mb-3">{t("dashboard.quickActions")}</h2>
+        <h2 className="text-sm font-semibold text-[var(--foreground)] mb-3">{t("dashboard.quickActions")}</h2>
         <QuickActions />
       </div>
 
@@ -556,20 +587,16 @@ function DashboardView({ events, onToggle, onOpenCard, profile }: { events: Even
 
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-600 text-[var(--foreground)]">{t("dashboard.upcomingEvents")}</h2>
-          <button className="text-xs text-[var(--primary)] font-500 flex items-center gap-0.5">
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">{t("dashboard.upcomingEvents")}</h2>
+          <button className="text-xs text-[var(--primary)] font-medium flex items-center gap-0.5">
             {t("common.seeAll")} <Icon d={icons.chevronRight} size={12} />
           </button>
         </div>
-        <div className="flex flex-col gap-3">
-          {events.slice(0, 3).map((e) => (
-            <EventCard key={e.id} event={e} onToggle={onToggle} />
-          ))}
-        </div>
+        <LiveEventCards events={liveEvents.slice(0, 3)} />
       </div>
 
       <div>
-        <h2 className="text-sm font-600 text-[var(--foreground)] mb-1">{t("dashboard.recentActivity")}</h2>
+        <h2 className="text-sm font-semibold text-[var(--foreground)] mb-1">{t("dashboard.recentActivity")}</h2>
         <Card>
           <CardContent className="pt-0 px-4 pb-2">
             <ActivityFeed />
@@ -580,39 +607,25 @@ function DashboardView({ events, onToggle, onOpenCard, profile }: { events: Even
   );
 }
 
-function EventsView({ events, onToggle }: { events: Event[]; onToggle: (id: number) => void }) {
+function EventsView({ events, loading, error }: { events: EventRecord[]; loading: boolean; error: boolean }) {
   const { t } = useI18n();
-  const [filter, setFilter] = useState<"all" | Event["type"]>("all");
-  const filtered = filter === "all" ? events : events.filter((e) => e.type === filter);
-  const eventFilters: Array<{ key: "all" | Event["type"]; label: string }> = [
-    { key: "all", label: t("common.all") },
-    { key: "training", label: t("events.training") },
-    { key: "tournament", label: t("events.tournament") },
-    { key: "social", label: t("events.social") },
-    { key: "workshop", label: t("events.workshop") },
-  ];
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-xl font-700 text-[var(--foreground)]">{t("events.title")}</h1>
+        <h1 className="text-xl font-bold text-[var(--foreground)]">{t("events.title")}</h1>
         <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{t("events.subtitle")}</p>
       </div>
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4" style={{ scrollbarWidth: "none" }}>
-        {eventFilters.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-500 transition-all duration-150 ${filter === f.key ? "bg-[var(--primary)] text-white" : "bg-[var(--card)] border border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--primary)]"}`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-      <div className="flex flex-col gap-3">
-        {filtered.map((e) => <EventCard key={e.id} event={e} onToggle={onToggle} />)}
-      </div>
+      {loading && <p className="text-sm text-[var(--muted-foreground)]">{t("common.loading")}</p>}
+      {error && <p role="alert" className="text-sm text-red-700">{t("events.loadError")}</p>}
+      {!loading && !error && <LiveEventCards events={events} />}
     </div>
   );
+}
+
+function LiveEventCards({ events }: { events: EventRecord[] }) {
+  const { t, locale } = useI18n();
+  if (!events.length) return <p className="text-sm text-[var(--muted-foreground)]">{t("events.empty")}</p>;
+  return <div className="flex max-h-[min(62vh,44rem)] flex-col gap-3 overflow-y-auto pr-1">{events.map((event) => <Card key={event.id} className="p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="font-bold text-[var(--foreground)]">{event.title}</h3><p className="mt-1 text-xs text-[var(--muted-foreground)]">{event.venue.name}</p></div><Badge variant={event.status === "CANCELLED" || event.status === "COMPLETED" ? "destructive" : "success"}>{t(`events.status.${event.status}` as MessageKey)}</Badge></div><div className="mt-3 grid gap-1 text-xs text-[var(--muted-foreground)] sm:grid-cols-2"><span>{formatLocaleDateTime(event.start, locale)} - {formatLocaleDateTime(event.end, locale)}</span><span>{t("events.capacity")}: {event.registeredCount}/{event.capacity} ({event.spotsLeft} {t("events.spotsLeftLabel")})</span></div><Link className="mt-3 inline-flex text-xs font-semibold text-[var(--primary)] underline" to={`/events/${encodeURIComponent(event.id)}`}>{t("events.details")}</Link></Card>)}</div>;
 }
 
 function PaymentsView({ payments, onPay }: { payments: Payment[]; onPay: (id: number) => void }) {
@@ -620,13 +633,13 @@ function PaymentsView({ payments, onPay }: { payments: Payment[]; onPay: (id: nu
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-xl font-700 text-[var(--foreground)]">{t("payments.title")}</h1>
+        <h1 className="text-xl font-bold text-[var(--foreground)]">{t("payments.title")}</h1>
         <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{t("payments.subtitle")}</p>
       </div>
       {payments.length === 0 ? (
         <div className="flex flex-col items-center py-16 text-[var(--muted-foreground)]">
           <Icon d={icons.creditCard} size={32} />
-          <p className="text-sm mt-3 font-500">{t("payments.empty")}</p>
+          <p className="text-sm mt-3 font-medium">{t("payments.empty")}</p>
           <p className="text-xs mt-1">{t("payments.emptyHint")}</p>
         </div>
       ) : (
@@ -661,7 +674,7 @@ function AdminDrawer({ onClose, onAdminMembers, onAdminPayments, onAdminEvents }
           <div className="h-7 w-7 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700">
             <Icon d={icons.shieldAdmin} size={14} />
           </div>
-          <span className="text-sm font-700 text-[var(--foreground)]">{t("admin.area")}</span>
+          <span className="text-sm font-bold text-[var(--foreground)]">{t("admin.area")}</span>
           <button onClick={onClose} className="ml-auto text-[var(--muted-foreground)] hover:text-[var(--foreground)] h-8 w-8 flex items-center justify-center rounded-full hover:bg-[var(--muted)]">
             <Icon d={icons.x} size={16} />
           </button>
@@ -673,7 +686,7 @@ function AdminDrawer({ onClose, onAdminMembers, onAdminPayments, onAdminEvents }
             <button
               key={item.label}
               onClick={() => { onClose(); if (item.label === "Members") onAdminMembers(); else if (item.label === "Payments") onAdminPayments(); else if (item.label === "Event Manage") onAdminEvents(); }}
-              className="flex items-center gap-3 px-4 py-3.5 rounded-[var(--radius)] bg-amber-50 border border-amber-100 text-amber-800 font-500 text-sm hover:bg-amber-100 active:scale-[0.98] transition-all w-full"
+              className="flex items-center gap-3 px-4 py-3.5 rounded-lg bg-amber-50 border border-amber-100 text-amber-800 font-medium text-sm hover:bg-amber-100 active:scale-[0.98] transition-all w-full"
             >
               <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700 shrink-0">
                 <Icon d={item.icon} size={17} />
@@ -689,21 +702,21 @@ function AdminDrawer({ onClose, onAdminMembers, onAdminPayments, onAdminEvents }
 }
 
 function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, onAdminPayments, onAdminEvents, canAccessAdmin }: { profile: ProfileDto | null; onEditProfile: () => void; onLogout: () => void; onAdminMembers: () => void; onAdminPayments: () => void; onAdminEvents: () => void; canAccessAdmin: boolean }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [adminOpen, setAdminOpen] = useState(false);
 
-  if (!profile) return <div className="flex flex-col gap-4"><Card><CardContent className="p-5"><h1 className="text-lg font-700">{t("profile.title")}</h1><p className="text-sm text-[var(--muted-foreground)] mt-2">{t("profile.incompleteDetails")}</p><Button className="mt-4" onClick={onEditProfile}>{t("profile.edit")}</Button></CardContent></Card><Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 gap-2" onClick={onLogout}><Icon d={icons.logout} size={15} /> {t("auth.signOut")}</Button></div>;
+  if (!profile) return <div className="flex flex-col gap-4"><Card><CardContent className="p-5"><h1 className="text-lg font-bold">{t("profile.title")}</h1><p className="text-sm text-[var(--muted-foreground)] mt-2">{t("profile.incompleteDetails")}</p><Button className="mt-4" onClick={onEditProfile}>{t("profile.edit")}</Button></CardContent></Card><Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 gap-2" onClick={onLogout}><Icon d={icons.logout} size={15} /> {t("auth.signOut")}</Button></div>;
   const initials = `${profile.user.firstName[0] || ""}${profile.user.lastName[0] || ""}`.toUpperCase() || "?";
   const address = profile.profile ? `${profile.profile.street} ${profile.profile.houseNumber}, ${profile.profile.postalCode} ${profile.profile.city}` : t("profile.incomplete");
-  const localizedBirthDate = profile.profile?.birthDate ? new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(new Date(`${profile.profile.birthDate}T12:00:00Z`)) : "-";
+  const localizedBirthDate = profile.profile?.birthDate ? formatLocaleDate(`${profile.profile.birthDate}T12:00:00Z`, locale) : "-";
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col items-center pt-4 pb-2">
         <Avatar fallback={initials} size="lg" className="h-16 w-16 text-lg mb-3" />
-        <h1 className="text-lg font-700">{profile.user.displayName}</h1>
+        <h1 className="text-lg font-bold">{profile.user.displayName}</h1>
         <p className="text-xs text-[var(--muted-foreground)]">{profile.user.email}</p>
-        <Badge variant={profile.user.active ? "success" : "outline"} className="mt-2">{profile.user.role}</Badge>
+        <Badge variant={profile.user.active ? "success" : "outline"} className="mt-2">{profile.user.role === "SUPER_ADMIN" ? t("roles.superAdmin") : profile.user.role === "ADMIN" ? t("roles.admin") : profile.user.role === "MEMBER" ? t("roles.member") : t("roles.guest")}</Badge>
       </div>
 
       <Card><CardContent className="p-4 flex flex-col gap-2 text-sm"><div><span className="text-[var(--muted-foreground)]">{t("profile.name")}: </span>{profile.user.firstName} {profile.user.lastName}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.address")}: </span>{address}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.birthDate")}: </span>{localizedBirthDate}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.phone")}: </span>{profile.profile?.phone || "-"}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.contactInfo")}: </span>{profile.profile?.contactInfo || "-"}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.groups")}: </span>{profile.groups.length ? profile.groups.map((group) => group.name).join(", ") : "-"}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.userId")}: </span>{profile.user.id}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.status")}: </span>{profile.user.active ? t("profile.active") : t("profile.inactive")} / {profile.user.verified ? t("profile.verified") : t("profile.unverified")}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.createdAt")}: </span>{profile.user.created}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.updatedAt")}: </span>{profile.user.updated}</div></CardContent></Card>
@@ -717,7 +730,7 @@ function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, onAdmin
             <div key={item.label}>
               <button onClick={item.action} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--muted)] text-left transition-colors">
                 <span className="text-[var(--muted-foreground)]"><Icon d={item.icon} size={16} /></span>
-                <span className="flex-1 text-sm font-500">{item.label}</span>
+                <span className="flex-1 text-sm font-medium">{item.label}</span>
                 <span className="text-[var(--muted-foreground)]"><Icon d={icons.chevronRight} size={14} /></span>
               </button>
               {i < arr.length - 1 && <Separator />}
@@ -785,12 +798,12 @@ function BottomNav({
             <div className="relative">
               <Icon d={item.icon} size={20} />
               {showDot && (
-                <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-red-500 border-2 border-[var(--card)] text-[8px] text-white font-700 flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-red-500 border-2 border-[var(--card)] text-[8px] text-white font-bold flex items-center justify-center">
                   {unpaidCount}
                 </span>
               )}
             </div>
-            <span className="text-[10px] font-500">{t(item.label === "Home" ? "nav.home" : item.label === "Events" ? "nav.events" : item.label === "Payments" ? "nav.payments" : "nav.profile")}</span>
+            <span className="text-[10px] font-medium">{t(primaryNavMessageKey(item.key))}</span>
           </button>
         );
       })}
@@ -822,7 +835,7 @@ function Sidebar({
   const { t } = useI18n();
   const displayName = profile?.user.displayName || t("profile.title");
   const groups = profile?.groups.map((item) => item.name) ?? [];
-  const role = profile?.user.role === "SUPER_ADMIN" ? "Super Admin" : profile?.user.role === "ADMIN" ? "Admin" : profile?.user.role === "MEMBER" ? "Member" : "Guest";
+  const role = profile?.user.role === "SUPER_ADMIN" ? t("roles.superAdmin") : profile?.user.role === "ADMIN" ? t("roles.admin") : profile?.user.role === "MEMBER" ? t("roles.member") : t("roles.guest");
   return (
     <aside className="hidden lg:flex flex-col w-[var(--sidebar-width)] shrink-0 bg-[var(--card)] border-r border-[var(--border)] h-full">
       {/* Logo */}
@@ -832,7 +845,7 @@ function Sidebar({
           <img src={logoSrc} alt={t("brand.logoAlt")} className="h-full w-full object-contain p-0.5" />
           </div>
           <div className="min-w-0">
-            <p className="font-700 text-xs leading-tight truncate">{t("brand.name")}</p>
+            <p className="font-bold text-xs leading-tight truncate">{t("brand.name")}</p>
             <p className="text-[10px] text-[var(--muted-foreground)] truncate">{t("brand.legalSuffix")}</p>
           </div>
         </div>
@@ -843,7 +856,7 @@ function Sidebar({
         <div className="flex items-center gap-3">
           <Avatar fallback={displayName.slice(0, 2).toUpperCase()} size="md" />
           <div className="min-w-0">
-            <p className="text-sm font-600 truncate">{displayName}</p>
+            <p className="text-sm font-semibold truncate">{displayName}</p>
             <p className="text-[10px] text-[var(--muted-foreground)]">{role}</p>
             <div className="text-[10px] text-[var(--muted-foreground)]/75 leading-tight">{groups.length ? groups.map((group) => <p key={group} className="truncate">{group}</p>) : <p>-</p>}</div>
           </div>
@@ -862,17 +875,17 @@ function Sidebar({
             <button
               key={item.key}
               onClick={() => onChange(item.key)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius)] text-sm font-500 transition-all duration-150 w-full ${isActive ? "bg-[var(--secondary)] text-[var(--primary)]" : "text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"}`}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 w-full ${isActive ? "bg-[var(--secondary)] text-[var(--primary)]" : "text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"}`}
             >
               <div className="relative">
                 <Icon d={item.icon} size={17} />
                 {showDot && (
-                  <span className="absolute -top-1.5 -right-1.5 h-3.5 w-3.5 rounded-full bg-red-500 text-white text-[8px] font-700 flex items-center justify-center">
+                  <span className="absolute -top-1.5 -right-1.5 h-3.5 w-3.5 rounded-full bg-red-500 text-white text-[8px] font-bold flex items-center justify-center">
                     {unpaidCount}
                   </span>
                 )}
               </div>
-              {item.label}
+              {t(primaryNavMessageKey(item.key))}
               {isActive && <div className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--primary)]" />}
             </button>
           );
@@ -883,14 +896,14 @@ function Sidebar({
       {canAccessAdmin && <div className="px-3 pb-2 pt-3 border-t border-[var(--border)]">
         <div className="flex items-center gap-2 px-3 mb-2">
           <div className="h-px flex-1 bg-[var(--border)]" />
-          <span className="text-[10px] font-600 text-[var(--muted-foreground)] uppercase tracking-widest">{t("admin.title")}</span>
+          <span className="text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-widest">{t("admin.title")}</span>
           <div className="h-px flex-1 bg-[var(--border)]" />
         </div>
         {ADMIN_ITEMS.map((item) => (
           <button
             key={item.label}
             onClick={item.label === "Members" ? onAdminMembers : item.label === "Payments" ? onAdminPayments : item.label === "Event Manage" ? onAdminEvents : undefined}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius)] text-sm font-500 w-full text-[var(--muted-foreground)] hover:bg-amber-50 hover:text-amber-700 transition-all duration-150"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium w-full text-[var(--muted-foreground)] hover:bg-amber-50 hover:text-amber-700 transition-all duration-150"
           >
             <Icon d={item.icon} size={17} />
             {t(item.label === "Members" ? "admin.members.title" : item.label === "Payments" ? "admin.payments.title" : "admin.events.title")}
@@ -900,7 +913,7 @@ function Sidebar({
 
       {/* Bottom */}
       <div className="p-3 border-t border-[var(--border)] flex flex-col gap-1">
-        <button onClick={onLogout} className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius)] text-sm font-500 text-red-500 hover:bg-red-50 transition-colors w-full">
+        <button onClick={onLogout} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 transition-colors w-full">
           <Icon d={icons.logout} size={17} />
           {t("auth.signOut")}
         </button>
@@ -915,6 +928,8 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
   const { logout: authLogout } = useAuth();
   const { data: user } = useAuthUser();
   const { t } = useI18n();
+  const liveEvents = useEvents();
+  useEventRealtime();
   const { data: profile, isLoading: profileLoading, isError: profileError, refetch: refetchProfile } = useMyProfile();
   const canAccessAdmin = isAdminRole(user?.role);
   const [tab, setTab] = useState<NavTab>(initialTab);
@@ -937,10 +952,10 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
   }
 
   const tabLabel: Record<NavTab, string> = {
-    dashboard: t("nav.home"),
-    events: t("nav.events"),
-    payments: t("nav.payments"),
-    profile: t("nav.profile"),
+    dashboard: t(primaryNavMessageKey("dashboard")),
+    events: t(primaryNavMessageKey("events")),
+    payments: t(primaryNavMessageKey("payments")),
+    profile: t(primaryNavMessageKey("profile")),
   };
 
   const logout = onLogout ?? authLogout;
@@ -948,9 +963,9 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
   function renderView() {
     switch (tab) {
       case "dashboard":
-        return <DashboardView events={events} onToggle={toggleRegistration} onOpenCard={() => setCardOpen(true)} profile={profile || null} />;
+        return <DashboardView events={events} liveEvents={liveEvents.data ?? []} onToggle={toggleRegistration} onOpenCard={() => setCardOpen(true)} profile={profile || null} />;
       case "events":
-        return <EventsView events={events} onToggle={toggleRegistration} />;
+        return <EventsView events={liveEvents.data ?? []} loading={liveEvents.isPending} error={liveEvents.isError} />;
       case "payments":
         return <PaymentsView payments={payments} onPay={handlePay} />;
       case "profile":
@@ -961,13 +976,14 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
   }
 
   return (
-    <div className="h-full flex bg-[var(--background)]" style={{ fontFamily: "'Outfit', system-ui, sans-serif" }}>
+    <div className="h-full flex bg-[var(--background)]" style={{ fontFamily: "var(--font-sans)" }}>
       <Sidebar active={tab} onChange={setTab} unpaidCount={unpaidCount} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} canAccessAdmin={canAccessAdmin} profile={profile || null} />
 
-      <main className="flex-1 overflow-y-auto">
+      <main className="min-w-0 w-full max-w-full flex-1 overflow-x-hidden overflow-y-auto">
         <div className="hidden lg:flex items-center justify-between px-8 py-5 border-b border-[var(--border)] bg-[var(--card)] sticky top-0 z-10">
-          <h1 className="text-base font-600 text-[var(--foreground)]">{tabLabel[tab]}</h1>
+          <h1 className="text-base font-semibold text-[var(--foreground)]">{tabLabel[tab]}</h1>
           <div className="flex items-center gap-3">
+            <LanguageSwitcher className="text-[var(--foreground)]" />
             <button className="relative h-9 w-9 rounded-full flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
               <Icon d={icons.bell} size={18} />
               <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 border-2 border-[var(--card)]" />
@@ -976,7 +992,11 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
           </div>
         </div>
 
-        <div className="px-4 py-5 lg:px-8 lg:py-7 pb-24 lg:pb-8 max-w-2xl lg:max-w-none">
+        <div className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--card)] sticky top-0 z-10">
+          <span className="text-sm font-semibold text-[var(--foreground)]">{tabLabel[tab]}</span>
+          <LanguageSwitcher className="text-[var(--foreground)]" />
+        </div>
+        <div className="min-w-0 w-full max-w-2xl px-4 py-5 pb-24 lg:max-w-none lg:px-8 lg:py-7 lg:pb-8">
           {renderView()}
         </div>
       </main>
@@ -1046,11 +1066,9 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <I18nProvider>
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-        </I18nProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>
   );

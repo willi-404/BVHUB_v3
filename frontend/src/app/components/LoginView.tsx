@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
 import logoSrc from "../../imports/logo1-high-resolution.png";
 import { useAuth } from "../../features/auth/AuthProvider";
-import { useI18n } from "../../i18n";
+import { LanguageSwitcher, useI18n } from "../../i18n";
 
 interface LoginViewProps {
   onLogin?: () => void;
@@ -104,64 +105,67 @@ export default function LoginView({ onLogin, sessionExpired = false }: LoginView
       className="min-h-full flex flex-col items-center justify-center px-4 py-12"
       style={{
         background: "linear-gradient(160deg, #0a1f10 0%, #0f2d1a 40%, #14532d 80%, #1a6b38 100%)",
-        fontFamily: "'Outfit', system-ui, sans-serif",
+        fontFamily: "var(--font-sans)",
       }}
     >
       <div className="w-full max-w-sm relative">
+        <div className="flex justify-end mb-3 text-white">
+          <LanguageSwitcher />
+        </div>
         <div className="flex flex-col items-center mb-8">
           <div className="h-20 w-20 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center mb-4 overflow-hidden p-1.5 backdrop-blur-sm">
             <img src={logoSrc} alt={t("brand.logoAlt")} className="h-full w-full object-contain" />
           </div>
-          <h1 className="text-white font-700 text-xl tracking-tight text-center">{t("brand.name")}</h1>
+          <h1 className="text-white font-bold text-xl tracking-tight text-center">{t("brand.name")}</h1>
           <p className="text-white/50 text-xs mt-1">{t("brand.portal")}</p>
         </div>
 
-        <div className="rounded-[var(--radius)] border border-white/10 shadow-2xl" style={{ background: "rgba(255,255,255,0.97)" }}>
+        <div className="rounded-lg border border-white/10 shadow-2xl" style={{ background: "rgba(255,255,255,0.97)" }}>
           <div className="p-6">
             <div className="mb-5">
-              <h2 className="text-lg font-700 text-[var(--foreground)]">{mode === "otp" ? t("auth.otpTitle") : t("auth.adminLogin")}</h2>
+              <h2 className="text-lg font-bold text-[var(--foreground)]">{mode === "otp" ? t("auth.otpTitle") : t("auth.adminLogin")}</h2>
               <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{mode === "otp" ? t("auth.otpDescription") : t("auth.adminDescription")}</p>
             </div>
 
             <form onSubmit={mode === "otp" ? handleOtpSubmit : handlePasswordSubmit} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-600 text-[var(--muted-foreground)] uppercase tracking-wide">{mode === "otp" ? t("auth.email") : t("auth.identity")}</label>
+                <label className="text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">{mode === "otp" ? t("auth.email") : t("auth.identity")}</label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]"><Icon d={icons.mail} size={15} /></span>
-                  <input
+                  <Input
                     type="text"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     autoComplete="username"
-                    className="w-full h-11 pl-9 pr-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] outline-none transition-all focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/15"
+                    className="h-11 pl-9 pr-3"
                   />
                 </div>
               </div>
 
               {mode === "otp" && otpId && (
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-600 text-[var(--muted-foreground)] uppercase tracking-wide">{t("auth.code")}</label>
-                  <input
+                  <label className="text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">{t("auth.code")}</label>
+                  <Input
                     inputMode="numeric"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 8))}
                     autoComplete="one-time-code"
-                    className="w-full h-11 px-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] outline-none transition-all focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/15"
+                    className="h-11"
                   />
                 </div>
               )}
 
               {mode === "password" && (
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-600 text-[var(--muted-foreground)] uppercase tracking-wide">{t("auth.password")}</label>
+                  <label className="text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">{t("auth.password")}</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]"><Icon d={icons.lock} size={15} /></span>
-                    <input
+                    <Input
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       autoComplete="current-password"
-                      className="w-full h-11 pl-9 pr-10 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] outline-none transition-all focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/15"
+                      className="h-11 pl-9 pr-10"
                     />
                     <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" aria-label={t("auth.togglePassword")}>
                       <Icon d={showPassword ? icons.eyeOff : icons.eye} size={15} />
@@ -170,8 +174,8 @@ export default function LoginView({ onLogin, sessionExpired = false }: LoginView
                 </div>
               )}
 
-              {notice && <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-[var(--radius-sm)] px-3 py-2">{notice}</p>}
-              {error && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-[var(--radius-sm)] px-3 py-2">{error}</p>}
+              {notice && <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2">{notice}</p>}
+              {error && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>}
 
               <Button type="submit" size="lg" className="w-full mt-1 gap-2" disabled={loading}>
                 {loading ? <><span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />{t("auth.signIn")} …</> : <>{mode === "otp" ? (otpId ? t("auth.verifyCode") : t("auth.sendCode")) : t("auth.passwordLogin")}<Icon d={icons.arrowRight} size={16} /></>}
@@ -179,11 +183,11 @@ export default function LoginView({ onLogin, sessionExpired = false }: LoginView
             </form>
 
             <div className="h-px w-full bg-[var(--border)] mt-5" />
-            <button type="button" onClick={() => switchMode(mode === "otp" ? "password" : "otp")} className="w-full text-center text-xs text-[var(--primary)] font-600 mt-4 hover:underline">
+            <button type="button" onClick={() => switchMode(mode === "otp" ? "password" : "otp")} className="w-full text-center text-xs text-[var(--primary)] font-semibold mt-4 hover:underline">
               {mode === "otp" ? t("auth.switchPassword") : t("auth.switchOtp")}
             </button>
             {mode === "otp" && otpId && <button type="button" onClick={() => { setOtpId(null); setOtp(""); setNotice(""); setError(""); }} className="w-full text-center text-xs text-[var(--muted-foreground)] mt-3 hover:text-[var(--foreground)]">{t("auth.retry")}</button>}
-            <p className="text-center text-xs text-[var(--muted-foreground)] mt-4">{t("auth.noAccount")} <Link to="/register" className="text-[var(--primary)] font-600 hover:underline">{t("auth.register")}</Link></p>
+            <p className="text-center text-xs text-[var(--muted-foreground)] mt-4">{t("auth.noAccount")} <Link to="/register" className="text-[var(--primary)] font-semibold hover:underline">{t("auth.register")}</Link></p>
           </div>
         </div>
 

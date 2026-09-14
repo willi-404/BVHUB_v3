@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Member, groupConfig, initials } from "./MemberTypes";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
+import { Select } from "../ui/select";
+import { Checkbox } from "../ui/checkbox";
 import { pb } from "../../../lib/pocketbase";
 import { useAuthUser } from "../../../features/auth/AuthProvider";
 import { canManageMemberGroups, canManageMemberRole } from "../../../features/members/policy";
@@ -54,7 +56,7 @@ function CopyButton({ text }: { text: string }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-[10px] font-700 text-[var(--muted-foreground)] uppercase tracking-widest mb-2">{title}</p>
+      <p className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-widest mb-2">{title}</p>
       <div className="flex flex-col gap-2">{children}</div>
     </div>
   );
@@ -67,7 +69,7 @@ function Row({ icon, label, value, mono = false, action }: { icon: string; label
       <div className="min-w-0 flex-1">
         <p className="text-[10px] text-[var(--muted-foreground)]">{label}</p>
         <div className="flex items-center gap-1.5">
-          <p className={`text-xs font-500 text-[var(--foreground)] break-all flex-1 ${mono ? "font-mono" : ""}`}>{value}</p>
+          <p className={`text-xs font-medium text-[var(--foreground)] break-all flex-1 ${mono ? "font-mono" : ""}`}>{value}</p>
           {action}
         </div>
       </div>
@@ -88,6 +90,7 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
   const [message, setMessage] = useState<string | null>(null);
   const canManageGroups = canManageMemberGroups(currentUser?.role, role);
   const canManageRole = canManageMemberRole(currentUser?.role, role);
+  const localizedRole = role === "SUPER_ADMIN" ? t("roles.superAdmin") : role === "ADMIN" ? t("roles.admin") : role === "MEMBER" ? t("roles.member") : t("roles.guest");
   useEffect(() => {
     setGroups(member.groups ?? []);
     setRole(member.role ?? "GUEST");
@@ -121,10 +124,10 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
   return (
     <>
       <div className="fixed inset-0 z-[110] bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-[111] bg-[var(--card)] rounded-2xl shadow-2xl overflow-hidden max-w-md mx-auto max-h-[90vh] flex flex-col">
+      <div className="fixed inset-x-4 top-1/2 z-[111] mx-auto flex max-h-[90vh] max-w-md -translate-y-1/2 flex-col overflow-hidden rounded-xl border bg-card text-card-foreground shadow-2xl">
         {/* Header band */}
         <div className="relative h-20 shrink-0" style={{ background: `linear-gradient(135deg, ${cfg.color}dd, ${cfg.color}88)` }}>
-          <button onClick={onClose} className="absolute top-3 right-3 h-8 w-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors">
+          <button onClick={onClose} aria-label={t("common.close")} className="absolute top-3 right-3 h-8 w-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors">
             <Icon d={ic.x} size={15} />
           </button>
         </div>
@@ -132,19 +135,19 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
         {/* Avatar */}
         <div className="flex flex-col items-center -mt-9 px-5 shrink-0">
           <div
-            className="h-18 w-18 rounded-full border-4 border-[var(--card)] flex items-center justify-center text-white text-xl font-700 shadow-lg"
+            className="h-18 w-18 rounded-full border-4 border-[var(--card)] flex items-center justify-center text-white text-xl font-bold shadow-lg"
             style={{ background: member.avatarColor, height: 72, width: 72 }}
           >
             {initials(member)}
           </div>
           <div className="mt-2 text-center">
-            <p className="font-700 text-base">{member.vorname} {member.nachname}</p>
+            <p className="font-bold text-base">{member.vorname} {member.nachname}</p>
             <p className="text-xs text-[var(--muted-foreground)]">@{member.username}</p>
             <span
-              className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-600 mt-1.5"
+              className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold mt-1.5"
               style={{ background: cfg.bg, color: cfg.color }}
             >
-              {t("profile.role")}: {role}
+              {t("profile.role")}: {localizedRole}
             </span>
           </div>
         </div>
@@ -167,7 +170,7 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
             </Section>
             <Separator />
             <Section title={t("profile.account")}>
-              <Row icon={ic.shield} label={t("profile.role")} value={role} />
+              <Row icon={ic.shield} label={t("profile.role")} value={localizedRole} />
               <Row icon={ic.shield} label={t("profile.groups")} value={member.groups?.map((group) => group.name).join(", ") || "-"} />
               <Row icon={ic.clock} label={t("profile.createdAt")} value={member.accountCreated} />
               <Row icon={ic.clock} label={t("profile.updatedAt")} value={member.accountUpdated} />
@@ -179,16 +182,16 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
                   <div className="flex flex-col gap-2">
                     {canManageGroups && available.map((group) => {
                       const checked = groups.some((item) => item.id === group.id);
-                      return <label key={group.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={checked} onChange={() => setGroups((current) => checked ? current.filter((item) => item.id !== group.id) : [...current, { id: group.id, membershipId: "", name: group.name, active: true }])} />{group.name}</label>;
+                      return <label key={group.id} className="flex items-center gap-2 text-xs"><Checkbox checked={checked} onChange={() => setGroups((current) => checked ? current.filter((item) => item.id !== group.id) : [...current, { id: group.id, membershipId: "", name: group.name, active: true }])} />{group.name}</label>;
                     })}
                     {canManageGroups && <Button size="sm" onClick={() => void saveGroups()} disabled={saving}>{saving ? t("common.saving") : t("admin.groups.save")}</Button>}
                     {canManageRole && <>
-                      <label className="text-xs font-600" htmlFor="member-role">{t("profile.role")}</label>
-                      <select id="member-role" value={roleDraft} onChange={(event) => setRoleDraft(event.target.value as Role)} disabled={saving} className="h-9 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] px-2 text-sm">
+                      <label className="text-xs font-semibold" htmlFor="member-role">{t("profile.role")}</label>
+                      <Select id="member-role" value={roleDraft} onChange={(event) => setRoleDraft(event.target.value as Role)} disabled={saving} className="h-9">
                         <option value="GUEST">{t("roles.guest")}</option>
                         <option value="MEMBER">{t("roles.member")}</option>
                         {currentUser?.role === "SUPER_ADMIN" && <option value="ADMIN">{t("roles.admin")}</option>}
-                      </select>
+                      </Select>
                       <Button size="sm" variant="outline" onClick={() => void saveRole()} disabled={saving || roleDraft === role}>{saving ? t("common.saving") : t("admin.role.save")}</Button>
                     </>}
                     {message && <p role="status" className="text-xs text-[var(--muted-foreground)]">{message}</p>}

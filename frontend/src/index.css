@@ -1,8 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 @import 'tailwindcss';
 
 @theme inline {
-  --font-sans: 'Outfit', system-ui, sans-serif;
+  --font-sans: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -17,6 +16,7 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-border: var(--border);
+  --color-input: var(--input);
   --color-ring: var(--ring);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
@@ -27,30 +27,83 @@
 }
 
 :root {
-  --background: hsl(0, 0%, 97%);
-  --foreground: hsl(220, 20%, 12%);
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(222.2 84% 4.9%);
   --card: hsl(0, 0%, 100%);
-  --card-foreground: hsl(220, 20%, 12%);
-  --primary: hsl(142, 71%, 29%);
-  --primary-foreground: hsl(0, 0%, 100%);
-  --secondary: hsl(142, 30%, 94%);
-  --secondary-foreground: hsl(142, 60%, 20%);
-  --muted: hsl(220, 14%, 94%);
-  --muted-foreground: hsl(220, 10%, 46%);
-  --accent: hsl(38, 92%, 50%);
-  --accent-foreground: hsl(220, 20%, 12%);
-  --border: hsl(220, 13%, 90%);
-  --ring: hsl(142, 71%, 29%);
-  --destructive: hsl(0, 84%, 60%);
-  --destructive-foreground: hsl(0, 0%, 100%);
-  --radius: 0.625rem;
+  --card-foreground: hsl(222.2 84% 4.9%);
+  --primary: hsl(222.2 47.4% 11.2%);
+  --primary-foreground: hsl(210 40% 98%);
+  --secondary: hsl(210 40% 96.1%);
+  --secondary-foreground: hsl(222.2 47.4% 11.2%);
+  --muted: hsl(210 40% 96.1%);
+  --muted-foreground: hsl(215.4 16.3% 46.9%);
+  --accent: hsl(210 40% 96.1%);
+  --accent-foreground: hsl(222.2 47.4% 11.2%);
+  --border: hsl(214.3 31.8% 91.4%);
+  --ring: hsl(222.2 84% 4.9%);
+  --input: hsl(214.3 31.8% 91.4%);
+  --destructive: hsl(0 84.2% 60.2%);
+  --destructive-foreground: hsl(210 40% 98%);
+  --radius: 0.5rem;
   --sidebar-width: 240px;
 }
 
 html, body, #root {
   height: 100%;
-  font-family: 'Outfit', system-ui, sans-serif;
+  width: 100%;
+  max-width: 100%;
+  font-family: var(--font-sans);
 }
+
+html, body {
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, select, textarea { font: inherit; }
+/* Keep icon/text-only native buttons consistent across browsers. Component
+   buttons provide their own surface; all other buttons should start from a
+   transparent, inherited baseline instead of the user-agent button face. */
+button:not([data-slot]) {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+
+input:not([data-slot]), select:not([data-slot]), textarea:not([data-slot]) {
+  border: 1px solid var(--input);
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--background);
+  color: var(--foreground);
+  outline: none;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+input:not([data-slot]), select:not([data-slot]) { min-height: 2.5rem; padding: 0.5rem 0.75rem; }
+textarea:not([data-slot]) { min-height: 5rem; padding: 0.625rem 0.75rem; }
+input:not([data-slot]):focus-visible, select:not([data-slot]):focus-visible, textarea:not([data-slot]):focus-visible {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 18%, transparent);
+}
+input[type="checkbox"]:not([data-slot]) { min-height: auto; accent-color: var(--primary); }
+
+/* Keep plain links aligned with the surrounding copy while preserving the
+   semantic shadcn text colors used by link-style actions. */
+a { color: inherit; }
+a.text-primary { color: var(--primary); }
+a.text-primary-foreground { color: var(--primary-foreground); }
+a.text-secondary-foreground { color: var(--secondary-foreground); }
+a.text-accent-foreground { color: var(--accent-foreground); }
 
 * {
   box-sizing: border-box;

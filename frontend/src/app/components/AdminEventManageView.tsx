@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
+import { Input } from "./ui/input";
+import { Select } from "./ui/select";
 import { useI18n } from "../../i18n";
 
 function Icon({ d, size = 18, className = "" }: { d: string; size?: number; className?: string }) {
@@ -68,16 +70,16 @@ const STATUS_OPTIONS: { value: Status; label: string; color: string; bg: string 
 // ─── Field components ─────────────────────────────────────────────────────────
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <label className="block text-xs font-600 text-[var(--muted-foreground)] mb-1.5 uppercase tracking-wide">{children}</label>;
+  return <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1.5 uppercase tracking-wide">{children}</label>;
 }
 
 function TextInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
-    <input
+    <Input
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full h-10 px-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/15 transition-all"
+      className="h-10"
     />
   );
 }
@@ -85,35 +87,35 @@ function TextInput({ value, onChange, placeholder }: { value: string; onChange: 
 function SelectInput({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
   const { t } = useI18n();
   return (
-    <select
+    <Select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full h-10 px-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/15 transition-all appearance-none"
+      className="h-10"
     >
       <option value="" disabled>{t("common.selectPlaceholder")}</option>
       {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
+    </Select>
   );
 }
 
 function DateInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <input
+    <Input
       type="date"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full h-10 px-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/15 transition-all"
+      className="h-10"
     />
   );
 }
 
 function TimeInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <input
+    <Input
       type="time"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full h-10 px-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/15 transition-all"
+      className="h-10"
     />
   );
 }
@@ -129,10 +131,10 @@ function DateTimeRow({ dateVal, timeVal, onDate, onTime }: { dateVal: string; ti
 
 function SectionCard({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
   return (
-    <div className="bg-[var(--card)] rounded-[var(--radius)] border border-[var(--border)] overflow-hidden">
+    <div className="bg-[var(--card)] rounded-lg border border-[var(--border)] overflow-hidden">
       <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[var(--border)] bg-[var(--muted)]/40">
         <Icon d={icon} size={14} className="text-[var(--primary)]" />
-        <p className="text-xs font-700 text-[var(--foreground)] uppercase tracking-wide">{title}</p>
+        <p className="text-xs font-bold text-[var(--foreground)] uppercase tracking-wide">{title}</p>
       </div>
       <div className="px-4 py-4 flex flex-col gap-4">{children}</div>
     </div>
@@ -151,7 +153,7 @@ function StatusSelector({ value, onChange }: { value: Status; onChange: (v: Stat
           <button
             key={opt.value}
             onClick={() => onChange(opt.value)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-600 border transition-all duration-150 active:scale-95"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all duration-150 active:scale-95"
             style={
               active
                 ? { background: opt.bg, borderColor: opt.color, color: opt.color }
@@ -209,11 +211,11 @@ export default function AdminEventManageView({ onBack }: { onBack: () => void })
           <Icon d={ic.chevronLeft} size={18} />
         </button>
         <div className="flex-1">
-          <h1 className="font-700 text-base text-[var(--foreground)]">{t("admin.events.create")}</h1>
+          <h1 className="font-bold text-base text-[var(--foreground)]">{t("admin.events.create")}</h1>
           <p className="text-[10px] text-[var(--muted-foreground)]">{t("admin.events.createHint")}</p>
         </div>
         {errorCount > 0 && (
-          <div className="flex items-center gap-1.5 text-xs text-red-500 font-600">
+          <div className="flex items-center gap-1.5 text-xs text-red-500 font-semibold">
             <Icon d={ic.alertCircle} size={14} />
             {errorCount} {t("admin.events.requiredMissing")}
           </div>
@@ -227,14 +229,14 @@ export default function AdminEventManageView({ onBack }: { onBack: () => void })
         <SectionCard title={t("admin.events.basicInfo")} icon={ic.tag}>
           <div>
             <FieldLabel>{t("admin.events.titleLabel")} *</FieldLabel>
-            <div className={errors.titel ? "ring-2 ring-red-400 rounded-[var(--radius)]" : ""}>
+            <div className={errors.titel ? "ring-2 ring-red-400 rounded-lg" : ""}>
               <TextInput value={form.titel} onChange={(v) => set("titel", v)} placeholder={t("admin.events.titlePlaceholder")} />
             </div>
           </div>
 
           <div>
             <FieldLabel>{t("admin.events.location")} *</FieldLabel>
-            <div className={errors.ort ? "ring-2 ring-red-400 rounded-[var(--radius)]" : ""}>
+            <div className={errors.ort ? "ring-2 ring-red-400 rounded-lg" : ""}>
               <SelectInput
                 value={form.ort}
                 onChange={(v) => set("ort", v)}
@@ -253,7 +255,7 @@ export default function AdminEventManageView({ onBack }: { onBack: () => void })
         <SectionCard title={t("admin.events.dateTime")} icon={ic.calendar}>
           <div>
             <FieldLabel>{t("admin.events.date")} *</FieldLabel>
-            <div className={errors.date ? "ring-2 ring-red-400 rounded-[var(--radius)]" : ""}>
+            <div className={errors.date ? "ring-2 ring-red-400 rounded-lg" : ""}>
               <DateInput value={form.date} onChange={(v) => set("date", v)} />
             </div>
           </div>
@@ -261,13 +263,13 @@ export default function AdminEventManageView({ onBack }: { onBack: () => void })
           <div className="grid grid-cols-2 gap-3">
             <div>
               <FieldLabel>{t("admin.events.start")} *</FieldLabel>
-              <div className={errors.start ? "ring-2 ring-red-400 rounded-[var(--radius)]" : ""}>
+              <div className={errors.start ? "ring-2 ring-red-400 rounded-lg" : ""}>
                 <TimeInput value={form.start} onChange={(v) => set("start", v)} />
               </div>
             </div>
             <div>
               <FieldLabel>{t("admin.events.end")} *</FieldLabel>
-              <div className={errors.end ? "ring-2 ring-red-400 rounded-[var(--radius)]" : ""}>
+              <div className={errors.end ? "ring-2 ring-red-400 rounded-lg" : ""}>
                 <TimeInput value={form.end} onChange={(v) => set("end", v)} />
               </div>
             </div>

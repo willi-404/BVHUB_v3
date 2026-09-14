@@ -210,6 +210,24 @@ const superAdmin = expectStatus(await request("POST", "/api/collections/users/re
 const admin = expectStatus(await request("POST", "/api/collections/users/records", {
   token: rootToken, body: userBody("admin@example.test", "ADMIN"),
 }), 200, "create admin");
+const inactiveAdmin = expectStatus(await request("POST", "/api/collections/users/records", {
+  token: rootToken, body: { ...userBody("inactive-admin@example.test", "ADMIN"), displayName: "Inactive Admin" },
+}), 200, "create inactive admin");
+const inactiveAdminSession = expectStatus(await request("POST", `/api/collections/users/impersonate/${inactiveAdmin.id}`, {
+  token: rootToken, body: { duration: 300 },
+}), 200, "create inactive admin session");
+expectStatus(await request("PATCH", `/api/collections/users/records/${inactiveAdmin.id}`, {
+  token: rootToken, body: { active: false },
+}), 200, "deactivate admin test account");
+const unverifiedAdmin = expectStatus(await request("POST", "/api/collections/users/records", {
+  token: rootToken, body: { ...userBody("unverified-admin@example.test", "ADMIN"), displayName: "Unverified Admin" },
+}), 200, "create unverified admin");
+const unverifiedAdminSession = expectStatus(await request("POST", `/api/collections/users/impersonate/${unverifiedAdmin.id}`, {
+  token: rootToken, body: { duration: 300 },
+}), 200, "create unverified admin session");
+expectStatus(await request("PATCH", `/api/collections/users/records/${unverifiedAdmin.id}`, {
+  token: rootToken, body: { verified: false },
+}), 200, "unverify admin test account");
 const member = expectStatus(await request("POST", "/api/collections/users/records", {
   token: rootToken, body: userBody("member@example.test", "MEMBER"),
 }), 200, "create member with 12+ password");
@@ -319,6 +337,199 @@ const superLogin = expectStatus(await request("POST", "/api/collections/users/au
 const adminLogin = expectStatus(await request("POST", "/api/collections/users/auth-with-password", {
   body: { identity: admin.email, password: "Synthetic-password-12!" },
 }), 200, "admin password login");
+
+// WU-05 routes must load their authorization helpers explicitly in the hook module.
+expectStatus(await request("GET", "/api/bvhub/admin/events"), 401, "unauthenticated admin event list");
+expectStatus(await request("DELETE", "/api/bvhub/admin/events/not-an-id"), 401, "unauthenticated draft delete");
+expectStatus(await request("GET", "/api/bvhub/admin/venues"), 401, "unauthenticated admin venue list");
+for (const [label, token] of [["guest", guestLoginToken], ["member", memberLoginToken]]) {
+  expectStatus(await request("GET", "/api/bvhub/admin/events", { token }), 403, `${label} cannot list admin events`);
+  expectStatus(await request("GET", "/api/bvhub/admin/venues", { token }), 403, `${label} cannot list admin venues`);
+  expectStatus(await request("POST", "/api/bvhub/admin/events", { token, body: {} }), 403, `${label} cannot create admin events`);
+  expectStatus(await request("DELETE", "/api/bvhub/admin/events/not-an-id", { token }), 403, `${label} cannot delete events`);
+  expectStatus(await request("POST", "/api/bvhub/admin/venues", { token, body: {} }), 403, `${label} cannot create admin venues`);
+}
+for (const [account, session] of [[inactiveAdmin, inactiveAdminSession], [unverifiedAdmin, unverifiedAdminSession]]) {
+  expectStatus(await request("GET", "/api/bvhub/admin/events", { token: session.token }), 403, `${account.displayName} cannot list admin events`);
+  expectStatus(await request("GET", "/api/bvhub/admin/venues", { token: session.token }), 403, `${account.displayName} cannot list admin venues`);
+}
+for (const [label, token] of [["admin", adminLogin.token], ["superadmin", superLogin.token]]) {
+  expectStatus(await request("GET", "/api/bvhub/admin/events", { token }), 200, `${label} lists admin events`);
+  expectStatus(await request("GET", "/api/bvhub/admin/venues", { token }), 200, `${label} lists admin venues`);
+}
+const searchByDisplayName = expectStatus(await request("GET", `/api/bvhub/admin/users?search=${encodeURIComponent("Test ADMIN")}`, { token: adminLogin.token }), 200, "search admin users by display name");
+assert.ok(searchByDisplayName.items.some((item) => item.displayName === "Test ADMIN"));
+const searchByEmail = expectStatus(await request("GET", `/api/bvhub/admin/users?search=${encodeURIComponent("admin@example.test")}`, { token: adminLogin.token }), 200, "search users by email");
+assert.ok(searchByEmail.items.some((item) => item.email === admin.email));
+const searchByFirstName = expectStatus(await request("GET", `/api/bvhub/admin/users?search=${encodeURIComponent("Synthetic")}`, { token: adminLogin.token }), 200, "search users by first name");
+assert.ok(searchByFirstName.items.length > 0);
+const venuePayload = {
+  name: "  WU-05 Integration Venue  ",
+  address: "Teststrasse 42, 91052 Erlangen",
+  description: "Integration venue",
+  checkoutRegion: "ER",
+};
+const createdVenue = expectStatus(await request("POST", "/api/bvhub/admin/venues", {
+  token: adminLogin.token, body: venuePayload,
+}), 201, "admin creates venue");
+assert.equal(createdVenue.name, venuePayload.name.trim(), "venue name is normalized");
+assert.equal(createdVenue.active, true, "new venue is active by default");
+assert.equal(createdVenue.createdBy, undefined, "venue does not expose a client-controlled creator");
+const unconfiguredVenue = expectStatus(await request("POST", "/api/bvhub/admin/venues", {
+  token: adminLogin.token, body: { name: "WU-05 Unconfigured Venue", address: "No checkout region" },
+}), 201, "admin creates venue without checkout region");
+const unconfiguredEvent = expectStatus(await request("POST", "/api/bvhub/admin/events", {
+  token: adminLogin.token, body: { title: "Unconfigured publish test", description: "", venue: unconfiguredVenue.id, start: "2099-08-01T16:00:00.000Z", end: "2099-08-01T18:00:00.000Z", capacity: 5, published: false, status: "MEMBERS_ONLY" },
+}), 201, "admin creates unpublished event with unconfigured venue");
+const blockedPublish = await request("PATCH", `/api/bvhub/admin/events/${unconfiguredEvent.id}`, { token: adminLogin.token, body: { published: true } });
+assert.notEqual(blockedPublish.status, 500, "publishing an unconfigured venue never returns 500");
+assert.ok([400, 409].includes(blockedPublish.status), "publishing an unconfigured venue is rejected");
+expectStatus(await request("GET", "/api/bvhub/venues", { token: memberLoginToken }), 200, "member reads active venues");
+expectStatus(await request("POST", "/api/bvhub/admin/venues", {
+  token: adminLogin.token, body: { ...venuePayload, name: "Invalid extra field venue", createdBy: superAdmin.id },
+}), 400, "venue rejects protected payload fields");
+const eventPayload = {
+  title: "WU-05 Integration Event",
+  description: "Plaintext integration event",
+  venue: createdVenue.id,
+  start: "2099-07-01T16:00:00.000Z",
+  end: "2099-07-01T18:00:00.000Z",
+  capacity: 25,
+  published: false,
+  status: "MEMBERS_ONLY",
+};
+expectStatus(await request("POST", "/api/bvhub/admin/events", {
+  token: adminLogin.token, body: { ...eventPayload, createdBy: superAdmin.id },
+}), 400, "event rejects client-controlled creator");
+const validEvent = expectStatus(await request("POST", "/api/bvhub/admin/events", {
+  token: adminLogin.token, body: eventPayload,
+}), 201, "admin creates event");
+assert.equal(validEvent.createdBy, admin.id, "event creator is set from authenticated actor");
+assert.equal(validEvent.status, "MEMBERS_ONLY");
+const initialChangelog = expectStatus(await request("GET", `/api/bvhub/admin/events/${validEvent.id}/changelog`, { token: adminLogin.token }), 200, "admin reads event changelog");
+assert.equal(initialChangelog.items.length, 1, "event creation creates one changelog entry");
+
+// Regression: a never-published draft with its CREATED audit row is physically
+// deletable. The venue and a control event must remain intact.
+const draftEvent = expectStatus(await request("POST", "/api/bvhub/admin/events", {
+  token: adminLogin.token,
+  body: { ...eventPayload, title: "WU-05 Draft Delete Regression" },
+}), 201, "create real draft");
+const draftChangelog = expectStatus(await request("GET", `/api/bvhub/admin/events/${draftEvent.id}/changelog`, { token: adminLogin.token }), 200, "draft changelog exists");
+assert.equal(draftChangelog.items.length, 1);
+assert.equal(draftEvent.canDelete, true);
+expectStatus(await request("DELETE", `/api/bvhub/admin/events/${draftEvent.id}`, { token: adminLogin.token }), 204, "delete real draft");
+expectStatus(await request("GET", `/api/collections/events/records/${draftEvent.id}`, { token: rootToken }), 404, "deleted draft is gone");
+const adminAfterDraftDelete = expectStatus(await request("GET", "/api/bvhub/admin/events", { token: adminLogin.token }), 200, "admin list after draft delete");
+assert.equal(adminAfterDraftDelete.items.some((item) => item.id === draftEvent.id), false);
+const orphanChangelog = expectStatus(await request("GET", `/api/collections/event_changelog/records?filter=${encodeURIComponent(`event = "${draftEvent.id}"`)}`, { token: rootToken }), 200, "draft changelog cleanup");
+assert.equal(orphanChangelog.items.length, 0);
+const superDraft = expectStatus(await request("POST", "/api/bvhub/admin/events", { token: superLogin.token, body: { ...eventPayload, title: "WU-05 Superadmin Draft Delete" } }), 201, "superadmin creates draft");
+expectStatus(await request("DELETE", `/api/bvhub/admin/events/${superDraft.id}`, { token: superLogin.token }), 204, "superadmin deletes draft");
+const dashboardDraft = expectStatus(await request("POST", "/api/bvhub/admin/events", { token: adminLogin.token, body: { ...eventPayload, title: "WU-05 Dashboard Draft Delete" } }), 201, "create dashboard draft");
+const dashboardDelete = await request("DELETE", `/api/collections/events/records/${dashboardDraft.id}`, { token: rootToken });
+assert.ok([200, 204].includes(dashboardDelete.status), `dashboard direct draft delete: ${dashboardDelete.status}`);
+expectStatus(await request("GET", `/api/collections/events/records/${dashboardDraft.id}`, { token: rootToken }), 404, "dashboard draft is gone");
+expectStatus(await request("GET", `/api/bvhub/admin/venues/${createdVenue.id}`, { token: adminLogin.token }), 404, "venue direct route unavailable");
+const noOpEvent = expectStatus(await request("PATCH", `/api/bvhub/admin/events/${validEvent.id}`, { token: adminLogin.token, body: eventPayload }), 200, "no-op event patch");
+assert.equal(noOpEvent.id, validEvent.id);
+const noOpChangelog = expectStatus(await request("GET", `/api/bvhub/admin/events/${validEvent.id}/changelog`, { token: adminLogin.token }), 200, "read changelog after no-op");
+assert.equal(noOpChangelog.items.length, initialChangelog.items.length, "no-op patch does not create changelog");
+expectStatus(await request("GET", `/api/bvhub/admin/events/${validEvent.id}/changelog`, { token: memberLoginToken }), 403, "member cannot read event changelog");
+expectStatus(await request("POST", "/api/bvhub/admin/events", {
+  token: adminLogin.token, body: { ...eventPayload, title: "Invalid range", start: eventPayload.end, end: eventPayload.start },
+}), 400, "event rejects invalid time range");
+expectStatus(await request("POST", "/api/bvhub/admin/events", {
+  token: adminLogin.token, body: { ...eventPayload, title: "Unknown field", unexpected: true },
+}), 400, "event rejects unknown fields");
+const publishedEvent = expectStatus(await request("PATCH", `/api/bvhub/admin/events/${validEvent.id}`, {
+  token: adminLogin.token, body: { published: true },
+}), 200, "admin publishes event");
+assert.equal(publishedEvent.published, true);
+const adminAddMailBefore = smtpMessages.length;
+expectStatus(await request("POST", `/api/bvhub/admin/events/${validEvent.id}/participants`, { token: adminLogin.token, body: { userId: member.id } }), 201, "admin add participant immediate mail");
+assert.match(await waitForMail(adminAddMailBefore), /hinzugef/);
+const adminRemoveMailBefore = smtpMessages.length;
+expectStatus(await request("DELETE", `/api/bvhub/admin/events/${validEvent.id}/participants/${member.id}`, { token: adminLogin.token }), 200, "admin remove participant immediate mail");
+assert.match(await waitForMail(adminRemoveMailBefore), /abgemeldet/);
+const publicEventList = expectStatus(await request("GET", "/api/bvhub/events", { token: memberLoginToken }), 200, "member reads published events");
+assert.ok(publicEventList.items.some((item) => item.id === validEvent.id), "published future event appears in public event list");
+expectStatus(await request("GET", `/api/bvhub/events/${validEvent.id}`, { token: guestLoginToken }), 200, "guest reads published event detail");
+expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrations`, {
+  token: guestLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" },
+}), 409, "guest cannot register for members-only event");
+expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrations`, {
+  token: memberLoginToken, body: { checkoutRegion: "NUE", termsVersion: "NUE-v1" },
+}), 409, "registration rejects wrong checkout region");
+const eventRegistrationMailBefore = smtpMessages.length;
+const wuRegistration = expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrations`, {
+  token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" },
+}), 201, "member registers for event");
+assert.equal(wuRegistration.status, "REGISTERED");
+assert.match(await waitForMail(eventRegistrationMailBefore), /Anmeldung best/);
+assert.match(smtpMessages.at(-1), /WU-05 Integration Event/);
+const repeatedRegistration = expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrations`, {
+  token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" },
+}), 201, "repeated registration is idempotent");
+assert.equal(repeatedRegistration.id, wuRegistration.id);
+expectStatus(await request("GET", `/api/bvhub/events/${validEvent.id}/registration`, { token: memberLoginToken }), 200, "member reads own registration");
+const adminRemoveAgainMailBefore = smtpMessages.length;
+expectStatus(await request("DELETE", `/api/bvhub/admin/events/${validEvent.id}/participants/${member.id}`, { token: adminLogin.token }), 200, "admin removes participant immediate mail");
+assert.match(await waitForMail(adminRemoveAgainMailBefore), /abgemeldet/);
+const rejoinMailBefore = smtpMessages.length;
+expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrations`, { token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" } }), 201, "member re-registers after admin remove");
+assert.match(await waitForMail(rejoinMailBefore), /Anmeldung best/);
+const cancellationMailBefore = smtpMessages.length;
+expectStatus(await request("DELETE", `/api/bvhub/events/${validEvent.id}/registrations/me`, { token: memberLoginToken }), 200, "member cancels own registration");
+assert.match(await waitForMail(cancellationMailBefore), /Anmeldung storniert/);
+const reRegistrationMailBefore = smtpMessages.length;
+expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrations`, {
+  token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" },
+}), 201, "member registers again after cancellation");
+assert.match(await waitForMail(reRegistrationMailBefore), /Anmeldung best/);
+const outbox = expectStatus(await request("GET", `/api/collections/notification_outbox/records?filter=${encodeURIComponent(`registration = "${wuRegistration.id}"`)}`, { token: rootToken }), 200, "registration creates notification outbox");
+assert.equal(outbox.items.length, 7, "each registration state transition creates one notification outbox item");
+assert.deepEqual(outbox.items.map((item) => item.kind).sort(), [
+  "EVENT_ADMIN_ADDED",
+  "EVENT_ADMIN_REMOVED",
+  "EVENT_ADMIN_REMOVED",
+  "EVENT_REGISTRATION_CANCELLED",
+  "EVENT_REGISTRATION_CONFIRMED",
+  "EVENT_REGISTRATION_CONFIRMED",
+  "EVENT_REGISTRATION_CONFIRMED",
+].sort(), "registration, cancellation, and re-registration are notified once each");
+
+const waitingEvent = expectStatus(await request("POST", "/api/bvhub/admin/events", { token: adminLogin.token, body: { ...eventPayload, title: "WU-05 Waiting Event", capacity: 1, published: true, status: "OPEN_TO_ALL" } }), 201, "create waiting-list event");
+expectStatus(await request("POST", `/api/bvhub/events/${waitingEvent.id}/registrations`, { token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" } }), 201, "fill waiting-list event");
+const waitingMailBefore = smtpMessages.length;
+const waitingRegistration = expectStatus(await request("POST", `/api/bvhub/events/${waitingEvent.id}/registrations`, { token: guestLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" } }), 201, "join waiting list");
+assert.equal(waitingRegistration.status, "WAITING");
+assert.match(await waitForMail(waitingMailBefore), /Warteliste/);
+const promotionMailBefore = smtpMessages.length;
+expectStatus(await request("DELETE", `/api/bvhub/events/${waitingEvent.id}/registrations/me`, { token: memberLoginToken }), 200, "cancel and promote waiting member");
+assert.match(await waitForMail(promotionMailBefore), /nachger/);
+assert.match(smtpMessages.at(-1), /WU-05 Waiting Event/);
+const promotedRegistration = expectStatus(await request("GET", `/api/bvhub/events/${waitingEvent.id}/registration`, { token: guestLoginToken }), 200, "read promoted registration");
+assert.equal(promotedRegistration.status, "REGISTERED");
+const promotedOutbox = expectStatus(await request("GET", `/api/collections/notification_outbox/records?filter=${encodeURIComponent(`registration = "${waitingRegistration.id}"`)}`, { token: rootToken }), 200, "waiting-list outbox");
+assert.deepEqual(promotedOutbox.items.map((item) => item.kind).sort(), ["EVENT_WAITING_LIST_JOINED", "EVENT_WAITING_LIST_PROMOTED"].sort());
+
+const voluntaryEvent = expectStatus(await request("POST", "/api/bvhub/admin/events", { token: adminLogin.token, body: { ...eventPayload, title: "WU-05 Voluntary Waiting Event", capacity: 1, published: true, status: "OPEN_TO_ALL" } }), 201, "create voluntary waiting event");
+expectStatus(await request("POST", `/api/bvhub/events/${voluntaryEvent.id}/registrations`, { token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" } }), 201, "fill voluntary event");
+const voluntary = expectStatus(await request("POST", `/api/bvhub/events/${voluntaryEvent.id}/registrations`, { token: guestLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" } }), 201, "voluntarily join waiting list");
+const voluntaryMailBefore = smtpMessages.length;
+expectStatus(await request("DELETE", `/api/bvhub/events/${voluntaryEvent.id}/registrations/me`, { token: guestLoginToken }), 200, "leave waiting list");
+assert.match(await waitForMail(voluntaryMailBefore), /Warteliste verlassen/);
+
+const cancelledEvent = expectStatus(await request("PATCH", `/api/bvhub/admin/events/${validEvent.id}`, {
+  token: adminLogin.token, body: { status: "CANCELLED" },
+}), 200, "admin cancels published event");
+assert.equal(cancelledEvent.status, "CANCELLED");
+assert.equal(cancelledEvent.canDelete, true, "cancelled event can be explicitly hard deleted");
+expectStatus(await request("DELETE", `/api/bvhub/admin/events/${validEvent.id}`, { token: adminLogin.token }), 204, "registered event hard delete purges dependencies");
+expectStatus(await request("GET", `/api/collections/events/records/${validEvent.id}`, { token: rootToken }), 404, "registered event is deleted");
+expectStatus(await request("DELETE", "/api/bvhub/admin/events/not-an-id", { token: adminLogin.token }), 400, "invalid event id");
+expectStatus(await request("DELETE", `/api/bvhub/admin/events/zzzzzzzzzzzzzzz`, { token: adminLogin.token }), 404, "unknown event id");
 for (const [label, token, displayName] of [["admin", adminLogin.token, "Updated Admin"], ["superadmin", superLogin.token, "Updated Superadmin"]]) {
   const updated = expectStatus(await request("PATCH", "/api/bvhub/me/profile", { token, body: { displayName } }), 200, `${label} updates own profile`);
   assert.equal(updated.user.displayName, displayName, `${label} profile response contains updated name`);

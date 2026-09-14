@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
+import { Card } from "./ui/card";
 import { MEMBERS, Member, initials, groupConfig } from "./shared/MemberTypes";
 import { MemberDetailPopup } from "./shared/MemberDetailPopup";
-import { useI18n } from "../../i18n";
+import { formatLocaleDate, useI18n } from "../../i18n";
 
 function Icon({ d, size = 18, className = "" }: { d: string; size?: number; className?: string }) {
   return (
@@ -24,6 +25,11 @@ const ic = {
   euro:         "M4 10h12M4 14h12M19 6a7.7 7.7 0 0 0-5.2-2A7.9 7.9 0 0 0 6 20.1 7.7 7.7 0 0 0 13.8 22c2 0 3.9-.8 5.2-2",
   users:        "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75",
 };
+const eventTitleKeys = {
+  "Tuesday Evening Training": "demo.event.tuesday",
+  "Club Singles Championship": "demo.event.championship",
+  "End-of-Season Social Night": "demo.event.social",
+} as const;
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -97,7 +103,7 @@ function PaidToggle({ paid, onChange }: { paid: boolean; onChange: (v: boolean) 
   return (
     <button
       onClick={() => onChange(!paid)}
-      className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-600 transition-all duration-150 active:scale-95 border"
+      className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 active:scale-95 border"
       style={
         paid
           ? { background: "#dcfce7", borderColor: "#15803d", color: "#15803d" }
@@ -119,7 +125,7 @@ function EventPaymentCard({
   event: AdminEvent;
   onShowMember: (m: Member) => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const [participants, setParticipants] = useState<EventParticipant[]>(event.participants);
   const [saved, setSaved] = useState(false);
@@ -140,21 +146,21 @@ function EventPaymentCard({
   }
 
   return (
-    <div className="bg-[var(--card)] rounded-[var(--radius)] border border-[var(--border)] overflow-hidden">
+    <Card className="overflow-hidden">
       {/* Card header */}
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <h3 className="font-700 text-sm text-[var(--foreground)] leading-snug">{event.title}</h3>
+            <h3 className="font-bold text-sm text-[var(--foreground)] leading-snug">{t(eventTitleKeys[event.title as keyof typeof eventTitleKeys] ?? "demo.event.social")}</h3>
             <div className="flex items-center gap-3 mt-1.5 flex-wrap">
               <span className="flex items-center gap-1 text-[11px] text-[var(--muted-foreground)]">
-                <Icon d={ic.calendar} size={11} /> {event.date}
+                <Icon d={ic.calendar} size={11} /> {formatLocaleDate(event.date, locale)}
               </span>
               <span className="flex items-center gap-1 text-[11px] text-[var(--muted-foreground)]">
                 <Icon d={ic.clock} size={11} /> {event.time}
               </span>
-              <span className="flex items-center gap-1 text-[11px] font-600 text-[var(--foreground)]">
-                <Icon d={ic.euro} size={11} /> {event.price.toFixed(2)} / Person
+              <span className="flex items-center gap-1 text-[11px] font-semibold text-[var(--foreground)]">
+                <Icon d={ic.euro} size={11} /> {event.price.toFixed(2)} / {t("payments.perPerson")}
               </span>
             </div>
           </div>
@@ -167,13 +173,13 @@ function EventPaymentCard({
         >
           <div className="flex items-center gap-2">
             <Icon d={ic.users} size={13} className={allPaid ? "text-emerald-600" : "text-amber-600"} />
-            <span className="text-xs font-600" style={{ color: allPaid ? "#15803d" : "#b45309" }}>
+            <span className="text-xs font-semibold" style={{ color: allPaid ? "#15803d" : "#b45309" }}>
               {allPaid
                 ? `${t("admin.payments.allPaid")} (${participants.length})`
                 : `${unpaidCount} / ${participants.length} ${t("admin.payments.open")}`}
             </span>
           </div>
-          <span className="text-xs font-700" style={{ color: allPaid ? "#15803d" : "#b45309" }}>
+          <span className="text-xs font-bold" style={{ color: allPaid ? "#15803d" : "#b45309" }}>
             €{((participants.length - unpaidCount) * event.price).toFixed(0)} / €{(participants.length * event.price).toFixed(0)}
           </span>
         </div>
@@ -181,7 +187,7 @@ function EventPaymentCard({
         {/* Show details toggle */}
         <button
           onClick={() => setExpanded((v) => !v)}
-          className="mt-3 flex items-center gap-1.5 text-xs font-600 text-[var(--primary)] hover:underline"
+          className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-[var(--primary)] hover:underline"
         >
           <Icon d={expanded ? ic.chevronUp : ic.chevronDown} size={13} />
           {expanded ? t("common.hideDetails") : t("common.showDetails")}
@@ -203,7 +209,7 @@ function EventPaymentCard({
                     {/* Avatar — clickable */}
                     <button
                       onClick={() => onShowMember(member)}
-                      className="shrink-0 h-10 w-10 rounded-full flex items-center justify-center text-white text-sm font-700 hover:opacity-80 active:scale-95 transition-all"
+                      className="shrink-0 h-10 w-10 rounded-full flex items-center justify-center text-white text-sm font-bold hover:opacity-80 active:scale-95 transition-all"
                       style={{ background: member.avatarColor }}
                     >
                       {initials(member)}
@@ -214,13 +220,13 @@ function EventPaymentCard({
                       onClick={() => onShowMember(member)}
                       className="flex-1 text-left min-w-0 hover:opacity-70 transition-opacity"
                     >
-                      <p className="text-sm font-700 text-[var(--foreground)] truncate">@{member.username}</p>
+                      <p className="text-sm font-bold text-[var(--foreground)] truncate">@{member.username}</p>
                       <p className="text-xs text-[var(--muted-foreground)] truncate">{member.vorname} {member.nachname}</p>
                       <span
-                        className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-700 mt-0.5"
+                        className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold mt-0.5"
                         style={{ background: cfg.bg, color: cfg.color }}
                       >
-                        {cfg.label}
+                        {member.gruppe === "MemberER" ? t("groups.memberER") : member.gruppe === "MemberNUE" ? t("groups.memberNUE") : member.gruppe === "Admin" ? t("groups.admin") : t("groups.guest")}
                       </span>
                     </button>
 
@@ -255,7 +261,7 @@ function EventPaymentCard({
           </div>
         </>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -276,8 +282,8 @@ export default function AdminPaymentsView({ onBack }: { onBack: () => void }) {
           <Icon d={ic.chevronLeft} size={18} />
         </button>
         <div>
-          <h1 className="font-700 text-base text-[var(--foreground)]">{t("admin.payments.title")}</h1>
-          <p className="text-[10px] text-[var(--muted-foreground)]">{ADMIN_EVENTS.length} {t("admin.payments.events")}</p>
+          <h1 className="font-bold text-base text-[var(--foreground)]">{t("admin.payments.title")}</h1>
+          <p className="text-[10px] text-[var(--muted-foreground)]">{t("admin.members.eventsCount", { count: ADMIN_EVENTS.length })}</p>
         </div>
       </div>
 

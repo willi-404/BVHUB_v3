@@ -54,7 +54,7 @@ function groupsFor(app, userId) {
 function userDto(app, user) {
   return {
     id: user.id,
-    username: user.getString("username") || user.getString("email"),
+    username: user.getString("displayName"),
     displayName: user.getString("displayName"),
     firstName: user.getString("firstName"),
     lastName: user.getString("lastName"),
