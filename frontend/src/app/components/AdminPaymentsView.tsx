@@ -282,7 +282,7 @@ export default function AdminPaymentsView({ onBack }: { onBack: () => void }) {
           <Icon d={ic.chevronLeft} size={18} />
         </button>
         <div>
-          <h1 className="font-bold text-base text-[var(--foreground)]">{t("admin.payments.title")}</h1>
+          <h1 className="page-title">{t("admin.payments.title")}</h1>
           <p className="text-[10px] text-[var(--muted-foreground)]">{t("admin.members.eventsCount", { count: ADMIN_EVENTS.length })}</p>
         </div>
       </div>

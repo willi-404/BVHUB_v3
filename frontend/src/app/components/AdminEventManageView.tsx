@@ -122,7 +122,7 @@ function TimeInput({ value, onChange }: { value: string; onChange: (v: string) =
 
 function DateTimeRow({ dateVal, timeVal, onDate, onTime }: { dateVal: string; timeVal: string; onDate: (v: string) => void; onTime: (v: string) => void }) {
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
       <DateInput value={dateVal} onChange={onDate} />
       <TimeInput value={timeVal} onChange={onTime} />
     </div>
@@ -210,8 +210,8 @@ export default function AdminEventManageView({ onBack }: { onBack: () => void })
         >
           <Icon d={ic.chevronLeft} size={18} />
         </button>
-        <div className="flex-1">
-          <h1 className="font-bold text-base text-[var(--foreground)]">{t("admin.events.create")}</h1>
+        <div className="min-w-0 flex-1">
+          <h1 className="page-title">{t("admin.events.create")}</h1>
           <p className="text-[10px] text-[var(--muted-foreground)]">{t("admin.events.createHint")}</p>
         </div>
         {errorCount > 0 && (
@@ -260,7 +260,7 @@ export default function AdminEventManageView({ onBack }: { onBack: () => void })
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div>
               <FieldLabel>{t("admin.events.start")} *</FieldLabel>
               <div className={errors.start ? "ring-2 ring-red-400 rounded-lg" : ""}>

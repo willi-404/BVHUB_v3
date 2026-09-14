@@ -69,13 +69,19 @@ export default function EventDetailPage() {
   const [cancelError, setCancelError] = useState<string | null>(null)
   const event = query.data
   const adminViewer = isAdminRole(authUser.data?.role)
+  const hasRegistration = ["REGISTERED", "WAITING"].includes(
+    event?.myRegistrationStatus ?? "",
+  )
+  const hasAvailableAction = Boolean(
+    event?.canRegister || (hasRegistration && event?.canCancel),
+  )
   const registered = Boolean(
     (location.state as { registered?: boolean } | null)?.registered,
   )
 
   if (query.isPending && !event)
     return (
-      <div className="min-h-full p-6">
+      <div className="min-h-full px-4 py-6">
         <NavigationLinks />
         <p className="mt-5 text-sm text-[var(--muted-foreground)]">
           {t("common.loading")}
@@ -84,7 +90,7 @@ export default function EventDetailPage() {
     )
   if (query.isError || !event)
     return (
-      <div className="min-h-full p-6">
+      <div className="min-h-full px-4 py-6">
         <NavigationLinks />
         <p role="alert" className="mt-5 text-sm text-red-700">
           {t("events.notFound")}
@@ -114,9 +120,9 @@ export default function EventDetailPage() {
             {t("events.registrationSuccess")}
           </p>
         )}
-        <Card className="mt-4 p-5 lg:p-8">
+        <Card className={`${hasAvailableAction ? "mobile-cta-content " : ""}mt-4 min-w-0 p-5 lg:p-8`}>
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <h1 className="text-2xl font-bold">{event.title}</h1>
+            <h1 className="page-title min-w-0 break-words">{event.title}</h1>
             <Badge
               variant={
                 event.status === "CANCELLED" || event.status === "COMPLETED"
@@ -130,12 +136,12 @@ export default function EventDetailPage() {
           {event.description && (
             <section className="mt-6">
               <h2 className="text-sm font-bold">{t("events.description")}</h2>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--muted-foreground)]">
+              <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--muted-foreground)]">
                 {event.description}
               </p>
             </section>
           )}
-          <dl className="mt-6 grid gap-4 sm:grid-cols-2">
+          <dl className="mt-6 grid gap-4 md:grid-cols-2">
             <div>
               <dt className="text-xs font-semibold text-[var(--muted-foreground)]">
                 {t("start")}
@@ -156,13 +162,13 @@ export default function EventDetailPage() {
               <dt className="text-xs font-semibold text-[var(--muted-foreground)]">
                 {t("events.venue")}
               </dt>
-              <dd className="mt-1 text-sm font-semibold">{event.venue.name}</dd>
+              <dd className="mt-1 break-words text-sm font-semibold">{event.venue.name}</dd>
             </div>
             <div>
               <dt className="text-xs font-semibold text-[var(--muted-foreground)]">
                 {t("events.address")}
               </dt>
-              <dd className="mt-1 text-sm">{event.venue.address}</dd>
+              <dd className="mt-1 break-words text-sm">{event.venue.address}</dd>
             </div>
             <div>
               <dt className="text-xs font-semibold text-[var(--muted-foreground)]">
@@ -188,35 +194,39 @@ export default function EventDetailPage() {
             <p className="mt-1 text-xs text-[var(--muted-foreground)]">
               {t("events.spotsLeft", { count: event.spotsLeft })}
             </p>
-            <div className="mt-4 flex flex-wrap gap-2">
+            {!event.canRegister && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                <p className="rounded border border-[var(--border)] px-4 py-2 text-sm">
+                  {registrationReason(event, authUser.data?.role, t)}
+                </p>
+                {hasRegistration && !event.canCancel && (
+                  <p className="rounded border border-[var(--border)] px-4 py-2 text-sm text-[var(--muted-foreground)]">
+                    {t("events.cancellationDeadlinePassed")}
+                  </p>
+                )}
+              </div>
+            )}
+            {hasAvailableAction && (
+              <div className="mobile-cta event-detail-cta mt-4">
               {event.canRegister ? (
                 <Link
-                  className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+                  className="inline-flex h-11 w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 md:h-9 md:w-auto"
                   to={`/events/${encodeURIComponent(event.id)}/checkout`}
                 >
                   {t("events.registerNow")}
                 </Link>
-              ) : (
-                <p className="rounded border border-[var(--border)] px-4 py-2 text-sm">
-                  {registrationReason(event, authUser.data?.role, t)}
-                </p>
-              )}
-              {["REGISTERED", "WAITING"].includes(event.myRegistrationStatus ?? "") && (
+              ) : hasRegistration && event.canCancel ? (
                 <Button
                   variant="outline"
-                  className="h-9"
-                  disabled={cancel.isPending || !event.canCancel}
+                  className="h-11 w-full md:h-9 md:w-auto"
+                  disabled={cancel.isPending}
                   onClick={() => void handleCancel()}
                 >
                   {t("events.cancelRegistration")}
                 </Button>
-              )}
-              {["REGISTERED", "WAITING"].includes(event.myRegistrationStatus ?? "") && !event.canCancel && (
-                <p className="rounded border border-[var(--border)] px-4 py-2 text-sm text-[var(--muted-foreground)]">
-                  {t("events.cancellationDeadlinePassed")}
-                </p>
-              )}
-            </div>
+              ) : null}
+              </div>
+            )}
             {(cancel.isError || cancelError) && (
               <p role="alert" className="mt-3 text-sm text-red-700">
                 {t((cancelError ?? "events.registrationError") as MessageKey)}
@@ -253,11 +263,11 @@ export default function EventDetailPage() {
                   participant.registrationId ??
                   `${participant.displayName}-${index}`
                 }
-                className="mt-2 flex justify-between border-b border-[var(--border)] py-2 text-sm"
+                className="mt-2 flex min-w-0 flex-wrap justify-between gap-2 border-b border-[var(--border)] py-2 text-sm"
               >
-                <span>{participant.displayName}</span>
+                <span className="min-w-0 break-words">{participant.displayName}</span>
                 {adminViewer && (
-                  <span>
+                  <span className="min-w-0 break-words">
                     {participant.firstName} {participant.lastName}
                   </span>
                 )}

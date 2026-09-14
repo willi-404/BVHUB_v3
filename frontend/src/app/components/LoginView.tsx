@@ -116,7 +116,7 @@ export default function LoginView({ onLogin, sessionExpired = false }: LoginView
           <div className="h-20 w-20 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center mb-4 overflow-hidden p-1.5 backdrop-blur-sm">
             <img src={logoSrc} alt={t("brand.logoAlt")} className="h-full w-full object-contain" />
           </div>
-          <h1 className="text-white font-bold text-xl tracking-tight text-center">{t("brand.name")}</h1>
+          <h1 className="page-title text-center tracking-tight text-white">{t("brand.name")}</h1>
           <p className="text-white/50 text-xs mt-1">{t("brand.portal")}</p>
         </div>
 
@@ -129,10 +129,11 @@ export default function LoginView({ onLogin, sessionExpired = false }: LoginView
 
             <form onSubmit={mode === "otp" ? handleOtpSubmit : handlePasswordSubmit} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">{mode === "otp" ? t("auth.email") : t("auth.identity")}</label>
+                <label htmlFor="login-identity" className="text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">{mode === "otp" ? t("auth.email") : t("auth.identity")}</label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]"><Icon d={icons.mail} size={15} /></span>
                   <Input
+                    id="login-identity"
                     type="text"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -144,8 +145,9 @@ export default function LoginView({ onLogin, sessionExpired = false }: LoginView
 
               {mode === "otp" && otpId && (
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">{t("auth.code")}</label>
+                  <label htmlFor="login-code" className="text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">{t("auth.code")}</label>
                   <Input
+                    id="login-code"
                     inputMode="numeric"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 8))}
@@ -157,17 +159,18 @@ export default function LoginView({ onLogin, sessionExpired = false }: LoginView
 
               {mode === "password" && (
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">{t("auth.password")}</label>
+                  <label htmlFor="login-password" className="text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">{t("auth.password")}</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]"><Icon d={icons.lock} size={15} /></span>
                     <Input
+                      id="login-password"
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       autoComplete="current-password"
                       className="h-11 pl-9 pr-10"
                     />
-                    <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" aria-label={t("auth.togglePassword")}>
+                    <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-0 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center text-[var(--muted-foreground)]" aria-label={t("auth.togglePassword")}>
                       <Icon d={showPassword ? icons.eyeOff : icons.eye} size={15} />
                     </button>
                   </div>

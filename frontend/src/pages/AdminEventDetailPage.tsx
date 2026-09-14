@@ -75,10 +75,10 @@ export default function AdminEventDetailPage() {
       })
   }, [event])
   if (events.isPending && !event)
-    return <div className="p-6">{t("common.loading")}</div>
+    return <div className="px-4 py-6">{t("common.loading")}</div>
   if (events.isError || !event)
     return (
-      <div className="p-6">
+      <div className="px-4 py-6">
         <p role="alert" className="text-sm text-red-700">
           {t("events.notFound")}
         </p>
@@ -118,8 +118,8 @@ export default function AdminEventDetailPage() {
           {t("common.back")}
         </Link>
         <Card className="mt-4 p-5 lg:p-8">
-          <div className="flex items-center justify-between gap-3">
-            <h1 className="text-2xl font-bold">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+            <h1 className="page-title min-w-0 break-words">
               {t("common.edit")}: {event.title}
             </h1>
             <span className="text-xs">
@@ -179,7 +179,7 @@ export default function AdminEventDetailPage() {
                   ))}
               </Select>
             </label>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-2">
               <label className="grid gap-1 text-sm">
                 {t("start")}
                 <Input

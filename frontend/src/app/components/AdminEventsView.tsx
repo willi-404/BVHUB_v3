@@ -122,9 +122,9 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
   return (
     <div className="min-h-full bg-[var(--background)] px-4 py-5 lg:px-8">
       <div className="mx-auto max-w-6xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{t("admin.title")}</h1>
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="page-title">{t("admin.title")}</h1>
             <p className="mt-1 text-sm text-[var(--muted-foreground)]">
               {tab === "events"
                 ? t("admin.events.title")
@@ -537,7 +537,7 @@ function EventPanel({
                 ))}
             </Select>
           </label>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2">
             <label className="grid gap-1 text-sm">
               {t("start")}
               <Input

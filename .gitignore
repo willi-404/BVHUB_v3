@@ -50,3 +50,5 @@ temp/
 build_deploy.sh
 # Playwright CLI output (may contain credentials)
 .playwright-cli/
+frontend/playwright-report/
+frontend/test-results/
