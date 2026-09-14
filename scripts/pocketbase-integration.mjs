@@ -1,6 +1,29 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import net from "node:net";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const dashboardTime = require("../pocketbase/pb_hooks/dashboard-statistics-service.js");
+
+assert.equal(dashboardTime.berlinMonthKey(new Date("2026-03-31T21:59:59.999Z")), "2026-03", "Berlin month remains March before local midnight");
+assert.equal(dashboardTime.berlinMonthKey(new Date("2026-03-31T22:00:00.000Z")), "2026-04", "Berlin summer-time month starts at 22:00 UTC");
+assert.equal(dashboardTime.berlinMonthKey(new Date("2026-10-31T22:59:59.999Z")), "2026-10", "Berlin month remains October after DST ends");
+assert.equal(dashboardTime.berlinMonthKey(new Date("2026-10-31T23:00:00.000Z")), "2026-11", "Berlin winter-time month starts at 23:00 UTC");
+assert.deepEqual(dashboardTime.recentMonths("2026-01", 6), ["2025-08", "2025-09", "2025-10", "2025-11", "2025-12", "2026-01"], "cross-year cron month sequence is stable");
+globalThis.DynamicModel = class DynamicModel { constructor(shape) { Object.assign(this, shape); } };
+globalThis.$security = { randomString: () => "cronmonthtest01" };
+let cronUpsertParams;
+const cronTestQuery = {
+  bind(params) { cronUpsertParams = params; return this; },
+  one(model) { model.registeredUsers = 4; model.members = 3; },
+  execute() {},
+};
+const cronTestApp = { db: () => ({ newQuery: () => cronTestQuery }) };
+dashboardTime.upsertSnapshot(cronTestApp, new Date("2026-03-31T22:00:00.000Z"));
+assert.equal(cronUpsertParams.month, "2026-04", "cron upsert creates the new Berlin month at local midnight");
+delete globalThis.DynamicModel;
+delete globalThis.$security;
 
 const baseUrl = process.env.PB_TEST_URL;
 const superuserEmail = process.env.PB_TEST_SUPERUSER_EMAIL;
@@ -338,6 +361,39 @@ const adminLogin = expectStatus(await request("POST", "/api/collections/users/au
   body: { identity: admin.email, password: "Synthetic-password-12!" },
 }), 200, "admin password login");
 
+expectStatus(await request("GET", "/api/bvhub/dashboard/statistics"), 401, "unauthenticated dashboard statistics");
+expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: inactiveAdminSession.token }), 403, "inactive account cannot read dashboard statistics");
+expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: unverifiedAdminSession.token }), 403, "unverified account cannot read dashboard statistics");
+const allUsersForDashboard = expectStatus(await request("GET", "/api/collections/users/records?perPage=500", { token: rootToken }), 200, "read users for dashboard boundary assertions").items;
+const expectedRegisteredUsers = allUsersForDashboard.filter((user) => ["GUEST", "MEMBER"].includes(user.role)).length;
+const expectedMembers = allUsersForDashboard.filter((user) => user.role === "MEMBER").length;
+for (const [label, token] of [["guest", guestLoginToken], ["member", memberLoginToken], ["admin", adminLogin.token], ["superadmin", superLogin.token]]) {
+  const dashboard = expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token }), 200, `${label} reads dashboard statistics`);
+  assert.equal(dashboard.timezone, "Europe/Berlin");
+  assert.equal(dashboard.current.registeredUsers, expectedRegisteredUsers, "guest and member roles are counted regardless of activation state");
+  assert.equal(dashboard.current.members, expectedMembers, "only member roles are counted");
+  assert.equal(dashboard.months.length, 6);
+  assert.equal(dashboard.months.at(-1).complete, false, "current month remains live rather than complete");
+}
+expectStatus(await request("GET", "/api/collections/dashboard_member_statistics/records", { token: memberLoginToken }), 403, "client cannot list private dashboard snapshots");
+expectStatus(await request("POST", "/api/collections/dashboard_member_statistics/records", {
+  token: memberLoginToken,
+  body: { month: "2020-01", registeredUsers: 999, members: 999, capturedAt: new Date().toISOString() },
+}), 403, "client cannot write private dashboard snapshots");
+const rootSnapshots = expectStatus(await request("GET", "/api/collections/dashboard_member_statistics/records?perPage=20", { token: rootToken }), 200, "superuser reads dashboard snapshots");
+assert.equal(rootSnapshots.items.length, 1, "deployment initializes only the current month snapshot");
+assert.equal(rootSnapshots.items[0].registeredUsers, expectedRegisteredUsers, "user create and update hooks refresh the current snapshot");
+
+const transientDashboardGuest = expectStatus(await request("POST", "/api/collections/users/records", {
+  token: rootToken,
+  body: userBody("dashboard-delete@example.test", "GUEST"),
+}), 200, "create dashboard deletion boundary user");
+const dashboardAfterCreate = expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: memberLoginToken }), 200, "dashboard refreshes after user create");
+assert.equal(dashboardAfterCreate.current.registeredUsers, expectedRegisteredUsers + 1);
+expectStatus(await request("DELETE", `/api/collections/users/records/${transientDashboardGuest.id}`, { token: rootToken }), 204, "delete dashboard boundary user");
+const dashboardAfterDelete = expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: memberLoginToken }), 200, "dashboard refreshes after user delete");
+assert.equal(dashboardAfterDelete.current.registeredUsers, expectedRegisteredUsers);
+
 // WU-05 routes must load their authorization helpers explicitly in the hook module.
 expectStatus(await request("GET", "/api/bvhub/admin/events"), 401, "unauthenticated admin event list");
 expectStatus(await request("DELETE", "/api/bvhub/admin/events/not-an-id"), 401, "unauthenticated draft delete");
@@ -407,6 +463,7 @@ const validEvent = expectStatus(await request("POST", "/api/bvhub/admin/events",
 }), 201, "admin creates event");
 assert.equal(validEvent.createdBy, admin.id, "event creator is set from authenticated actor");
 assert.equal(validEvent.status, "MEMBERS_ONLY");
+const dashboardBeforePublish = expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: memberLoginToken }), 200, "dashboard before event publish");
 const initialChangelog = expectStatus(await request("GET", `/api/bvhub/admin/events/${validEvent.id}/changelog`, { token: adminLogin.token }), 200, "admin reads event changelog");
 assert.equal(initialChangelog.items.length, 1, "event creation creates one changelog entry");
 
@@ -454,6 +511,8 @@ const publishedEvent = expectStatus(await request("PATCH", `/api/bvhub/admin/eve
   token: adminLogin.token, body: { published: true },
 }), 200, "admin publishes event");
 assert.equal(publishedEvent.published, true);
+const dashboardAfterPublish = expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: memberLoginToken }), 200, "dashboard after event publish");
+assert.equal(dashboardAfterPublish.current.publishedEventsThisMonth, dashboardBeforePublish.current.publishedEventsThisMonth + 1, "first publication in the Berlin month is counted");
 const adminAddMailBefore = smtpMessages.length;
 const adminAdded = expectStatus(await request("POST", `/api/bvhub/admin/events/${validEvent.id}/participants`, { token: adminLogin.token, body: { userId: guest.id } }), 201, "admin add participant immediate mail");
 assert.match(await waitForMail(adminAddMailBefore), /hinzugef/);
@@ -476,6 +535,8 @@ const wuRegistration = expectStatus(await request("POST", `/api/bvhub/events/${v
   token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" },
 }), 201, "member registers for event");
 assert.equal(wuRegistration.status, "REGISTERED");
+const dashboardAfterRegistration = expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: memberLoginToken }), 200, "dashboard after event registration");
+assert.equal(dashboardAfterRegistration.current.myUpcomingRegistrations, 1, "only the member's future REGISTERED event is counted");
 assert.match(await waitForMail(eventRegistrationMailBefore), /Anmeldung best/);
 assert.match(smtpMessages.at(-1), /WU-05 Integration Event/);
 assert.match(smtpMessages.at(-1), /Integration venue/);
@@ -615,6 +676,11 @@ expectStatus(await request("PATCH", `/api/bvhub/admin/users/${superAdmin.id}/rol
 expectStatus(await request("PATCH", `/api/bvhub/admin/users/${managed.id}/role`, {
   token: superLogin.token, body: { role: "MEMBER", confirmation: "ROLE_CHANGE" },
 }), 200, "superadmin demotes admin");
+const dashboardAfterRoleChange = expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: memberLoginToken }), 200, "dashboard after direct SQL role change");
+const currentDashboardMonth = dashboardTime.berlinMonthKey(new Date());
+const snapshotAfterRoleChange = expectStatus(await request("GET", `/api/collections/dashboard_member_statistics/records?filter=${encodeURIComponent(`month = "${currentDashboardMonth}"`)}`, { token: rootToken }), 200, "read snapshot after direct SQL role change").items[0];
+assert.equal(snapshotAfterRoleChange.registeredUsers, dashboardAfterRoleChange.current.registeredUsers, "role change transaction refreshes registered-user snapshot");
+assert.equal(snapshotAfterRoleChange.members, dashboardAfterRoleChange.current.members, "role change transaction refreshes member snapshot");
 const roleSessionTarget = expectStatus(await request("POST", "/api/collections/users/records", {
   token: rootToken, body: userBody("role-session@example.test", "MEMBER"),
 }), 200, "create role session target");

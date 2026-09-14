@@ -122,6 +122,24 @@ async function mockSession(
       await route.fulfill({ json: { items: [event] } })
       return
     }
+    if (path === "/api/bvhub/dashboard/statistics") {
+      await route.fulfill({
+        json: {
+          timezone: "Europe/Berlin",
+          trackingSince: "2026-09",
+          current: { registeredUsers: 12, members: 8, publishedEventsThisMonth: 1, myUpcomingRegistrations: 1 },
+          months: [
+            { month: "2026-04", registeredUsers: null, members: null, complete: false },
+            { month: "2026-05", registeredUsers: null, members: null, complete: false },
+            { month: "2026-06", registeredUsers: null, members: null, complete: false },
+            { month: "2026-07", registeredUsers: null, members: null, complete: false },
+            { month: "2026-08", registeredUsers: null, members: null, complete: false },
+            { month: "2026-09", registeredUsers: 12, members: 8, complete: false },
+          ],
+        },
+      })
+      return
+    }
     if (path === `/api/bvhub/events/${event.id}`) {
       await route.fulfill({ json: event })
       return

@@ -19,3 +19,8 @@ export const venueKeys = {
   lists: () => [...venueKeys.all, "list"] as const,
   list: (scope: "public" | "admin") => [...venueKeys.lists(), scope] as const,
 }
+
+export const dashboardKeys = {
+  all: ["dashboard"] as const,
+  statistics: () => [...dashboardKeys.all, "statistics"] as const,
+}

@@ -28,6 +28,7 @@ import type { ProfileDto, ProfilePatch } from "../features/profile/types";
 import { primaryNavMessageKey, type PrimaryNavTab } from "./navigationLabels";
 import { useEvents, useEventRealtime } from "../features/events/hooks/useEvents";
 import type { EventRecord } from "../features/events/types";
+import DashboardStatisticsPanel from "../features/dashboard/components/DashboardStatisticsPanel";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -344,25 +345,6 @@ function EditProfileOverlay({ onClose }: { onClose: () => void }) {
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
-function StatBar() {
-  const { t } = useI18n();
-  return (
-    <div data-responsive-grid="dashboard-stats" className="grid grid-cols-1 gap-3 md:grid-cols-3">
-      {[
-        { label: t("dashboard.members"), value: "148", sub: t("dashboard.thisMonthChange"), color: "var(--primary)" },
-        { label: t("dashboard.events"), value: "6", sub: t("dashboard.thisMonth"), color: "hsl(38,92%,50%)" },
-        { label: t("dashboard.registered"), value: "2", sub: t("dashboard.byYou"), color: "hsl(217,91%,60%)" },
-      ].map((stat) => (
-        <Card key={stat.label} className="text-center py-3 px-2">
-          <div className="text-2xl font-bold" style={{ color: stat.color }}>{stat.value}</div>
-          <div className="text-xs font-semibold text-[var(--foreground)] mt-0.5">{stat.label}</div>
-          <div className="text-[10px] text-[var(--muted-foreground)] mt-0.5">{stat.sub}</div>
-        </Card>
-      ))}
-    </div>
-  );
-}
-
 function QuickActions() {
   const { t, locale } = useI18n();
   const websiteLocale = locale === "zh-CN" ? "zh" : "de";
@@ -578,7 +560,7 @@ function DashboardView({ events, liveEvents, onToggle, onOpenCard, profile }: { 
         </p>
       </button>
 
-      <StatBar />
+      <DashboardStatisticsPanel />
 
       <div>
         <h2 className="text-sm font-semibold text-[var(--foreground)] mb-3">{t("dashboard.quickActions")}</h2>

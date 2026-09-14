@@ -20,6 +20,7 @@
   --color-ring: var(--ring);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-dashboard-member: var(--dashboard-member);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -44,6 +45,7 @@
   --input: hsl(214.3 31.8% 91.4%);
   --destructive: hsl(0 84.2% 60.2%);
   --destructive-foreground: hsl(210 40% 98%);
+  --dashboard-member: hsl(151 55% 36%);
   --radius: 0.5rem;
   --sidebar-width: 240px;
   --mobile-cta-height: 4.25rem;
@@ -140,6 +142,45 @@ canvas {
   text-wrap: balance;
 }
 
+@keyframes dashboard-stat-enter {
+  from {
+    opacity: 0;
+    scale: 0.96;
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+    filter: blur(0);
+  }
+}
+
+.dashboard-stat-enter {
+  animation: dashboard-stat-enter 300ms cubic-bezier(0.2, 0, 0, 1) both;
+  animation-delay: var(--dashboard-enter-delay, 0ms);
+}
+
+.dashboard-stat-interactive {
+  transition-property: translate, box-shadow;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+
+.dashboard-stat-interactive:hover,
+.dashboard-stat-interactive:focus-visible {
+  translate: 0 -2px;
+}
+
+.dashboard-stat-interactive:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.dashboard-stat-icon svg {
+  inline-size: 1.1rem;
+  block-size: 1.1rem;
+}
+
 .mobile-drawer-backdrop {
   opacity: 0;
   pointer-events: none;
@@ -232,6 +273,20 @@ canvas {
   .mobile-drawer-panel {
     transform: none;
     transition-property: opacity;
+  }
+
+  .dashboard-stat-enter {
+    animation: none;
+    filter: none;
+  }
+
+  .dashboard-stat-interactive {
+    transition: none;
+  }
+
+  .dashboard-stat-interactive:hover,
+  .dashboard-stat-interactive:focus-visible {
+    translate: none;
   }
 }
 
