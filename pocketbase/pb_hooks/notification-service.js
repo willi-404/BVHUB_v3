@@ -8,13 +8,31 @@ function escapeHtml(value) {
 function formatDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value || "-";
-  return `${String(date.getUTCDate()).padStart(2, "0")}.${String(date.getUTCMonth() + 1).padStart(2, "0")}.${date.getUTCFullYear()}`;
+  const local = berlinDate(date);
+  return `${String(local.getUTCDate()).padStart(2, "0")}.${String(local.getUTCMonth() + 1).padStart(2, "0")}.${local.getUTCFullYear()}`;
 }
 
 function formatTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
-  return `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")} UTC`;
+  const local = berlinDate(date);
+  return `${String(local.getUTCHours()).padStart(2, "0")}:${String(local.getUTCMinutes()).padStart(2, "0")} Uhr`;
+}
+
+function lastSundayDay(year, month) {
+  const last = new Date(Date.UTC(year, month + 1, 0));
+  return last.getUTCDate() - last.getUTCDay();
+}
+
+function berlinOffsetMinutes(date) {
+  const year = date.getUTCFullYear();
+  const summerStart = Date.UTC(year, 2, lastSundayDay(year, 2), 1, 0, 0);
+  const summerEnd = Date.UTC(year, 9, lastSundayDay(year, 9), 1, 0, 0);
+  return date.getTime() >= summerStart && date.getTime() < summerEnd ? 120 : 60;
+}
+
+function berlinDate(date) {
+  return new Date(date.getTime() + berlinOffsetMinutes(date) * 60 * 1000);
 }
 
 function parsePayload(entry) {

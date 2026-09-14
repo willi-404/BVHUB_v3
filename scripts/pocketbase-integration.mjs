@@ -447,11 +447,13 @@ const publishedEvent = expectStatus(await request("PATCH", `/api/bvhub/admin/eve
 }), 200, "admin publishes event");
 assert.equal(publishedEvent.published, true);
 const adminAddMailBefore = smtpMessages.length;
-expectStatus(await request("POST", `/api/bvhub/admin/events/${validEvent.id}/participants`, { token: adminLogin.token, body: { userId: member.id } }), 201, "admin add participant immediate mail");
+const adminAdded = expectStatus(await request("POST", `/api/bvhub/admin/events/${validEvent.id}/participants`, { token: adminLogin.token, body: { userId: guest.id } }), 201, "admin add participant immediate mail");
 assert.match(await waitForMail(adminAddMailBefore), /hinzugef/);
 const adminRemoveMailBefore = smtpMessages.length;
-expectStatus(await request("DELETE", `/api/bvhub/admin/events/${validEvent.id}/participants/${member.id}`, { token: adminLogin.token }), 200, "admin remove participant immediate mail");
+expectStatus(await request("DELETE", `/api/bvhub/admin/events/${validEvent.id}/participants/${guest.id}`, { token: adminLogin.token }), 200, "admin remove participant immediate mail");
 assert.match(await waitForMail(adminRemoveMailBefore), /abgemeldet/);
+const adminParticipantOutbox = expectStatus(await request("GET", `/api/collections/notification_outbox/records?filter=${encodeURIComponent(`registration = "${adminAdded.registrationId}"`)}`, { token: rootToken }), 200, "admin participant notification outbox");
+assert.deepEqual(adminParticipantOutbox.items.map((item) => item.kind).sort(), ["EVENT_ADMIN_ADDED", "EVENT_ADMIN_REMOVED"].sort());
 const publicEventList = expectStatus(await request("GET", "/api/bvhub/events", { token: memberLoginToken }), 200, "member reads published events");
 assert.ok(publicEventList.items.some((item) => item.id === validEvent.id), "published future event appears in public event list");
 expectStatus(await request("GET", `/api/bvhub/events/${validEvent.id}`, { token: guestLoginToken }), 200, "guest reads published event detail");
@@ -468,6 +470,8 @@ const wuRegistration = expectStatus(await request("POST", `/api/bvhub/events/${v
 assert.equal(wuRegistration.status, "REGISTERED");
 assert.match(await waitForMail(eventRegistrationMailBefore), /Anmeldung best/);
 assert.match(smtpMessages.at(-1), /WU-05 Integration Event/);
+assert.match(smtpMessages.at(-1), /01\.07\.2099/);
+assert.match(smtpMessages.at(-1), /18:00 Uhr/);
 const repeatedRegistration = expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrations`, {
   token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" },
 }), 201, "repeated registration is idempotent");
@@ -488,10 +492,8 @@ expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrat
 }), 201, "member registers again after cancellation");
 assert.match(await waitForMail(reRegistrationMailBefore), /Anmeldung best/);
 const outbox = expectStatus(await request("GET", `/api/collections/notification_outbox/records?filter=${encodeURIComponent(`registration = "${wuRegistration.id}"`)}`, { token: rootToken }), 200, "registration creates notification outbox");
-assert.equal(outbox.items.length, 7, "each registration state transition creates one notification outbox item");
+assert.equal(outbox.items.length, 5, "each registration state transition creates one notification outbox item");
 assert.deepEqual(outbox.items.map((item) => item.kind).sort(), [
-  "EVENT_ADMIN_ADDED",
-  "EVENT_ADMIN_REMOVED",
   "EVENT_ADMIN_REMOVED",
   "EVENT_REGISTRATION_CANCELLED",
   "EVENT_REGISTRATION_CONFIRMED",

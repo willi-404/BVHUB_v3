@@ -88,9 +88,12 @@ routerAdd("POST", "/api/bvhub/admin/events/{id}/participants", (e) => {
   if (Object.keys(body).length !== 1 || typeof body.userId !== "string") throw new BadRequestError("Ungültiger Teilnehmer");
   const target = api.userRecord($app, body.userId);
   if (!target.getBool("active") || !target.getBool("verified")) throw new ForbiddenError("Benutzer nicht aktiv");
-  if (!event.getBool("published") || ["CANCELLED", "COMPLETED"].includes(event.getString("status")) || Date.parse(event.getString("end")) <= Date.now()) throw new ApiError(409, "Event ist nicht registrierbar", {});
+  // Admin participant management is an explicit override of the public
+  // registration gates (publication state, audience, and target role). It
+  // still cannot mutate terminal or already-ended events.
+  if (["CANCELLED", "COMPLETED"].includes(event.getString("status")) || Date.parse(event.getString("end")) <= Date.now()) throw new ApiError(409, "Event ist nicht registrierbar", {});
   const venue = api.venue($app, event.getString("venue"));
-  if (!venue.getBool("active") || !venue.getString("checkoutRegion") || !api.roleCanRegister(target.getString("role"), event.getString("status"))) throw new ApiError(409, "Event ist nicht registrierbar", {});
+  if (!venue.getBool("active") || !venue.getString("checkoutRegion")) throw new ApiError(409, "Veranstaltungsort ist nicht konfiguriert", {});
   let result;
   const notificationIds = [];
   $app.runInTransaction((txApp) => {
