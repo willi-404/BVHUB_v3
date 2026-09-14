@@ -146,6 +146,7 @@ routerAdd(
         "venue",
         "start",
         "end",
+        "abmeldefrist",
         "capacity",
         "published",
         "status",
@@ -160,7 +161,7 @@ routerAdd(
     if (data.published) record.set("firstPublishedAt", service.nowIso());
     $app.save(record);
     service.appendChangelog($app, record, current, {
-      title: { old: null, new: data.title }, description: { old: null, new: data.description }, venue: { old: null, new: data.venue }, start: { old: null, new: data.start }, end: { old: null, new: data.end }, capacity: { old: null, new: data.capacity }, status: { old: null, new: data.status }, published: { old: null, new: data.published },
+      title: { old: null, new: data.title }, description: { old: null, new: data.description }, venue: { old: null, new: data.venue }, start: { old: null, new: data.start }, end: { old: null, new: data.end }, abmeldefrist: { old: null, new: data.abmeldefrist }, capacity: { old: null, new: data.capacity }, status: { old: null, new: data.status }, published: { old: null, new: data.published },
     }, "CREATED");
     return e.json(201, service.eventDto($app, record));
   },
@@ -180,6 +181,7 @@ routerAdd(
         "venue",
         "start",
         "end",
+        "abmeldefrist",
         "capacity",
         "published",
         "status",
@@ -190,7 +192,7 @@ routerAdd(
     if (data.published && (!v.getBool("active") || !v.getString("checkoutRegion")))
       throw new ApiError(409, "Aktiver Veranstaltungsort erforderlich", {});
     const changes = {};
-    Object.keys(data).forEach((key) => { const old = key === "venue" ? record.getString(key) : key === "published" ? record.getBool(key) : key === "capacity" ? record.getInt(key) : record.getString(key); const equal = ["start", "end"].includes(key) ? Date.parse(old) === Date.parse(data[key]) : old === data[key]; if (!equal) changes[key] = { old, new: data[key] }; });
+    Object.keys(data).forEach((key) => { const old = key === "venue" ? record.getString(key) : key === "published" ? record.getBool(key) : key === "capacity" ? record.getInt(key) : record.getString(key); const equal = ["start", "end", "abmeldefrist"].includes(key) ? Date.parse(old) === Date.parse(data[key]) : old === data[key]; if (!equal) changes[key] = { old, new: data[key] }; });
     $app.runInTransaction((txApp) => { const txRecord = txApp.findRecordById("events", record.id); Object.keys(data).forEach((key) => txRecord.set(key, data[key])); if (data.published && !txRecord.getString("firstPublishedAt")) txRecord.set("firstPublishedAt", service.nowIso()); txApp.save(txRecord); service.appendChangelog(txApp, txRecord, e.auth, changes); });
     return e.json(200, service.eventDto($app, service.event($app, record.id)));
   },

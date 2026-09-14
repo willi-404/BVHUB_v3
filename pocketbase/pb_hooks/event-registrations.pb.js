@@ -47,6 +47,14 @@ routerAdd("DELETE", "/api/bvhub/events/{id}/registrations/me", (e) => {
   const user = api.requireAuthenticatedReader(e);
   if (!user) throw new ForbiddenError("Zugriff nicht erlaubt");
   const event = api.event($app, api.idOf(e));
+  const existingRegistration = registrations.registrationFor($app, event, user);
+  if (existingRegistration && ["REGISTERED", "WAITING"].includes(existingRegistration.getString("status")) && Date.parse(event.getString("abmeldefrist")) <= Date.now()) {
+    return e.json(409, {
+      code: 409,
+      message: "Abmeldefrist ist abgelaufen",
+      data: { code: "CANCELLATION_DEADLINE_PASSED" },
+    });
+  }
   let result;
   const notificationIds = [];
   $app.runInTransaction((txApp) => {

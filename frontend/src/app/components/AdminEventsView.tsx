@@ -20,7 +20,7 @@ import type {
   EventStatus,
   Venue,
 } from "../../features/events/types"
-import { useI18n, type MessageKey } from "../../i18n"
+import { berlinDateTimeInputToIso, formatBerlinDateTimeInput, useI18n, type MessageKey } from "../../i18n"
 import { mapPBError } from "../../lib/errorMapper"
 
 const emptyEvent = {
@@ -29,6 +29,7 @@ const emptyEvent = {
   venue: "",
   start: "",
   end: "",
+  abmeldefrist: "",
   capacity: 1,
   published: false,
   status: "MEMBERS_ONLY" as EventStatus,
@@ -67,8 +68,9 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
             title: event.title,
             description: event.description,
             venue: event.venue.id,
-            start: event.start.slice(0, 16),
-            end: event.end.slice(0, 16),
+            start: formatBerlinDateTimeInput(event.start),
+            end: formatBerlinDateTimeInput(event.end),
+            abmeldefrist: formatBerlinDateTimeInput(event.abmeldefrist),
             capacity: event.capacity,
             published: event.published,
             status: event.status,
@@ -91,25 +93,31 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
     )
   }
   async function saveEvent(options: { published?: boolean } = {}) {
-    const published = options.published ?? (editingEvent ? eventForm.published : false)
-    await eventMutation.mutateAsync({
-      id: editingEvent?.id,
-      input: {
-        ...eventForm,
-        published,
-        start: new Date(eventForm.start).toISOString(),
-        end: new Date(eventForm.end).toISOString(),
-      },
-    })
-    setEventFormOpen(false)
-    setEditingEvent(null)
+    setActionError(null)
+    try {
+      const published = options.published ?? (editingEvent ? eventForm.published : false)
+      await eventMutation.mutateAsync({
+        id: editingEvent?.id,
+        input: {
+          ...eventForm,
+          published,
+          start: berlinDateTimeInputToIso(eventForm.start),
+          end: berlinDateTimeInputToIso(eventForm.end),
+          abmeldefrist: berlinDateTimeInputToIso(eventForm.abmeldefrist),
+        },
+      })
+      setEventFormOpen(false)
+      setEditingEvent(null)
+    } catch (error) {
+      setActionError(error instanceof RangeError ? "errors.invalid_request" : mapPBError(error))
+    }
   }
   async function saveVenue() {
     await venueMutation.mutateAsync({ id: editingVenue?.id, input: venueForm })
     setVenueFormOpen(false)
     setEditingVenue(null)
   }
-  const failure = eventMutation.isError || venueMutation.isError || cancelOrDelete.isError || deleteDraft.isError
+  const failure = Boolean(actionError) || eventMutation.isError || venueMutation.isError || cancelOrDelete.isError || deleteDraft.isError
 
   return (
     <div className="min-h-full bg-[var(--background)] px-4 py-5 lg:px-8">
@@ -551,6 +559,11 @@ function EventPanel({
               />
             </label>
           </div>
+          <label className="grid gap-1 text-sm">
+            {t("admin.events.cancellationDeadline")}
+            <Input required type="datetime-local" value={form.abmeldefrist} max={form.start} onChange={(e) => onChange({ ...form, abmeldefrist: e.target.value })} className="h-10" />
+            <span className="text-xs text-[var(--muted-foreground)]">{t("admin.events.cancellationDeadlineHint")}</span>
+          </label>
           <label className="grid gap-1 text-sm">
             {t("admin.events.capacity")}
             <Input

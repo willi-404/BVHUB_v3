@@ -20,7 +20,7 @@ function queueNotification(app, registration, user, event, venue, kind, now, ext
   if (existing) return existing;
   const record = new Record(app.findCollectionByNameOrId("notification_outbox"));
   record.set("kind", kind); record.set("registration", registration.id); record.set("recipient", user.getString("email"));
-  const payload = { eventTitle: event.getString("title"), venue: venue.getString("name"), address: venue.getString("address"), start: event.getString("start"), end: event.getString("end"), displayName: user.getString("displayName") || user.getString("firstName"), locale: "de", ...(extra || {}) };
+  const payload = { eventTitle: event.getString("title"), venue: venue.getString("name"), venueDescription: venue.getString("description"), address: venue.getString("address"), start: event.getString("start"), end: event.getString("end"), displayName: user.getString("displayName") || user.getString("firstName"), locale: "de", ...(extra || {}) };
   record.set("payload", JSON.stringify(payload));
   record.set("status", "PENDING"); record.set("attempts", 1); record.set("dedupeKey", dedupeKey); record.set("nextAttemptAt", stateAt); record.set("lastError", ""); record.set("processingStartedAt", "");
   app.save(record);

@@ -4,6 +4,7 @@ import { ClientResponseError } from "pocketbase";
 export function mapPBError(error: unknown): string {
   const data = error instanceof ClientResponseError ? error.response?.data : (error as { response?: { data?: { code?: string } } })?.response?.data;
   if (data?.code === "EVENT_NOT_DELETABLE") return "errors.event_not_deletable";
+  if (data?.code === "CANCELLATION_DEADLINE_PASSED") return "events.cancellationDeadlinePassed";
   const status = error instanceof ClientResponseError ? error.status : (error as { status?: number })?.status;
   if (status === 400) return "errors.invalid_request";
   if (status === 401) return "errors.invalid_credentials";

@@ -16,6 +16,7 @@ export interface EventRecord {
   venue: Venue
   start: string
   end: string
+  abmeldefrist: string
   capacity: number
   registeredCount: number
   spotsLeft: number
@@ -44,6 +45,7 @@ export interface EventInput {
   venue: string
   start: string
   end: string
+  abmeldefrist: string
   capacity: number
   published: boolean
   status: EventStatus

@@ -379,7 +379,7 @@ const unconfiguredVenue = expectStatus(await request("POST", "/api/bvhub/admin/v
   token: adminLogin.token, body: { name: "WU-05 Unconfigured Venue", address: "No checkout region" },
 }), 201, "admin creates venue without checkout region");
 const unconfiguredEvent = expectStatus(await request("POST", "/api/bvhub/admin/events", {
-  token: adminLogin.token, body: { title: "Unconfigured publish test", description: "", venue: unconfiguredVenue.id, start: "2099-08-01T16:00:00.000Z", end: "2099-08-01T18:00:00.000Z", capacity: 5, published: false, status: "MEMBERS_ONLY" },
+  token: adminLogin.token, body: { title: "Unconfigured publish test", description: "", venue: unconfiguredVenue.id, start: "2099-08-01T16:00:00.000Z", end: "2099-08-01T18:00:00.000Z", abmeldefrist: "2099-08-01T15:00:00.000Z", capacity: 5, published: false, status: "MEMBERS_ONLY" },
 }), 201, "admin creates unpublished event with unconfigured venue");
 const blockedPublish = await request("PATCH", `/api/bvhub/admin/events/${unconfiguredEvent.id}`, { token: adminLogin.token, body: { published: true } });
 assert.notEqual(blockedPublish.status, 500, "publishing an unconfigured venue never returns 500");
@@ -394,6 +394,7 @@ const eventPayload = {
   venue: createdVenue.id,
   start: "2099-07-01T16:00:00.000Z",
   end: "2099-07-01T18:00:00.000Z",
+  abmeldefrist: "2099-07-01T15:00:00.000Z",
   capacity: 25,
   published: false,
   status: "MEMBERS_ONLY",
@@ -439,6 +440,13 @@ expectStatus(await request("GET", `/api/bvhub/admin/events/${validEvent.id}/chan
 expectStatus(await request("POST", "/api/bvhub/admin/events", {
   token: adminLogin.token, body: { ...eventPayload, title: "Invalid range", start: eventPayload.end, end: eventPayload.start },
 }), 400, "event rejects invalid time range");
+const { abmeldefrist: _deadline, ...eventWithoutDeadline } = eventPayload;
+expectStatus(await request("POST", "/api/bvhub/admin/events", {
+  token: adminLogin.token, body: eventWithoutDeadline,
+}), 400, "event requires cancellation deadline");
+expectStatus(await request("POST", "/api/bvhub/admin/events", {
+  token: adminLogin.token, body: { ...eventPayload, title: "Invalid cancellation deadline", abmeldefrist: eventPayload.end },
+}), 400, "event rejects cancellation deadline after event start");
 expectStatus(await request("POST", "/api/bvhub/admin/events", {
   token: adminLogin.token, body: { ...eventPayload, title: "Unknown field", unexpected: true },
 }), 400, "event rejects unknown fields");
@@ -470,6 +478,7 @@ const wuRegistration = expectStatus(await request("POST", `/api/bvhub/events/${v
 assert.equal(wuRegistration.status, "REGISTERED");
 assert.match(await waitForMail(eventRegistrationMailBefore), /Anmeldung best/);
 assert.match(smtpMessages.at(-1), /WU-05 Integration Event/);
+assert.match(smtpMessages.at(-1), /Integration venue/);
 assert.match(smtpMessages.at(-1), /01\.07\.2099/);
 assert.match(smtpMessages.at(-1), /18:00 Uhr/);
 const repeatedRegistration = expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrations`, {
@@ -522,6 +531,19 @@ const voluntary = expectStatus(await request("POST", `/api/bvhub/events/${volunt
 const voluntaryMailBefore = smtpMessages.length;
 expectStatus(await request("DELETE", `/api/bvhub/events/${voluntaryEvent.id}/registrations/me`, { token: guestLoginToken }), 200, "leave waiting list");
 assert.match(await waitForMail(voluntaryMailBefore), /Warteliste verlassen/);
+
+const closedCancellationEvent = expectStatus(await request("POST", "/api/bvhub/admin/events", { token: adminLogin.token, body: { ...eventPayload, title: "WU-05 Closed Cancellation Event", status: "OPEN_TO_ALL", published: true, abmeldefrist: "2020-01-01T12:00:00.000Z" } }), 201, "create event with passed cancellation deadline");
+const closedRegistration = expectStatus(await request("POST", `/api/bvhub/events/${closedCancellationEvent.id}/registrations`, { token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" } }), 201, "register before testing closed cancellation");
+const closedEventForMember = expectStatus(await request("GET", `/api/bvhub/events/${closedCancellationEvent.id}`, { token: memberLoginToken }), 200, "read event with passed cancellation deadline");
+assert.equal(closedEventForMember.canCancel, false, "public event DTO disables self-cancellation after deadline");
+const deniedCancellation = await request("DELETE", `/api/bvhub/events/${closedCancellationEvent.id}/registrations/me`, { token: memberLoginToken });
+assert.equal(deniedCancellation.status, 409, "member cannot cancel after deadline");
+assert.equal(deniedCancellation.data?.data?.code, "CANCELLATION_DEADLINE_PASSED");
+const registrationAfterDenial = expectStatus(await request("GET", `/api/bvhub/events/${closedCancellationEvent.id}/registration`, { token: memberLoginToken }), 200, "read registration after denied cancellation");
+assert.equal(registrationAfterDenial.status, "REGISTERED", "denied cancellation keeps registration active");
+expectStatus(await request("DELETE", `/api/bvhub/admin/events/${closedCancellationEvent.id}/participants/${member.id}`, { token: adminLogin.token }), 200, "admin removes participant after cancellation deadline");
+expectStatus(await request("POST", `/api/bvhub/admin/events/${closedCancellationEvent.id}/participants`, { token: superLogin.token, body: { userId: member.id } }), 201, "superadmin adds participant after cancellation deadline");
+assert.equal(closedRegistration.status, "REGISTERED");
 
 const cancelledEvent = expectStatus(await request("PATCH", `/api/bvhub/admin/events/${validEvent.id}`, {
   token: adminLogin.token, body: { status: "CANCELLED" },

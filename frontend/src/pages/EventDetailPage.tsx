@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Link, useLocation, useParams } from "react-router-dom"
 import { Badge } from "../app/components/ui/badge"
 import { Card } from "../app/components/ui/card"
@@ -11,6 +12,7 @@ import {
   useParticipants,
 } from "../features/events/hooks/useEvents"
 import { formatLocaleDateTime, useI18n, type MessageKey } from "../i18n"
+import { mapPBError } from "../lib/errorMapper"
 
 function NavigationLinks() {
   const { t } = useI18n()
@@ -64,6 +66,7 @@ export default function EventDetailPage() {
   const query = useEvent(eventId)
   const participants = useParticipants(eventId, Boolean(query.data?.published))
   const cancel = useCancelRegistration()
+  const [cancelError, setCancelError] = useState<string | null>(null)
   const event = query.data
   const adminViewer = isAdminRole(authUser.data?.role)
   const registered = Boolean(
@@ -91,10 +94,11 @@ export default function EventDetailPage() {
 
   async function handleCancel() {
     if (!eventId || cancel.isPending) return
+    setCancelError(null)
     try {
       await cancel.mutateAsync(eventId)
-    } catch {
-      /* mutation state renders the error */
+    } catch (error) {
+      setCancelError(mapPBError(error))
     }
   }
 
@@ -162,6 +166,12 @@ export default function EventDetailPage() {
             </div>
             <div>
               <dt className="text-xs font-semibold text-[var(--muted-foreground)]">
+                {t("events.cancellationDeadline")}
+              </dt>
+              <dd className="mt-1 text-sm">{formatLocaleDateTime(event.abmeldefrist, locale)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold text-[var(--muted-foreground)]">
                 {t("events.capacity")}
               </dt>
               <dd className="mt-1 text-sm">{event.capacity}</dd>
@@ -191,21 +201,25 @@ export default function EventDetailPage() {
                   {registrationReason(event, authUser.data?.role, t)}
                 </p>
               )}
-              {(event.myRegistrationStatus === "REGISTERED" ||
-                event.canCancel) && (
+              {["REGISTERED", "WAITING"].includes(event.myRegistrationStatus ?? "") && (
                 <Button
                   variant="outline"
                   className="h-9"
-                  disabled={cancel.isPending}
+                  disabled={cancel.isPending || !event.canCancel}
                   onClick={() => void handleCancel()}
                 >
                   {t("events.cancelRegistration")}
                 </Button>
               )}
+              {["REGISTERED", "WAITING"].includes(event.myRegistrationStatus ?? "") && !event.canCancel && (
+                <p className="rounded border border-[var(--border)] px-4 py-2 text-sm text-[var(--muted-foreground)]">
+                  {t("events.cancellationDeadlinePassed")}
+                </p>
+              )}
             </div>
-            {cancel.isError && (
+            {(cancel.isError || cancelError) && (
               <p role="alert" className="mt-3 text-sm text-red-700">
-                {t("events.registrationError")}
+                {t((cancelError ?? "events.registrationError") as MessageKey)}
               </p>
             )}
           </div>
