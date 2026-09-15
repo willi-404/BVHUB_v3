@@ -13,6 +13,8 @@ const AdminEventDetailPage = lazy(() => import("../pages/AdminEventDetailPage"))
 const AdminEventsPage = lazy(() => import("../app/components/AdminEventsView"));
 const AdminPage = lazy(() => import("../pages/AdminPage"));
 const MemberCardScannerPage = lazy(() => import("../pages/MemberCardScannerPage"));
+const PaymentDetailPage = lazy(() => import("../pages/PaymentDetailPage"));
+const AdminPaymentsPage = lazy(() => import("../pages/AdminPaymentsPage"));
 const RegisterPage = lazy(() => import("../app/components/RegisterView"));
 const RegisterSuccessPage = lazy(() => import("../app/components/RegisterSuccessView"));
 const VerifyEmailPage = lazy(() => import("../app/components/VerifyEmailView"));
@@ -29,8 +31,9 @@ export const router = createBrowserRouter([
     { path: "/events", element: load(<EventsPage />) },
     { path: "/events/:eventId", element: load(<EventDetailPage />) },
     { path: "/events/:eventId/checkout", element: load(<EventCheckoutPage />) },
+    { path: "/payments/:paymentId", element: load(<PaymentDetailPage />) },
     { element: <ProtectedRoute admin />, children: [{ path: "/admin/events/new", element: load(<AdminEventsPage />) }, { path: "/admin/events/:eventId", element: load(<AdminEventDetailPage />) }] },
-    { element: <ProtectedRoute admin />, children: [{ path: "/members", element: load(<MembersPage />) }, { path: "/admin", element: load(<AdminPage />) }, { path: "/admin/events", element: load(<AdminEventsPage />) }, { path: "/admin/venues", element: load(<AdminEventsPage />) }, { path: "/admin/member-card-scanner", element: load(<MemberCardScannerPage />) }] },
+    { element: <ProtectedRoute admin />, children: [{ path: "/members", element: load(<MembersPage />) }, { path: "/admin", element: load(<AdminPage />) }, { path: "/admin/events", element: load(<AdminEventsPage />) }, { path: "/admin/venues", element: load(<AdminEventsPage />) }, { path: "/admin/payments", element: load(<AdminPaymentsPage />) }, { path: "/admin/member-card-scanner", element: load(<MemberCardScannerPage />) }] },
   ] },
   { path: "/register", element: load(<RegisterPage />) },
   { path: "/register/success", element: load(<RegisterSuccessPage />) },

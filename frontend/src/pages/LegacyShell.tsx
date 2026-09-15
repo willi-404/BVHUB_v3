@@ -30,6 +30,8 @@ import { useEvents, useEventRealtime } from "../features/events/hooks/useEvents"
 import type { EventRecord } from "../features/events/types";
 import DashboardStatisticsPanel from "../features/dashboard/components/DashboardStatisticsPanel";
 import MemberQr from "../features/memberCard/components/MemberQr";
+import PaymentsView from "../features/payments/components/PaymentsView";
+import { useMyPayments, usePaymentRealtime } from "../features/payments/hooks/usePayments";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -87,15 +89,6 @@ interface Event {
   level: string;
 }
 
-interface Payment {
-  id: number;
-  eventTitle: string;
-  date: string;
-  time: string;
-  price: number;
-  paid: boolean;
-}
-
 const EVENTS: Event[] = [
   {
     id: 1,
@@ -145,12 +138,6 @@ const EVENTS: Event[] = [
     isRegistered: true,
     level: "All",
   },
-];
-
-const INITIAL_PAYMENTS: Payment[] = [
-  { id: 1, eventTitle: "Tuesday Evening Training", date: "Sep 2, 2026", time: "7:00 PM – 9:00 PM", price: 5, paid: false },
-  { id: 2, eventTitle: "Club Singles Championship", date: "Sep 6, 2026", time: "9:00 AM – 6:00 PM", price: 15, paid: false },
-  { id: 3, eventTitle: "End-of-Season Social Night", date: "Sep 14, 2026", time: "6:30 PM – 10:00 PM", price: 10, paid: true },
 ];
 
 const NEWS = [
@@ -449,47 +436,6 @@ function EventCard({ event, onToggle }: { event: Event; onToggle: (id: number) =
   );
 }
 
-function PaymentCard({ payment, onPay }: { payment: Payment; onPay: (id: number) => void }) {
-  const { t, locale } = useI18n();
-  return (
-    <Card className="overflow-hidden">
-      <div className="p-4 pb-3">
-        <div className="flex items-center gap-2 mb-2">
-          <Badge variant={payment.paid ? "success" : "destructive"}>
-            {payment.paid ? t("payments.paid") : t("payments.unpaid")}
-          </Badge>
-        </div>
-        <h3 className="font-semibold text-sm text-[var(--foreground)] leading-tight mb-2">{t(eventTitleKeys[payment.eventTitle] ?? "demo.event.social")}</h3>
-        <div className="flex flex-col gap-1 mb-3">
-          <div className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]">
-            <Icon d={icons.calendar} size={12} />
-            <span>{formatLocaleDate(payment.date, locale)}</span>
-            <span className="mx-1 opacity-30">·</span>
-            <Icon d={icons.clock} size={12} />
-            <span>{payment.time}</span>
-          </div>
-        </div>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wide font-medium">{t("payments.amount")}</p>
-            <p className="text-xl font-bold text-[var(--foreground)] mt-0.5">€{payment.price.toFixed(2)}</p>
-          </div>
-          {payment.paid ? (
-            <div className="flex items-center gap-1.5 text-emerald-600 text-sm font-semibold">
-              <Icon d={icons.check} size={16} />
-              {t("common.done")}
-            </div>
-          ) : (
-            <Button size="md" onClick={() => onPay(payment.id)} className="px-5">
-              {t("payments.payNow")}
-            </Button>
-          )}
-        </div>
-      </div>
-    </Card>
-  );
-}
-
 function ActivityFeed() {
   const { t } = useI18n();
   const iconMap: Record<string, string> = { check: icons.check, shield: icons.shield, trophy: icons.trophy };
@@ -597,29 +543,6 @@ function LiveEventCards({ events }: { events: EventRecord[] }) {
   const { t, locale } = useI18n();
   if (!events.length) return <p className="text-sm text-[var(--muted-foreground)]">{t("events.empty")}</p>;
   return <div className="flex max-h-[min(62vh,44rem)] flex-col gap-3 overflow-y-auto pr-1">{events.map((event) => <Card key={event.id} className="p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="break-words font-bold text-[var(--foreground)]">{event.title}</h3><p className="mt-1 break-words text-xs text-[var(--muted-foreground)]">{event.venue.name}</p></div><Badge variant={event.status === "CANCELLED" || event.status === "COMPLETED" ? "destructive" : "success"}>{t(`events.status.${event.status}` as MessageKey)}</Badge></div><div className="mt-3 grid gap-1 text-xs text-[var(--muted-foreground)] md:grid-cols-2"><span>{formatLocaleDateTime(event.start, locale)} - {formatLocaleDateTime(event.end, locale)}</span><span>{t("events.capacity")}: {event.registeredCount}/{event.capacity} ({event.spotsLeft} {t("events.spotsLeftLabel")})</span></div><Link className="mt-3 inline-flex text-xs font-semibold text-[var(--primary)] underline" to={`/events/${encodeURIComponent(event.id)}`}>{t("events.details")}</Link></Card>)}</div>;
-}
-
-function PaymentsView({ payments, onPay }: { payments: Payment[]; onPay: (id: number) => void }) {
-  const { t } = useI18n();
-  return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h1 id="view-title-payments" tabIndex={-1} className="page-title text-[var(--foreground)]">{t("payments.title")}</h1>
-        <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{t("payments.subtitle")}</p>
-      </div>
-      {payments.length === 0 ? (
-        <div className="flex flex-col items-center py-16 text-[var(--muted-foreground)]">
-          <Icon d={icons.creditCard} size={32} />
-          <p className="text-sm mt-3 font-medium">{t("payments.empty")}</p>
-          <p className="text-xs mt-1">{t("payments.emptyHint")}</p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {payments.map((p) => <PaymentCard key={p.id} payment={p} onPay={onPay} />)}
-        </div>
-      )}
-    </div>
-  );
 }
 
 function AdminDrawer({ onClose, onAdminMembers, onAdminPayments, onAdminEvents, onAdminScanner }: { onClose: () => void; onAdminMembers: () => void; onAdminPayments: () => void; onAdminEvents: () => void; onAdminScanner: () => void }) {
@@ -1103,11 +1026,12 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
   const { t } = useI18n();
   const liveEvents = useEvents();
   useEventRealtime();
+  usePaymentRealtime();
+  const myPayments = useMyPayments();
   const { data: profile, isLoading: profileLoading, isError: profileError, refetch: refetchProfile } = useMyProfile();
   const canAccessAdmin = isAdminRole(user?.role);
   const [tab, setTab] = useState<NavTab>(initialTab);
   const [events, setEvents] = useState<Event[]>(EVENTS);
-  const [payments, setPayments] = useState<Payment[]>(INITIAL_PAYMENTS);
   const [cardOpen, setCardOpen] = useState(false);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [adminView, setAdminView] = useState<"members" | "payments" | "events" | null>(null);
@@ -1115,16 +1039,12 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
   const mobileNavigationTrigger = useRef<HTMLButtonElement>(null);
   const mainRef = useRef<HTMLElement>(null);
 
-  const unpaidCount = payments.filter((p) => !p.paid).length;
+  const unpaidCount = myPayments.data?.filter((payment) => payment.status === "UNPAID").length ?? 0;
 
   function toggleRegistration(id: number) {
     setEvents((prev) =>
       prev.map((e) => e.id === id ? { ...e, isRegistered: !e.isRegistered, registered: e.isRegistered ? e.registered - 1 : e.registered + 1 } : e)
     );
-  }
-
-  function handlePay(id: number) {
-    setPayments((prev) => prev.map((p) => p.id === id ? { ...p, paid: true } : p));
   }
 
   const tabLabel: Record<NavTab, string> = {
@@ -1157,7 +1077,7 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
       case "events":
         return <EventsView events={liveEvents.data ?? []} loading={liveEvents.isPending} error={liveEvents.isError} />;
       case "payments":
-        return <PaymentsView payments={payments} onPay={handlePay} />;
+        return <PaymentsView />;
       case "profile":
         if (profileLoading) return <div><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p className="mt-2 text-sm text-[var(--muted-foreground)]">{t("profile.loading")}</p></div>;
         if (profileError) return <Card><CardContent className="p-5"><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p role="alert" className="mt-2 text-sm text-red-600">{t("profile.loadError")}</p><Button className="mt-4" onClick={() => void refetchProfile()}>{t("common.retry")}</Button></CardContent></Card>;

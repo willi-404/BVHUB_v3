@@ -18,6 +18,7 @@ export interface EventRecord {
   end: string
   abmeldefrist: string
   capacity: number
+  guestFeeCents: number
   registeredCount: number
   spotsLeft: number
   myRegistrationStatus: "REGISTERED" | "WAITING" | "CANCELLED" | null
@@ -47,6 +48,7 @@ export interface EventInput {
   end: string
   abmeldefrist: string
   capacity: number
+  guestFeeCents: number
   published: boolean
   status: EventStatus
 }

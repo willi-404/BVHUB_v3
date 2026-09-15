@@ -22,6 +22,7 @@ import type {
 } from "../../features/events/types"
 import { berlinDateTimeInputToIso, formatBerlinDateTimeInput, useI18n, type MessageKey } from "../../i18n"
 import { mapPBError } from "../../lib/errorMapper"
+import { formatEuroInput, parseEuroCents } from "../../features/payments/paymentUtils"
 
 const emptyEvent = {
   title: "",
@@ -31,6 +32,7 @@ const emptyEvent = {
   end: "",
   abmeldefrist: "",
   capacity: 1,
+  guestFee: "3,80",
   published: false,
   status: "MEMBERS_ONLY" as EventStatus,
 }
@@ -72,6 +74,7 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
             end: formatBerlinDateTimeInput(event.end),
             abmeldefrist: formatBerlinDateTimeInput(event.abmeldefrist),
             capacity: event.capacity,
+            guestFee: formatEuroInput(event.guestFeeCents),
             published: event.published,
             status: event.status,
           }
@@ -96,10 +99,12 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
     setActionError(null)
     try {
       const published = options.published ?? (editingEvent ? eventForm.published : false)
+      const { guestFee, ...formValues } = eventForm
       await eventMutation.mutateAsync({
         id: editingEvent?.id,
         input: {
-          ...eventForm,
+          ...formValues,
+          guestFeeCents: parseEuroCents(guestFee),
           published,
           start: berlinDateTimeInputToIso(eventForm.start),
           end: berlinDateTimeInputToIso(eventForm.end),
@@ -577,6 +582,18 @@ function EventPanel({
               }
               className="h-10"
             />
+          </label>
+          <label className="grid gap-1 text-sm">
+            {t("admin.events.guestFee")}
+            <Input
+              required
+              inputMode="decimal"
+              pattern="[0-9]+([,.][0-9]{1,2})?"
+              value={form.guestFee}
+              onChange={(e) => onChange({ ...form, guestFee: e.target.value })}
+              className="h-10"
+            />
+            <span className="text-xs text-[var(--muted-foreground)]">{t("admin.events.guestFeeHint")}</span>
           </label>
           <label className="flex items-center gap-2 text-sm">
             <Checkbox

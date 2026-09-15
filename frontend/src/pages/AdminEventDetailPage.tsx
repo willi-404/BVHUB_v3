@@ -22,6 +22,7 @@ import { useMembers } from "../features/members/hooks/useMembers"
 import type { EventStatus } from "../features/events/types"
 import { berlinDateTimeInputToIso, formatBerlinDateTimeInput, formatLocaleDateTime, useI18n, type MessageKey } from "../i18n"
 import { mapPBError } from "../lib/errorMapper"
+import { formatEuroInput, parseEuroCents } from "../features/payments/paymentUtils"
 
 type Form = {
   title: string
@@ -31,6 +32,7 @@ type Form = {
   end: string
   abmeldefrist: string
   capacity: number
+  guestFee: string
   status: EventStatus
   published: boolean
 }
@@ -42,6 +44,7 @@ const empty: Form = {
   end: "",
   abmeldefrist: "",
   capacity: 1,
+  guestFee: "3,80",
   status: "MEMBERS_ONLY",
   published: false,
 }
@@ -70,6 +73,7 @@ export default function AdminEventDetailPage() {
         end: formatBerlinDateTimeInput(event.end),
         abmeldefrist: formatBerlinDateTimeInput(event.abmeldefrist),
         capacity: event.capacity,
+        guestFee: formatEuroInput(event.guestFeeCents),
         status: event.status,
         published: event.published,
       })
@@ -90,10 +94,12 @@ export default function AdminEventDetailPage() {
   const save = async (publish = form.published) => {
     setFormError(null)
     try {
+      const { guestFee, ...formValues } = form
       await mutation.mutateAsync({
         id: event.id,
         input: {
-          ...form,
+          ...formValues,
+          guestFeeCents: parseEuroCents(guestFee),
           published: publish,
           start: berlinDateTimeInputToIso(form.start),
           end: berlinDateTimeInputToIso(form.end),
@@ -228,6 +234,18 @@ export default function AdminEventDetailPage() {
                 }
                 className="h-10"
               />
+            </label>
+            <label className="grid gap-1 text-sm">
+              {t("admin.events.guestFee")}
+              <Input
+                required
+                inputMode="decimal"
+                pattern="[0-9]+([,.][0-9]{1,2})?"
+                value={form.guestFee}
+                onChange={(e) => setForm({ ...form, guestFee: e.target.value })}
+                className="h-10"
+              />
+              <span className="text-xs text-[var(--muted-foreground)]">{t("admin.events.guestFeeHint")}</span>
             </label>
             <label className="grid gap-1 text-sm">
               {t("admin.events.status")}
