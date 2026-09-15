@@ -257,4 +257,46 @@ test.describe.serial("payments with isolated PocketBase", () => {
     await userSession.context.close()
     await adminSession.context.close()
   })
+
+  test("admin payment page scrolls at desktop and mobile widths", async ({ browser }) => {
+    const directSession = await sessionPage(browser, seed.users.admin, seed.tokens.admin, { width: 1280, height: 720 })
+    await directSession.page.goto("/admin/payments")
+    const directMain = directSession.page.locator("main").filter({ hasText: "Payment settings" }).first()
+    await expect(directMain).toBeVisible()
+    await directSession.page.getByTestId(`payment-event-${seed.events.guest.id}`).getByRole("button").first().click()
+    await expect(directSession.page.locator(`[data-testid="admin-payment-${seed.guestPaymentId}"]:visible`)).toBeVisible()
+    const directMetrics = await directMain.evaluate((element) => ({
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+      overflowY: getComputedStyle(element).overflowY,
+    }))
+    expect(directMetrics.overflowY).toBe("auto")
+    expect(directMetrics.scrollHeight).toBeGreaterThan(directMetrics.clientHeight)
+    const directBox = await directMain.boundingBox()
+    expect(directBox).not.toBeNull()
+    await directSession.page.mouse.move((directBox?.x ?? 0) + 32, (directBox?.y ?? 0) + 32)
+    await directSession.page.mouse.wheel(0, 1000)
+    await expect.poll(() => directMain.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+    await directSession.context.close()
+
+    const mobileSession = await sessionPage(browser, seed.users.admin, seed.tokens.admin, { width: 375, height: 844 })
+    await mobileSession.page.goto("/admin/payments")
+    const mobileMain = mobileSession.page.locator("main").filter({ hasText: "Payment settings" }).first()
+    await expect(mobileMain).toBeVisible()
+    await mobileSession.page.getByTestId(`payment-event-${seed.events.guest.id}`).getByRole("button").first().click()
+    await expect(mobileSession.page.locator(`[data-testid="admin-payment-${seed.guestPaymentId}"]:visible`)).toBeVisible()
+    const mobileMetrics = await mobileMain.evaluate((element) => ({
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+      overflowY: getComputedStyle(element).overflowY,
+    }))
+    expect(mobileMetrics.overflowY).toBe("auto")
+    expect(mobileMetrics.scrollHeight).toBeGreaterThan(mobileMetrics.clientHeight)
+    const mobileBox = await mobileMain.boundingBox()
+    expect(mobileBox).not.toBeNull()
+    await mobileSession.page.mouse.move((mobileBox?.x ?? 0) + 20, (mobileBox?.y ?? 0) + 20)
+    await mobileSession.page.mouse.wheel(0, 1000)
+    await expect.poll(() => mobileMain.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+    await mobileSession.context.close()
+  })
 })

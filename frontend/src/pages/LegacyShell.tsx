@@ -1177,7 +1177,7 @@ function AdminRoutePage({ kind }: { kind: "members" | "payments" | "events" }) {
   const onBack = () => navigate("/");
 
   return (
-    <div className="min-h-full bg-[var(--background)]">
+    <div className="flex min-h-screen flex-col overflow-hidden bg-[var(--background)]">
       {kind === "members" && <AdminMembersView onBack={onBack} />}
       {kind === "payments" && <AdminPaymentsView onBack={onBack} />}
       {kind === "events" && <AdminEventManageView onBack={onBack} />}

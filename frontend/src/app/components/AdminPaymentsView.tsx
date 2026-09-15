@@ -603,7 +603,7 @@ export function AdminPaymentsView({ onBack }: { onBack: () => void }) {
   const { t } = useI18n()
   const summary = useAdminPaymentSummary()
   return (
-    <main className="mx-auto w-full max-w-6xl space-y-6 p-4 pb-24 sm:p-6">
+    <main className="min-h-0 flex-1 overflow-y-auto mx-auto w-full max-w-6xl space-y-6 p-4 pb-24 sm:p-6">
       <div className="flex items-center gap-3">
         <Button
           variant="ghost"

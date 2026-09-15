@@ -5,5 +5,9 @@ import { useNavigate } from "react-router-dom"
 export default function AdminPaymentsPage() {
   const navigate = useNavigate()
   usePaymentRealtime()
-  return <AdminPaymentsView onBack={() => navigate("/dashboard")} />
+  return (
+    <div className="flex h-full min-h-screen flex-col overflow-hidden bg-background">
+      <AdminPaymentsView onBack={() => navigate("/dashboard")} />
+    </div>
+  )
 }
