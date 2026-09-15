@@ -28,6 +28,7 @@ delete globalThis.$security;
 const baseUrl = process.env.PB_TEST_URL;
 const superuserEmail = process.env.PB_TEST_SUPERUSER_EMAIL;
 const superuserPassword = process.env.PB_TEST_SUPERUSER_PASSWORD;
+const serverLogPath = process.env.PB_TEST_SERVER_LOG;
 if (!baseUrl || !superuserEmail || !superuserPassword) throw new Error("Missing integration test configuration");
 
 async function request(method, path, { token, body } = {}) {
@@ -723,9 +724,11 @@ expectStatus(await request("PATCH", "/api/bvhub/admin/member-card-settings", { t
 expectStatus(await request("PATCH", "/api/bvhub/admin/member-card-settings", { token: superLogin.token, body: { tokenTtlSeconds: 60, refreshLeadSeconds: 60 } }), 400, "member-card settings reject refresh lead at TTL");
 
 const memberCardIssued = expectStatus(await request("POST", "/api/bvhub/me/member-card-token", { token: memberLoginToken, body: {} }), 200, "member issues member-card token");
+const issuedRawMemberCardTokens = [memberCardIssued.token];
 assert.match(memberCardIssued.token, /^[A-Za-z0-9]{48}$/);
 assert.ok(Date.parse(memberCardIssued.expiresAt) > Date.now());
 assert.ok(Date.parse(memberCardIssued.refreshAt) < Date.parse(memberCardIssued.expiresAt));
+assert.equal(Date.parse(memberCardIssued.expiresAt) - Date.parse(memberCardIssued.refreshAt), 20_000, "member-card refresh lead matches settings");
 const storedMemberCardTokens = expectStatus(await request("GET", `/api/collections/member_card_tokens/records?filter=${encodeURIComponent(`user = "${member.id}"`)}`, { token: rootToken }), 200, "superuser reads member-card token records");
 assert.equal(storedMemberCardTokens.items.length > 0, true);
 assert.match(storedMemberCardTokens.items.at(-1).tokenHash, /^[a-f0-9]{64}$/);
@@ -739,30 +742,78 @@ for (const body of [{}, { token: "" }, { token: 12 }, { token: "x".repeat(257) }
   expectStatus(await request("POST", "/api/bvhub/member-card/verify", { body }), 400, "malformed member-card verification request");
 }
 expectStatus(await request("GET", "/api/collections/member_card_tokens/records", { token: memberLoginToken }), 403, "member cannot directly list member-card tokens");
-expectStatus(await request("POST", "/api/bvhub/me/member-card-token", { token: guestLoginToken, body: {} }), 403, "guest cannot issue member-card token");
+
+const guestCardIssuedAt = Date.now();
+const guestCardResponse = await request("POST", "/api/bvhub/me/member-card-token", { token: guestLoginToken, body: {} });
+const guestCardIssued = expectStatus(guestCardResponse, 200, "active verified guest issues member-card token");
+issuedRawMemberCardTokens.push(guestCardIssued.token);
+assert.match(guestCardIssued.token, /^[A-Za-z0-9]{48}$/);
+assert.ok(Date.parse(guestCardIssued.expiresAt) >= guestCardIssuedAt + 119_000, "guest token uses the configured short TTL");
+assert.ok(Date.parse(guestCardIssued.expiresAt) <= Date.now() + 121_000, "guest token expiry is bounded by the configured TTL");
+assert.equal(Date.parse(guestCardIssued.expiresAt) - Date.parse(guestCardIssued.refreshAt), 20_000, "guest token uses the configured refresh lead");
+assert.equal(guestCardResponse.headers.get("cache-control"), "no-store", "guest token response is not cacheable");
+const guestTokenRecords = expectStatus(await request("GET", `/api/collections/member_card_tokens/records?filter=${encodeURIComponent(`user = "${guest.id}"`)}`, { token: rootToken }), 200, "read guest member-card token record");
+assert.ok(guestTokenRecords.items.length > 0, "guest token is persisted for verification");
+assert.match(guestTokenRecords.items.at(-1).tokenHash, /^[a-f0-9]{64}$/);
+assert.equal(guestTokenRecords.items.some((item) => item.tokenHash === guestCardIssued.token), false, "raw guest token is never stored");
+const expectedGuestDetailKeys = ["active", "address", "birthDate", "created", "displayName", "email", "firstName", "groups", "id", "lastName", "memberSince", "phone", "role", "updated", "username", "verified"];
+const guestAdminScan = expectStatus(await request("POST", "/api/bvhub/admin/member-card/verify", { token: adminLogin.token, body: { token: guestCardIssued.token } }), 200, "admin scans guest token");
+assert.equal(guestAdminScan.status, "GUEST_NON_MEMBER");
+assert.equal(guestAdminScan.reason, "GUEST_ACCOUNT");
+assert.deepEqual(Object.keys(guestAdminScan.member).sort(), expectedGuestDetailKeys);
+assert.equal(guestAdminScan.member.id, guest.id);
+assert.equal(guestAdminScan.member.email, guest.email);
+assert.equal(guestAdminScan.member.role, "GUEST");
+assert.equal(guestAdminScan.member.active, true);
+assert.equal(guestAdminScan.member.verified, true);
+const guestSuperScan = expectStatus(await request("POST", "/api/bvhub/admin/member-card/verify", { token: superLogin.token, body: { token: guestCardIssued.token } }), 200, "superadmin scans guest token");
+assert.equal(guestSuperScan.status, "GUEST_NON_MEMBER");
+assert.equal(guestSuperScan.reason, "GUEST_ACCOUNT");
+assert.deepEqual(guestSuperScan.member, guestAdminScan.member, "admin roles receive the same complete guest details");
+assert.deepEqual(expectStatus(await request("POST", "/api/bvhub/member-card/verify", { body: { token: guestCardIssued.token } }), 200, "anonymous guest verification remains private"), { valid: false });
+
+expectStatus(await request("POST", "/api/bvhub/me/member-card-token", { token: inactiveAdminSession.token, body: {} }), 403, "inactive account cannot issue member-card token");
+expectStatus(await request("POST", "/api/bvhub/me/member-card-token", { token: unverifiedAdminSession.token, body: {} }), 403, "unverified account cannot issue member-card token");
 await request("PATCH", `/api/collections/users/records/${member.id}`, { token: rootToken, body: { active: false } });
 assert.equal(expectStatus(await request("POST", "/api/bvhub/member-card/verify", { body: { token: memberCardIssued.token } }), 200, "inactive member-card user returns generic invalid").valid, false);
 await request("PATCH", `/api/collections/users/records/${member.id}`, { token: rootToken, body: { active: true } });
 await request("PUT", `/api/bvhub/admin/users/${member.id}/groups`, { token: adminLogin.token, body: { groups: [guestGroupId] } });
 assert.equal(expectStatus(await request("POST", "/api/bvhub/member-card/verify", { body: { token: memberCardIssued.token } }), 200, "removed member group invalidates token").valid, false);
+const noGroupMemberCard = expectStatus(await request("POST", "/api/bvhub/me/member-card-token", { token: memberLoginToken, body: {} }), 200, "active verified member without an active member group issues a token");
+issuedRawMemberCardTokens.push(noGroupMemberCard.token);
+const noGroupAdminScan = expectStatus(await request("POST", "/api/bvhub/admin/member-card/verify", { token: adminLogin.token, body: { token: noGroupMemberCard.token } }), 200, "admin scans token for member without active member group");
+assert.equal(noGroupAdminScan.status, "GUEST_NON_MEMBER");
+assert.equal(noGroupAdminScan.reason, "NO_ACTIVE_MEMBER_GROUP");
+assert.equal(noGroupAdminScan.member.id, member.id);
+assert.deepEqual(expectStatus(await request("POST", "/api/bvhub/member-card/verify", { body: { token: noGroupMemberCard.token } }), 200, "anonymous no-group verification remains private"), { valid: false });
 await request("PUT", `/api/bvhub/admin/users/${member.id}/groups`, { token: adminLogin.token, body: { groups: groupIds } });
 const expiringMemberCard = expectStatus(await request("POST", "/api/bvhub/me/member-card-token", { token: memberLoginToken, body: {} }), 200, "member issues token for expiry test");
+issuedRawMemberCardTokens.push(expiringMemberCard.token);
 const latestMemberCardRecord = expectStatus(await request("GET", `/api/collections/member_card_tokens/records?filter=${encodeURIComponent(`user = "${member.id}"`)}&sort=-created`, { token: rootToken }), 200, "find latest member-card token").items[0];
 expectStatus(await request("PATCH", `/api/collections/member_card_tokens/records/${latestMemberCardRecord.id}`, { token: rootToken, body: { expiresAt: "2020-01-01T00:00:00.000Z" } }), 200, "expire member-card token in test setup");
 assert.equal(expectStatus(await request("POST", "/api/bvhub/member-card/verify", { body: { token: expiringMemberCard.token } }), 200, "expired member-card token is invalid").valid, false);
 const unverifiedMemberCard = expectStatus(await request("POST", "/api/bvhub/me/member-card-token", { token: memberLoginToken, body: {} }), 200, "member issues token for verification-state test");
+issuedRawMemberCardTokens.push(unverifiedMemberCard.token);
 expectStatus(await request("PATCH", `/api/collections/users/records/${member.id}`, { token: rootToken, body: { verified: false } }), 200, "test member becomes unverified");
 assert.equal(expectStatus(await request("POST", "/api/bvhub/member-card/verify", { body: { token: unverifiedMemberCard.token } }), 200, "unverified member-card user is invalid").valid, false);
 expectStatus(await request("PATCH", `/api/collections/users/records/${member.id}`, { token: rootToken, body: { verified: true } }), 200, "restore verified member");
 const roleMemberCard = expectStatus(await request("POST", "/api/bvhub/me/member-card-token", { token: memberLoginToken, body: {} }), 200, "member issues token for role test");
+issuedRawMemberCardTokens.push(roleMemberCard.token);
 expectStatus(await request("PATCH", `/api/bvhub/admin/users/${member.id}/role`, { token: adminLogin.token, body: { role: "GUEST", confirmation: "ROLE_CHANGE" } }), 200, "member becomes guest for QR test");
 assert.equal(expectStatus(await request("POST", "/api/bvhub/member-card/verify", { body: { token: roleMemberCard.token } }), 200, "guest role invalidates member-card token").valid, false);
 expectStatus(await request("PATCH", `/api/bvhub/admin/users/${member.id}/role`, { token: adminLogin.token, body: { role: "MEMBER", confirmation: "ROLE_CHANGE" } }), 200, "restore member role after QR test");
 memberLoginToken = expectStatus(await request("POST", `/api/collections/users/impersonate/${member.id}`, { token: rootToken, body: { duration: 300 } }), 200, "refresh member token after role test").token;
 const inactiveGroupMemberCard = expectStatus(await request("POST", "/api/bvhub/me/member-card-token", { token: memberLoginToken, body: {} }), 200, "member issues token for group-state test");
+issuedRawMemberCardTokens.push(inactiveGroupMemberCard.token);
 expectStatus(await request("PATCH", `/api/collections/groups/records/${memberGroupIds[0]}`, { token: rootToken, body: { active: false } }), 200, "deactivate member group for QR test");
 assert.equal(expectStatus(await request("POST", "/api/bvhub/member-card/verify", { body: { token: inactiveGroupMemberCard.token } }), 200, "inactive member group invalidates token").valid, false);
 expectStatus(await request("PATCH", `/api/collections/groups/records/${memberGroupIds[0]}`, { token: rootToken, body: { active: true } }), 200, "restore member group after QR test");
+
+expectStatus(await request("PATCH", "/api/bvhub/admin/member-card-settings", { token: superLogin.token, body: { enabled: false } }), 200, "superadmin disables member-card issuance");
+for (const [label, token] of [["guest", guestLoginToken], ["member", memberLoginToken], ["admin", adminLogin.token], ["superadmin", superLogin.token]]) {
+  expectStatus(await request("POST", "/api/bvhub/me/member-card-token", { token, body: {} }), 403, `${label} cannot issue member-card token while feature is disabled`);
+}
+expectStatus(await request("PATCH", "/api/bvhub/admin/member-card-settings", { token: superLogin.token, body: { enabled: true } }), 200, "superadmin restores member-card issuance");
 expectStatus(await request("PUT", `/api/bvhub/admin/users/${guest.id}/groups`, {
   token: superLogin.token, body: { groups: [groupIds[0]] },
 }), 200, "superadmin assigns guest groups");
@@ -803,7 +854,16 @@ assert.ok(audits.items.some((event) => event.eventType === "USER_ROLE_CHANGED"),
 assert.ok(audits.items.some((event) => event.eventType === "USER_GROUPS_CHANGED"), "group changes are audited");
 assert.ok(audits.items.some((event) => event.eventType === "MEMBER_CARD_SETTINGS_CHANGED"), "member-card settings changes are audited");
 assert.ok(audits.items.every((event) => !Object.hasOwn(event, "email") && !Object.hasOwn(event, "token")), "audit events contain no token or email");
-assert.ok(audits.items.every((event) => !String(event.metadata || "").includes(memberCardIssued.token)), "audit metadata contains no raw member-card token");
+for (const rawToken of issuedRawMemberCardTokens) {
+  assert.ok(audits.items.every((event) => !String(event.metadata || "").includes(rawToken)), "audit metadata contains no raw member-card token");
+}
+const allStoredMemberCardTokens = expectStatus(await request("GET", "/api/collections/member_card_tokens/records?perPage=100", { token: rootToken }), 200, "read all stored member-card token hashes");
+assert.ok(allStoredMemberCardTokens.items.every((item) => /^[a-f0-9]{64}$/.test(item.tokenHash)), "only SHA-256 member-card token hashes are stored");
+assert.ok(allStoredMemberCardTokens.items.every((item) => !issuedRawMemberCardTokens.includes(item.tokenHash)), "no raw member-card token is stored in the hash field");
+if (serverLogPath) {
+  const serverLog = fs.readFileSync(serverLogPath, "utf8");
+  for (const rawToken of issuedRawMemberCardTokens) assert.equal(serverLog.includes(rawToken), false, "server logs contain no raw member-card token");
+}
 
 expectStatus(await request("PATCH", `/api/collections/users/records/${admin.id}`, {
   token: rootToken, body: { active: false },

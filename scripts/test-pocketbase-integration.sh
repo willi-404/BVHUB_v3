@@ -31,6 +31,7 @@ curl --fail --silent "$health_url" >/dev/null
 PB_TEST_URL="http://127.0.0.1:$port" \
 PB_TEST_SUPERUSER_EMAIL="$test_email" \
 PB_TEST_SUPERUSER_PASSWORD="$test_password" \
+PB_TEST_SERVER_LOG="$data_dir/server.log" \
 node "$repo_root/scripts/pocketbase-integration.mjs"
 
 printf 'PocketBase integration tests passed on 127.0.0.1:%s\n' "$port"

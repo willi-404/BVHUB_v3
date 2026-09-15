@@ -4,7 +4,7 @@ routerAdd("POST", "/api/bvhub/me/member-card-token", (e) => {
   const api = require(`${__hooks}/member-card-service.js`);
   api.noStore(e);
   const user = e.auth;
-  if (!user || user.getBool("active") !== true || user.getBool("verified") !== true || !api.isCurrentMember($app, user)) throw new ForbiddenError("Member card unavailable");
+  if (!user || user.getBool("active") !== true || user.getBool("verified") !== true) throw new ForbiddenError("Member card unavailable");
   const config = api.settings($app);
   if (!config || config.enabled !== true) throw new ForbiddenError("Member card unavailable");
 
