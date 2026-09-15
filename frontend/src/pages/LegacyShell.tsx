@@ -622,7 +622,7 @@ function PaymentsView({ payments, onPay }: { payments: Payment[]; onPay: (id: nu
   );
 }
 
-function AdminDrawer({ onClose, onAdminMembers, onAdminPayments, onAdminEvents }: { onClose: () => void; onAdminMembers: () => void; onAdminPayments: () => void; onAdminEvents: () => void }) {
+function AdminDrawer({ onClose, onAdminMembers, onAdminPayments, onAdminEvents, onAdminScanner }: { onClose: () => void; onAdminMembers: () => void; onAdminPayments: () => void; onAdminEvents: () => void; onAdminScanner: () => void }) {
   const { t } = useI18n();
   return (
     <>
@@ -656,13 +656,13 @@ function AdminDrawer({ onClose, onAdminMembers, onAdminPayments, onAdminEvents }
           {ADMIN_ITEMS.map((item) => (
             <button
               key={item.label}
-              onClick={() => { onClose(); if (item.label === "Members") onAdminMembers(); else if (item.label === "Payments") onAdminPayments(); else if (item.label === "Event Manage") onAdminEvents(); }}
+              onClick={() => { onClose(); if (item.label === "Members") onAdminMembers(); else if (item.label === "Payments") onAdminPayments(); else if (item.label === "Event Manage") onAdminEvents(); else onAdminScanner(); }}
               className="flex items-center gap-3 px-4 py-3.5 rounded-lg bg-amber-50 border border-amber-100 text-amber-800 font-medium text-sm hover:bg-amber-100 active:scale-[0.98] transition-all w-full"
             >
               <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700 shrink-0">
                 <Icon d={item.icon} size={17} />
               </div>
-              {t(item.label === "Members" ? "admin.members.title" : item.label === "Payments" ? "admin.payments.title" : "admin.events.title")}
+              {t(item.label === "Members" ? "admin.members.title" : item.label === "Payments" ? "admin.payments.title" : item.label === "Event Manage" ? "admin.events.title" : "admin.scanMemberCard")}
               <Icon d={icons.chevronRight} size={14} className="ml-auto text-amber-500" />
             </button>
           ))}
@@ -672,7 +672,7 @@ function AdminDrawer({ onClose, onAdminMembers, onAdminPayments, onAdminEvents }
   );
 }
 
-function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, onAdminPayments, onAdminEvents, canAccessAdmin }: { profile: ProfileDto | null; onEditProfile: () => void; onLogout: () => void; onAdminMembers: () => void; onAdminPayments: () => void; onAdminEvents: () => void; canAccessAdmin: boolean }) {
+function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, onAdminPayments, onAdminEvents, onAdminScanner, canAccessAdmin }: { profile: ProfileDto | null; onEditProfile: () => void; onLogout: () => void; onAdminMembers: () => void; onAdminPayments: () => void; onAdminEvents: () => void; onAdminScanner: () => void; canAccessAdmin: boolean }) {
   const { t, locale } = useI18n();
   const [adminOpen, setAdminOpen] = useState(false);
 
@@ -725,7 +725,7 @@ function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, onAdmin
         <Icon d={icons.logout} size={15} /> {t("auth.signOut")}
       </Button>
 
-      {adminOpen && <AdminDrawer onClose={() => setAdminOpen(false)} onAdminMembers={() => { setAdminOpen(false); onAdminMembers(); }} onAdminPayments={() => { setAdminOpen(false); onAdminPayments(); }} onAdminEvents={() => { setAdminOpen(false); onAdminEvents(); }} />}
+      {adminOpen && <AdminDrawer onClose={() => setAdminOpen(false)} onAdminMembers={() => { setAdminOpen(false); onAdminMembers(); }} onAdminPayments={() => { setAdminOpen(false); onAdminPayments(); }} onAdminEvents={() => { setAdminOpen(false); onAdminEvents(); }} onAdminScanner={() => { setAdminOpen(false); onAdminScanner(); }} />}
     </div>
   );
 }
@@ -736,6 +736,7 @@ const ADMIN_ITEMS = [
   { label: "Members", icon: icons.usersAdmin },
   { label: "Payments", icon: icons.creditCard },
   { label: "Event Manage", icon: icons.clipboardList },
+  { label: "Scan Member Card", icon: icons.qrCode },
 ];
 
 const NAV_ITEMS: Array<{ key: NavTab; label: string; icon: string }> = [
@@ -801,6 +802,7 @@ function MobileNavigationDrawer({
   onAdminMembers,
   onAdminPayments,
   onAdminEvents,
+  onAdminScanner,
   onLogout,
   triggerRef,
 }: {
@@ -813,6 +815,7 @@ function MobileNavigationDrawer({
   onAdminMembers: () => void;
   onAdminPayments: () => void;
   onAdminEvents: () => void;
+  onAdminScanner: () => void;
   onLogout: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
@@ -944,7 +947,7 @@ function MobileNavigationDrawer({
                 {t("admin.management")}
               </p>
               {ADMIN_ITEMS.map((item) => {
-                const action = item.label === "Members" ? onAdminMembers : item.label === "Payments" ? onAdminPayments : onAdminEvents;
+                const action = item.label === "Members" ? onAdminMembers : item.label === "Payments" ? onAdminPayments : item.label === "Event Manage" ? onAdminEvents : onAdminScanner;
                 return (
                   <button
                     key={item.label}
@@ -954,7 +957,7 @@ function MobileNavigationDrawer({
                   >
                     <Icon d={item.icon} size={18} />
                     <span className="min-w-0 flex-1 break-words">
-                      {t(item.label === "Members" ? "admin.members.title" : item.label === "Payments" ? "admin.payments.title" : "admin.events.title")}
+                      {t(item.label === "Members" ? "admin.members.title" : item.label === "Payments" ? "admin.payments.title" : item.label === "Event Manage" ? "admin.events.title" : "admin.scanMemberCard")}
                     </span>
                   </button>
                 );
@@ -986,6 +989,7 @@ function Sidebar({
   onAdminMembers,
   onAdminPayments,
   onAdminEvents,
+  onAdminScanner,
   canAccessAdmin,
   profile,
 }: {
@@ -996,6 +1000,7 @@ function Sidebar({
   onAdminMembers: () => void;
   onAdminPayments: () => void;
   onAdminEvents: () => void;
+  onAdminScanner: () => void;
   canAccessAdmin: boolean;
   profile: ProfileDto | null;
 }) {
@@ -1069,11 +1074,11 @@ function Sidebar({
         {ADMIN_ITEMS.map((item) => (
           <button
             key={item.label}
-            onClick={item.label === "Members" ? onAdminMembers : item.label === "Payments" ? onAdminPayments : item.label === "Event Manage" ? onAdminEvents : undefined}
+            onClick={item.label === "Members" ? onAdminMembers : item.label === "Payments" ? onAdminPayments : item.label === "Event Manage" ? onAdminEvents : onAdminScanner}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium w-full text-[var(--muted-foreground)] hover:bg-amber-50 hover:text-amber-700 transition-all duration-150"
           >
             <Icon d={item.icon} size={17} />
-            {t(item.label === "Members" ? "admin.members.title" : item.label === "Payments" ? "admin.payments.title" : "admin.events.title")}
+            {t(item.label === "Members" ? "admin.members.title" : item.label === "Payments" ? "admin.payments.title" : item.label === "Event Manage" ? "admin.events.title" : "admin.scanMemberCard")}
           </button>
         ))}
       </div>}
@@ -1092,6 +1097,7 @@ function Sidebar({
 // ─── AppShell (dashboard without login gate, used by FramePreview) ────────────
 
 export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: NavTab; onLogout?: () => void }) {
+  const navigate = useNavigate();
   const { logout: authLogout } = useAuth();
   const { data: user } = useAuthUser();
   const { t } = useI18n();
@@ -1155,14 +1161,14 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
       case "profile":
         if (profileLoading) return <div><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p className="mt-2 text-sm text-[var(--muted-foreground)]">{t("profile.loading")}</p></div>;
         if (profileError) return <Card><CardContent className="p-5"><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p role="alert" className="mt-2 text-sm text-red-600">{t("profile.loadError")}</p><Button className="mt-4" onClick={() => void refetchProfile()}>{t("common.retry")}</Button></CardContent></Card>;
-        return <ProfileView profile={profile || null} onEditProfile={() => setEditProfileOpen(true)} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} canAccessAdmin={canAccessAdmin} />;
+        return <ProfileView profile={profile || null} onEditProfile={() => setEditProfileOpen(true)} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} onAdminScanner={() => navigate("/admin/member-card-scanner")} canAccessAdmin={canAccessAdmin} />;
     }
   }
 
   return (
     <div className="relative h-full bg-[var(--background)]" style={{ fontFamily: "var(--font-sans)" }}>
       <div className="app-shell-background flex h-full" data-drawer-open={mobileNavigationOpen} inert={mobileNavigationOpen ? true : undefined}>
-        <Sidebar active={tab} onChange={setTab} unpaidCount={unpaidCount} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} canAccessAdmin={canAccessAdmin} profile={profile || null} />
+        <Sidebar active={tab} onChange={setTab} unpaidCount={unpaidCount} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} onAdminScanner={() => navigate("/admin/member-card-scanner")} canAccessAdmin={canAccessAdmin} profile={profile || null} />
 
         <main ref={mainRef} id="app-main-content" className="min-w-0 w-full max-w-full flex-1 overflow-x-hidden overflow-y-auto">
         <div className="hidden lg:flex items-center justify-between px-8 py-5 border-b border-[var(--border)] bg-[var(--card)] sticky top-0 z-10">
@@ -1238,6 +1244,7 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
         onAdminMembers={() => setAdminView("members")}
         onAdminPayments={() => setAdminView("payments")}
         onAdminEvents={() => setAdminView("events")}
+        onAdminScanner={() => navigate("/admin/member-card-scanner")}
         onLogout={logout}
         triggerRef={mobileNavigationTrigger}
       />

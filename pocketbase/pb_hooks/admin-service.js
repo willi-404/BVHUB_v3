@@ -68,6 +68,29 @@ function userDto(app, user) {
   };
 }
 
+function memberDetailDto(app, user) {
+  const value = userDto(app, user);
+  let profile = null;
+  try {
+    const record = app.findFirstRecordByData("user_profiles", "user", user.id);
+    profile = {
+      street: record.getString("street"),
+      houseNumber: record.getString("houseNumber"),
+      postalCode: record.getString("postalCode"),
+      city: record.getString("city"),
+      birthDate: record.getString("birthDate").slice(0, 10),
+      phone: record.getString("phone"),
+    };
+  } catch (_) {}
+  return {
+    ...value,
+    address: profile ? [profile.street, profile.houseNumber].filter(Boolean).join(" ") + (profile.postalCode || profile.city ? `, ${[profile.postalCode, profile.city].filter(Boolean).join(" ")}` : "") : "",
+    birthDate: profile?.birthDate || "",
+    phone: profile?.phone || "",
+    memberSince: value.created,
+  };
+}
+
 function audit(app, actorId, targetId, eventType, metadata) {
   const collection = app.findCollectionByNameOrId("audit_events");
   const record = new Record(collection);
@@ -91,4 +114,4 @@ function targetGroupIds(app, value) {
   return value;
 }
 
-module.exports = { MANAGED_GROUPS, MANAGED_ROLES, body, actor, findUser, groupRecords, groupsFor, userDto, audit, targetGroupIds, pathId };
+module.exports = { MANAGED_GROUPS, MANAGED_ROLES, body, actor, findUser, groupRecords, groupsFor, userDto, memberDetailDto, audit, targetGroupIds, pathId };

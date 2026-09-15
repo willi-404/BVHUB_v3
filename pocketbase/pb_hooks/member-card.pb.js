@@ -50,6 +50,40 @@ routerAdd("POST", "/api/bvhub/member-card/verify", (e) => {
   });
 });
 
+routerAdd("POST", "/api/bvhub/admin/member-card/verify", (e) => {
+  const card = require(`${__hooks}/member-card-service.js`);
+  const admin = require(`${__hooks}/admin-service.js`);
+  card.admin(e);
+  card.noStore(e);
+  const body = e.requestInfo().body;
+  if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).length !== 1 || typeof body.token !== "string") {
+    return e.json(200, { status: "INVALID", reason: "MALFORMED_TOKEN" });
+  }
+  const rawToken = body.token;
+  if (!/^[A-Za-z0-9]{48,256}$/.test(rawToken)) return e.json(200, { status: "INVALID", reason: "MALFORMED_TOKEN" });
+  const config = card.settings($app);
+  if (!config || config.enabled !== true) return e.json(200, { status: "INVALID", reason: "FEATURE_DISABLED" });
+
+  let tokenRecord;
+  try { tokenRecord = $app.findFirstRecordByData("member_card_tokens", "tokenHash", $security.sha256(rawToken)); } catch (_) {
+    return e.json(200, { status: "INVALID", reason: "UNKNOWN_TOKEN" });
+  }
+  const tokenExpiresAt = tokenRecord.getString("expiresAt");
+  if (Date.parse(tokenExpiresAt) <= Date.now()) return e.json(200, { status: "INVALID", reason: "EXPIRED_TOKEN" });
+  let user;
+  try { user = $app.findRecordById("users", tokenRecord.getString("user")); } catch (_) {
+    return e.json(200, { status: "INVALID", reason: "USER_NOT_FOUND" });
+  }
+  if (user.getBool("active") !== true) return e.json(200, { status: "INVALID", reason: "INACTIVE_ACCOUNT" });
+  if (user.getBool("verified") !== true) return e.json(200, { status: "INVALID", reason: "UNVERIFIED_ACCOUNT" });
+
+  const member = admin.memberDetailDto($app, user);
+  const verifiedAt = new Date().toISOString();
+  if (card.isCurrentMember($app, user)) return e.json(200, { status: "VALID_MEMBER", reason: null, member, tokenExpiresAt, verifiedAt });
+  const reason = user.getString("role") === "GUEST" ? "GUEST_ACCOUNT" : "NO_ACTIVE_MEMBER_GROUP";
+  return e.json(200, { status: "GUEST_NON_MEMBER", reason, member, tokenExpiresAt, verifiedAt });
+}, $apis.requireAuth("users"));
+
 routerAdd("GET", "/api/bvhub/admin/member-card-settings", (e) => {
   const api = require(`${__hooks}/member-card-service.js`);
   api.admin(e);
