@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { CheckCircle2, Copy, ExternalLink, Landmark, ReceiptText } from "lucide-react"
+import { CheckCircle2, Copy, Download, ExternalLink, Landmark, ReceiptText } from "lucide-react"
 import { QRCodeSVG } from "qrcode.react"
 import { formatIBAN } from "eu-payment-qr"
 import { Link, useParams } from "react-router-dom"
@@ -9,7 +9,7 @@ import { Button } from "../app/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "../app/components/ui/card"
 import { Separator } from "../app/components/ui/separator"
 import { usePayment, usePaymentRealtime } from "../features/payments/hooks/usePayments"
-import { buildPaytoUri, createEpcPayload, formatMoney } from "../features/payments/paymentUtils"
+import { buildPaytoUri, createEpcPayload, downloadEpcPng, formatMoney } from "../features/payments/paymentUtils"
 import { formatLocaleDateTime, useI18n } from "../i18n"
 
 export default function PaymentDetailPage() {
@@ -18,6 +18,7 @@ export default function PaymentDetailPage() {
   usePaymentRealtime()
   const payment = usePayment(paymentId)
   const [copied, setCopied] = useState<"iban" | "purpose" | null>(null)
+  const [qrDownloadError, setQrDownloadError] = useState(false)
   const epc = useMemo(() => {
     if (!payment.data || payment.data.status === "PAID" || !payment.data.paymentRequired || !payment.data.paymentSettings.configured) return null
     try { return { payload: createEpcPayload(payment.data), payto: buildPaytoUri(payment.data) } } catch { return null }
@@ -27,6 +28,13 @@ export default function PaymentDetailPage() {
     await navigator.clipboard.writeText(value)
     setCopied(key)
     window.setTimeout(() => setCopied(null), 1500)
+  }
+
+  async function downloadQr() {
+    const svg = document.querySelector<SVGSVGElement>('[data-testid="epc-payment-qr"] svg')
+    if (!svg || !payment.data) return
+    setQrDownloadError(false)
+    try { await downloadEpcPng(svg, `bvhub-payment-${payment.data.id}.png`) } catch { setQrDownloadError(true) }
   }
 
   if (payment.isPending) return <main className="min-h-full px-4 py-6"><p>{t("common.loading")}</p></main>
@@ -71,6 +79,8 @@ export default function PaymentDetailPage() {
                 {!paid && epc && (
                   <div className="flex flex-col items-center gap-4">
                     <div data-testid="epc-payment-qr" className="w-full max-w-64 rounded-lg bg-white p-4 shadow-sm outline outline-black/10"><QRCodeSVG value={epc.payload} size={224} level="M" marginSize={4} bgColor="#ffffff" fgColor="#111111" className="h-auto max-w-full" /></div>
+                    <Button data-testid="download-payment-qr" variant="outline" onClick={() => void downloadQr()}><Download data-icon="inline-start" />{t("payments.downloadQr")}</Button>
+                    {qrDownloadError && <p role="alert" className="text-sm text-destructive">{t("payments.qrDownloadError")}</p>}
                     <a data-testid="payto-link" href={epc.payto} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 sm:w-auto"><ExternalLink className="size-4" />{t("payments.openBankingApp")}</a>
                   </div>
                 )}

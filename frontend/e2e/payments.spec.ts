@@ -1,6 +1,6 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test"
 import { spawn, spawnSync, type ChildProcess } from "node:child_process"
-import { mkdtempSync, openSync, closeSync, rmSync } from "node:fs"
+import { mkdtempSync, openSync, closeSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -169,6 +169,16 @@ test.describe.serial("payments with isolated PocketBase", () => {
     await expect(page.locator("dd").getByText("Badminton Verein Erlangen", { exact: true })).toBeVisible()
     await expect(page.locator("dd").getByText("DE89 3704 0044 0532 0130 00", { exact: true })).toBeVisible()
     await expect(page.getByTestId("payto-link")).toHaveAttribute("href", /^payto:\/\/iban\//)
+    const downloadPromise = page.waitForEvent("download")
+    await page.getByTestId("download-payment-qr").click()
+    const download = await downloadPromise
+    expect(download.suggestedFilename()).toBe(`bvhub-payment-${createdPayment.id}.png`)
+    const pngPath = await download.path()
+    expect(pngPath).toBeTruthy()
+    const png = readFileSync(pngPath as string)
+    expect(png.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+    expect(png.readUInt32BE(16)).toBeGreaterThan(224)
+    expect(png.readUInt32BE(20)).toBeGreaterThan(224)
     await context.close()
   })
 
@@ -182,6 +192,7 @@ test.describe.serial("payments with isolated PocketBase", () => {
     await expect(page.getByText("You are a member. No payment is required for this event.")).toBeVisible()
     await expect(page.locator("dd").getByText("€0.00", { exact: true })).toBeVisible()
     await expect(page.getByTestId("epc-payment-qr")).toHaveCount(0)
+    await expect(page.getByTestId("download-payment-qr")).toHaveCount(0)
     await expect(page.getByTestId("payto-link")).toHaveCount(0)
     await context.close()
   })
@@ -200,6 +211,7 @@ test.describe.serial("payments with isolated PocketBase", () => {
     await expect(row.getByText("Paid", { exact: true })).toBeVisible()
     await expect(guestSession.page.getByText("Paid", { exact: true }).first()).toBeVisible({ timeout: 10_000 })
     await expect(guestSession.page.getByTestId("epc-payment-qr")).toHaveCount(0)
+    await expect(guestSession.page.getByTestId("download-payment-qr")).toHaveCount(0)
     await guestSession.context.close()
     await adminSession.context.close()
   })
