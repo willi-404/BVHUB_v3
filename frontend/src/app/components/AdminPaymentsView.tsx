@@ -201,7 +201,7 @@ function PaymentStatusSwitch({ payment }: { payment: AdminPaymentRecord }) {
       <Switch
         checked={payment.status === "PAID"}
         disabled={mutation.isPending}
-        className="data-[state=checked]:bg-emerald-600 data-[state=unchecked]:bg-destructive"
+        className="data-[state=checked]:!bg-emerald-600 data-[state=unchecked]:!bg-destructive"
         aria-label={t("admin.payments.setStatus")}
         onCheckedChange={() =>
           mutation.mutate({
