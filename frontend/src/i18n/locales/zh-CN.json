@@ -486,6 +486,10 @@
   "admin.payments.guestFee": "访客费用",
   "admin.payments.paymentCount": "付款记录",
   "admin.payments.openAmount": "待付金额",
+  "admin.payments.sortBy": "付款排序依据",
+  "admin.payments.sortNone": "未排序",
+  "admin.payments.sortAscending": "升序",
+  "admin.payments.sortDescending": "降序",
   "errors.forbidden": "你没有执行此操作的权限。",
   "errors.generic": "发生错误，请重试。",
   "errors.event_not_deletable": "此活动无法删除，因为它已发布、有人报名或已完成。"

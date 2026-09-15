@@ -486,6 +486,10 @@
   "admin.payments.guestFee": "Gastgebühr",
   "admin.payments.paymentCount": "Zahlungen",
   "admin.payments.openAmount": "Offener Betrag",
+  "admin.payments.sortBy": "Zahlungen sortieren nach",
+  "admin.payments.sortNone": "nicht sortiert",
+  "admin.payments.sortAscending": "aufsteigend",
+  "admin.payments.sortDescending": "absteigend",
   "errors.forbidden": "Du hast keine Berechtigung für diese Aktion.",
   "errors.generic": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
   "errors.event_not_deletable": "Dieses Event kann nicht gelöscht werden (veröffentlicht, registriert oder bereits abgeschlossen)."

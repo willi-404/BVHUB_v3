@@ -486,6 +486,10 @@
   "admin.payments.guestFee": "Guest fee",
   "admin.payments.paymentCount": "Payments",
   "admin.payments.openAmount": "Open amount",
+  "admin.payments.sortBy": "Sort payments by",
+  "admin.payments.sortNone": "not sorted",
+  "admin.payments.sortAscending": "ascending",
+  "admin.payments.sortDescending": "descending",
   "errors.forbidden": "You do not have permission for this action.",
   "errors.generic": "Something went wrong. Please try again.",
   "errors.event_not_deletable": "This event cannot be deleted because it was published, registered, or completed."
