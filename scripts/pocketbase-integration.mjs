@@ -51,6 +51,10 @@ function expectStatus(result, expected, label) {
   return result.data;
 }
 
+async function paymentsForRegistration(registrationId, rootToken) {
+  return expectStatus(await request("GET", `/api/collections/payments/records?filter=${encodeURIComponent(`registration = "${registrationId}"`)}`, { token: rootToken }), 200, "read registration payments").items;
+}
+
 const userBody = (email, role, password = "Synthetic-password-12!") => ({
   email, password, passwordConfirm: password, displayName: `Test ${role}`,
   firstName: "Synthetic", lastName: "Account", role, active: true, verified: true,
@@ -60,6 +64,57 @@ const auth = expectStatus(await request("POST", "/api/collections/_superusers/au
   body: { identity: superuserEmail, password: superuserPassword },
 }), 200, "superuser login");
 const rootToken = auth.token;
+
+if (process.env.PB_TEST_STAGE_LEGACY === "1") {
+  const legacyEventSchema = expectStatus(await request("GET", "/api/collections/events", { token: rootToken }), 200, "read pre-payment event schema");
+  assert.equal(legacyEventSchema.fields.some((field) => field.name === "guestFeeCents"), false, "guest fee migration is down before seeding legacy records");
+  expectStatus(await request("GET", "/api/collections/payments", { token: rootToken }), 404, "payments collection is absent before migration");
+  const legacyUser = expectStatus(await request("POST", "/api/collections/users/records", {
+    token: rootToken,
+    body: { ...userBody("legacy-payment-registration@example.test", "GUEST"), displayName: "Legacy Payment Guest" },
+  }), 200, "seed pre-payment guest");
+  const legacyMember = expectStatus(await request("POST", "/api/collections/users/records", {
+    token: rootToken,
+    body: { ...userBody("legacy-member-payment@example.test", "MEMBER"), displayName: "Legacy Payment Member" },
+  }), 200, "seed pre-payment member");
+  const legacyVenue = expectStatus(await request("POST", "/api/collections/venues/records", {
+    token: rootToken,
+    body: { name: "Legacy Payment Migration Venue", address: "Migrationstrasse 1", description: "", checkoutRegion: "ER", active: true },
+  }), 200, "seed pre-payment venue");
+  const legacyEvent = expectStatus(await request("POST", "/api/collections/events/records", {
+    token: rootToken,
+    body: { title: "Legacy Payment Migration Event", description: "", venue: legacyVenue.id, start: "2098-01-01T18:00:00.000Z", end: "2098-01-01T20:00:00.000Z", abmeldefrist: "2097-12-31T18:00:00.000Z", capacity: 10, published: false, status: "OPEN_TO_ALL", createdBy: legacyUser.id },
+  }), 200, "seed event before guest fee migration");
+  expectStatus(await request("POST", "/api/collections/event_registrations/records", {
+    token: rootToken,
+    body: { event: legacyEvent.id, user: legacyUser.id, status: "REGISTERED", registeredAt: "2097-12-01T12:00:00.000Z", checkoutRegion: "ER", termsVersion: "LEGACY-PAYMENT-MIGRATION", termsAcceptedAt: "2097-12-01T12:00:00.000Z" },
+  }), 200, "seed registered participant before payment migration");
+  expectStatus(await request("POST", "/api/collections/event_registrations/records", {
+    token: rootToken,
+    body: { event: legacyEvent.id, user: legacyMember.id, status: "REGISTERED", registeredAt: "2097-12-01T12:00:00.000Z", checkoutRegion: "ER", termsVersion: "LEGACY-PAYMENT-MIGRATION-MEMBER", termsAcceptedAt: "2097-12-01T12:00:00.000Z" },
+  }), 200, "seed registered member before payment migration");
+  fs.writeSync(process.stdout.fd, "Legacy payment migration fixture seeded\n");
+  process.exit(0);
+}
+
+const migratedEvents = expectStatus(await request("GET", `/api/collections/events/records?filter=${encodeURIComponent('title = "Legacy Payment Migration Event"')}`, { token: rootToken }), 200, "read migrated legacy event");
+assert.equal(migratedEvents.items.length, 1, "legacy migration event remains present");
+assert.equal(migratedEvents.items[0].guestFeeCents, 380, "old events are backfilled to 380 cents");
+const migratedRegistration = expectStatus(await request("GET", `/api/collections/event_registrations/records?filter=${encodeURIComponent('termsVersion = "LEGACY-PAYMENT-MIGRATION"')}`, { token: rootToken }), 200, "read migrated registration").items[0];
+const migratedPayment = await paymentsForRegistration(migratedRegistration.id, rootToken);
+assert.equal(migratedPayment.length, 1, "old registered participant is backfilled exactly once");
+assert.equal(migratedPayment[0].roleSnapshot, "GUEST");
+assert.equal(migratedPayment[0].paymentRequired, true);
+assert.equal(migratedPayment[0].amountCents, 380);
+assert.equal(migratedPayment[0].status, "UNPAID");
+assert.equal(migratedPayment[0].active, true);
+const migratedMemberRegistration = expectStatus(await request("GET", `/api/collections/event_registrations/records?filter=${encodeURIComponent('termsVersion = "LEGACY-PAYMENT-MIGRATION-MEMBER"')}`, { token: rootToken }), 200, "read migrated member registration").items[0];
+const migratedMemberPayment = await paymentsForRegistration(migratedMemberRegistration.id, rootToken);
+assert.equal(migratedMemberPayment.length, 1, "old registered member is backfilled exactly once");
+assert.equal(migratedMemberPayment[0].roleSnapshot, "MEMBER");
+assert.equal(migratedMemberPayment[0].paymentRequired, false);
+assert.equal(migratedMemberPayment[0].amountCents, 0);
+assert.equal(migratedMemberPayment[0].status, "PAID");
 
 const initialSettings = expectStatus(await request("GET", "/api/settings", { token: rootToken }), 200, "read initial settings");
 const registrationRateLimit = initialSettings.rateLimits.rules.find((rule) => rule.label === "POST /api/bvhub/register");
@@ -258,6 +313,12 @@ const member = expectStatus(await request("POST", "/api/collections/users/record
 const guest = expectStatus(await request("POST", "/api/collections/users/records", {
   token: rootToken, body: userBody("guest@example.test", "GUEST"),
 }), 200, "create guest");
+const paymentGuest = expectStatus(await request("POST", "/api/collections/users/records", {
+  token: rootToken, body: { ...userBody("payment-guest@example.test", "GUEST"), displayName: "Payment Guest" },
+}), 200, "create second guest for payment snapshots");
+const paymentGuestToken = expectStatus(await request("POST", `/api/collections/users/impersonate/${paymentGuest.id}`, {
+  token: rootToken, body: { duration: 300 },
+}), 200, "impersonate second payment guest").token;
 
 const inactiveGuest = expectStatus(await request("POST", "/api/collections/users/records", { token: rootToken, body: { ...userBody("inactive-guest@example.test", "GUEST"), displayName: "Inactive Guest" } }), 200, "create inactive test user");
 expectStatus(await request("PATCH", `/api/collections/users/records/${inactiveGuest.id}`, { token: rootToken, body: { active: false } }), 200, "deactivate guest");
@@ -362,6 +423,27 @@ const adminLogin = expectStatus(await request("POST", "/api/collections/users/au
   body: { identity: admin.email, password: "Synthetic-password-12!" },
 }), 200, "admin password login");
 
+expectStatus(await request("GET", "/api/bvhub/admin/payment-settings"), 401, "unauthenticated payment settings read");
+for (const [label, token] of [["guest", guestLoginToken], ["member", memberLoginToken]]) {
+  expectStatus(await request("GET", "/api/bvhub/admin/payment-settings", { token }), 403, `${label} cannot read payment settings`);
+  expectStatus(await request("PATCH", "/api/bvhub/admin/payment-settings", { token, body: { recipientName: "Forbidden" } }), 403, `${label} cannot update payment settings`);
+}
+const emptyPaymentSettings = expectStatus(await request("GET", "/api/bvhub/admin/payment-settings", { token: adminLogin.token }), 200, "admin reads empty payment settings");
+assert.equal(emptyPaymentSettings.configured, false);
+expectStatus(await request("PATCH", "/api/bvhub/admin/payment-settings", {
+  token: adminLogin.token, body: { recipientName: "Badminton Verein Erlangen", iban: "DE00 0000 0000 0000 0000 00", bic: "COBADEFFXXX" },
+}), 400, "payment settings reject invalid IBAN checksum");
+const adminPaymentSettings = expectStatus(await request("PATCH", "/api/bvhub/admin/payment-settings", {
+  token: adminLogin.token, body: { recipientName: "  Badminton Verein Erlangen  ", iban: "de89 3704 0044 0532 0130 00", bic: "cobadeffxxx" },
+}), 200, "admin updates payment settings");
+assert.deepEqual({ recipientName: adminPaymentSettings.recipientName, iban: adminPaymentSettings.iban, bic: adminPaymentSettings.bic, configured: adminPaymentSettings.configured }, {
+  recipientName: "Badminton Verein Erlangen", iban: "DE89370400440532013000", bic: "COBADEFFXXX", configured: true,
+});
+const superPaymentSettings = expectStatus(await request("PATCH", "/api/bvhub/admin/payment-settings", {
+  token: superLogin.token, body: { iban: "DE12500105170648489890" },
+}), 200, "superadmin updates payment settings");
+assert.equal(superPaymentSettings.iban, "DE12500105170648489890");
+
 expectStatus(await request("GET", "/api/bvhub/dashboard/statistics"), 401, "unauthenticated dashboard statistics");
 expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: inactiveAdminSession.token }), 403, "inactive account cannot read dashboard statistics");
 expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: unverifiedAdminSession.token }), 403, "unverified account cannot read dashboard statistics");
@@ -436,7 +518,7 @@ const unconfiguredVenue = expectStatus(await request("POST", "/api/bvhub/admin/v
   token: adminLogin.token, body: { name: "WU-05 Unconfigured Venue", address: "No checkout region" },
 }), 201, "admin creates venue without checkout region");
 const unconfiguredEvent = expectStatus(await request("POST", "/api/bvhub/admin/events", {
-  token: adminLogin.token, body: { title: "Unconfigured publish test", description: "", venue: unconfiguredVenue.id, start: "2099-08-01T16:00:00.000Z", end: "2099-08-01T18:00:00.000Z", abmeldefrist: "2099-08-01T15:00:00.000Z", capacity: 5, published: false, status: "MEMBERS_ONLY" },
+  token: adminLogin.token, body: { title: "Unconfigured publish test", description: "", venue: unconfiguredVenue.id, start: "2099-08-01T16:00:00.000Z", end: "2099-08-01T18:00:00.000Z", abmeldefrist: "2099-08-01T15:00:00.000Z", capacity: 5, guestFeeCents: 380, published: false, status: "MEMBERS_ONLY" },
 }), 201, "admin creates unpublished event with unconfigured venue");
 const blockedPublish = await request("PATCH", `/api/bvhub/admin/events/${unconfiguredEvent.id}`, { token: adminLogin.token, body: { published: true } });
 assert.notEqual(blockedPublish.status, 500, "publishing an unconfigured venue never returns 500");
@@ -453,9 +535,14 @@ const eventPayload = {
   end: "2099-07-01T18:00:00.000Z",
   abmeldefrist: "2099-07-01T15:00:00.000Z",
   capacity: 25,
+  guestFeeCents: 380,
   published: false,
   status: "MEMBERS_ONLY",
 };
+const { guestFeeCents: _guestFee, ...eventWithoutGuestFee } = eventPayload;
+expectStatus(await request("POST", "/api/bvhub/admin/events", {
+  token: adminLogin.token, body: eventWithoutGuestFee,
+}), 400, "event requires guest fee");
 expectStatus(await request("POST", "/api/bvhub/admin/events", {
   token: adminLogin.token, body: { ...eventPayload, createdBy: superAdmin.id },
 }), 400, "event rejects client-controlled creator");
@@ -464,9 +551,19 @@ const validEvent = expectStatus(await request("POST", "/api/bvhub/admin/events",
 }), 201, "admin creates event");
 assert.equal(validEvent.createdBy, admin.id, "event creator is set from authenticated actor");
 assert.equal(validEvent.status, "MEMBERS_ONLY");
+assert.equal(validEvent.guestFeeCents, 380, "event exposes the integer guest fee");
 const dashboardBeforePublish = expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: memberLoginToken }), 200, "dashboard before event publish");
 const initialChangelog = expectStatus(await request("GET", `/api/bvhub/admin/events/${validEvent.id}/changelog`, { token: adminLogin.token }), 200, "admin reads event changelog");
 assert.equal(initialChangelog.items.length, 1, "event creation creates one changelog entry");
+const editedFeeEvent = expectStatus(await request("PATCH", `/api/bvhub/admin/events/${validEvent.id}`, {
+  token: adminLogin.token, body: { guestFeeCents: 500 },
+}), 200, "admin edits event guest fee");
+assert.equal(editedFeeEvent.guestFeeCents, 500);
+expectStatus(await request("PATCH", `/api/bvhub/admin/events/${validEvent.id}`, {
+  token: adminLogin.token, body: { guestFeeCents: 380 },
+}), 200, "restore event guest fee for payment fixtures");
+const changelogAfterFeeEdit = expectStatus(await request("GET", `/api/bvhub/admin/events/${validEvent.id}/changelog`, { token: adminLogin.token }), 200, "guest fee edits are in the changelog");
+assert.equal(changelogAfterFeeEdit.items.length, initialChangelog.items.length + 2);
 
 // Regression: a never-published draft with its CREATED audit row is physically
 // deletable. The venue and a control event must remain intact.
@@ -493,7 +590,7 @@ expectStatus(await request("GET", `/api/bvhub/admin/venues/${createdVenue.id}`, 
 const noOpEvent = expectStatus(await request("PATCH", `/api/bvhub/admin/events/${validEvent.id}`, { token: adminLogin.token, body: eventPayload }), 200, "no-op event patch");
 assert.equal(noOpEvent.id, validEvent.id);
 const noOpChangelog = expectStatus(await request("GET", `/api/bvhub/admin/events/${validEvent.id}/changelog`, { token: adminLogin.token }), 200, "read changelog after no-op");
-assert.equal(noOpChangelog.items.length, initialChangelog.items.length, "no-op patch does not create changelog");
+assert.equal(noOpChangelog.items.length, changelogAfterFeeEdit.items.length, "no-op patch does not create changelog");
 expectStatus(await request("GET", `/api/bvhub/admin/events/${validEvent.id}/changelog`, { token: memberLoginToken }), 403, "member cannot read event changelog");
 expectStatus(await request("POST", "/api/bvhub/admin/events", {
   token: adminLogin.token, body: { ...eventPayload, title: "Invalid range", start: eventPayload.end, end: eventPayload.start },
@@ -517,11 +614,87 @@ assert.equal(dashboardAfterPublish.current.publishedEventsThisMonth, dashboardBe
 const adminAddMailBefore = smtpMessages.length;
 const adminAdded = expectStatus(await request("POST", `/api/bvhub/admin/events/${validEvent.id}/participants`, { token: adminLogin.token, body: { userId: guest.id } }), 201, "admin add participant immediate mail");
 assert.match(await waitForMail(adminAddMailBefore), /hinzugef/);
+const adminGuestPayments = await paymentsForRegistration(adminAdded.registrationId, rootToken);
+assert.equal(adminGuestPayments.length, 1, "admin manual add creates exactly one payment");
+const adminGuestPayment = adminGuestPayments[0];
+assert.equal(adminGuestPayment.user, guest.id);
+assert.equal(adminGuestPayment.roleSnapshot, "GUEST");
+assert.equal(adminGuestPayment.paymentRequired, true);
+assert.equal(adminGuestPayment.amountCents, 380);
+assert.equal(adminGuestPayment.status, "UNPAID");
+assert.equal(adminGuestPayment.active, true);
+assert.match(adminGuestPayment.purpose, new RegExp(`^BVHUB-EVT-${validEvent.id}-PAY-${adminGuestPayment.id}$`));
+assert.ok(adminGuestPayment.purpose.length <= 140, "payment purpose fits EPC message limit");
+const guestOwnPayments = expectStatus(await request("GET", "/api/bvhub/me/payments", { token: guestLoginToken }), 200, "guest reads own payments");
+assert.ok(guestOwnPayments.items.some((payment) => payment.id === adminGuestPayment.id));
+const guestPaymentDetail = expectStatus(await request("GET", `/api/bvhub/me/payments/${adminGuestPayment.id}`, { token: guestLoginToken }), 200, "guest reads own payment detail");
+assert.equal(guestPaymentDetail.paymentSettings.iban, "DE12500105170648489890", "payment detail uses current settings");
+assert.equal(guestPaymentDetail.amountCents, 380);
+expectStatus(await request("PATCH", "/api/bvhub/admin/payment-settings", {
+  token: superLogin.token, body: { iban: "DE89370400440532013000" },
+}), 200, "admin bank account can change after payment creation");
+const detailAfterBankChange = expectStatus(await request("GET", `/api/bvhub/me/payments/${adminGuestPayment.id}`, { token: guestLoginToken }), 200, "payment detail reloads current bank settings");
+assert.equal(detailAfterBankChange.paymentSettings.iban, "DE89370400440532013000");
+assert.equal(detailAfterBankChange.amountCents, adminGuestPayment.amountCents, "bank setting changes do not alter amount snapshot");
+assert.equal(detailAfterBankChange.purpose, adminGuestPayment.purpose, "bank setting changes do not alter purpose snapshot");
+expectStatus(await request("GET", `/api/bvhub/me/payments/${adminGuestPayment.id}`, { token: memberLoginToken }), 404, "user cannot read another user's payment");
+expectStatus(await request("GET", `/api/bvhub/me/payments/${adminGuestPayment.id}`, { token: paymentGuestToken }), 404, "second guest cannot read another guest payment");
+expectStatus(await request("POST", "/api/collections/payments/records", { token: guestLoginToken, body: { registration: adminAdded.registrationId } }), 403, "guest cannot create payment directly");
+expectStatus(await request("PATCH", `/api/collections/payments/records/${adminGuestPayment.id}`, { token: guestLoginToken, body: { status: "PAID" } }), 403, "guest cannot mutate payment collection directly");
+expectStatus(await request("DELETE", `/api/collections/payments/records/${adminGuestPayment.id}`, { token: guestLoginToken }), 403, "guest cannot delete payment directly");
+for (const [label, token] of [["guest", guestLoginToken], ["member", memberLoginToken]]) {
+  expectStatus(await request("PATCH", `/api/bvhub/admin/payments/${adminGuestPayment.id}/status`, { token, body: { status: "PAID" } }), 403, `${label} cannot change payment status`);
+}
+const paidGuestPayment = expectStatus(await request("PATCH", `/api/bvhub/admin/payments/${adminGuestPayment.id}/status`, {
+  token: adminLogin.token, body: { status: "PAID" },
+}), 200, "admin marks guest payment paid");
+assert.equal(paidGuestPayment.status, "PAID");
+assert.ok(paidGuestPayment.paidAt);
+assert.equal(paidGuestPayment.paidBy.id, admin.id);
+expectStatus(await request("PATCH", `/api/bvhub/admin/events/${validEvent.id}`, {
+  token: adminLogin.token, body: { guestFeeCents: 500 },
+}), 200, "change event fee after payment creation");
+assert.equal((await paymentsForRegistration(adminAdded.registrationId, rootToken))[0].amountCents, 380, "existing payment keeps its amount snapshot");
+const secondAdminAddMailBefore = smtpMessages.length;
+const secondAdminAdded = expectStatus(await request("POST", `/api/bvhub/admin/events/${validEvent.id}/participants`, {
+  token: adminLogin.token, body: { userId: paymentGuest.id },
+}), 201, "admin adds guest after fee change");
+await waitForMail(secondAdminAddMailBefore);
+const secondGuestPayment = (await paymentsForRegistration(secondAdminAdded.registrationId, rootToken))[0];
+assert.equal(secondGuestPayment.amountCents, 500, "new payment uses the updated event fee");
+assert.equal(secondGuestPayment.status, "UNPAID");
+assert.notEqual(secondGuestPayment.purpose, adminGuestPayment.purpose, "payment purposes are unique");
+expectStatus(await request("PATCH", `/api/bvhub/admin/users/${paymentGuest.id}/role`, {
+  token: superLogin.token, body: { role: "MEMBER", confirmation: "ROLE_CHANGE" },
+}), 200, "payment guest later becomes a member");
+const paymentAfterRoleChange = (await paymentsForRegistration(secondAdminAdded.registrationId, rootToken))[0];
+assert.equal(paymentAfterRoleChange.roleSnapshot, "GUEST", "role changes do not rewrite payment role snapshot");
+assert.equal(paymentAfterRoleChange.amountCents, 500, "role changes do not rewrite payment amount snapshot");
+assert.equal(paymentAfterRoleChange.status, "UNPAID", "role changes do not auto-settle an existing guest payment");
+expectStatus(await request("PATCH", `/api/bvhub/admin/users/${paymentGuest.id}/role`, {
+  token: superLogin.token, body: { role: "GUEST", confirmation: "ROLE_CHANGE" },
+}), 200, "restore second payment guest role");
 const adminRemoveMailBefore = smtpMessages.length;
 expectStatus(await request("DELETE", `/api/bvhub/admin/events/${validEvent.id}/participants/${guest.id}`, { token: adminLogin.token }), 200, "admin remove participant immediate mail");
 assert.match(await waitForMail(adminRemoveMailBefore), /abgemeldet/);
+const inactivePaidPayment = (await paymentsForRegistration(adminAdded.registrationId, rootToken))[0];
+assert.equal(inactivePaidPayment.active, false, "cancellation deactivates payment without deleting it");
+assert.equal(inactivePaidPayment.status, "PAID", "cancellation preserves paid status");
 const adminParticipantOutbox = expectStatus(await request("GET", `/api/collections/notification_outbox/records?filter=${encodeURIComponent(`registration = "${adminAdded.registrationId}"`)}`, { token: rootToken }), 200, "admin participant notification outbox");
 assert.deepEqual(adminParticipantOutbox.items.map((item) => item.kind).sort(), ["EVENT_ADMIN_ADDED", "EVENT_ADMIN_REMOVED"].sort());
+const adminReaddMailBefore = smtpMessages.length;
+const adminReadded = expectStatus(await request("POST", `/api/bvhub/admin/events/${validEvent.id}/participants`, { token: adminLogin.token, body: { userId: guest.id } }), 201, "admin re-adds cancelled guest");
+await waitForMail(adminReaddMailBefore);
+assert.equal(adminReadded.registrationId, adminAdded.registrationId, "re-registration reuses the registration");
+const reactivatedPayment = (await paymentsForRegistration(adminAdded.registrationId, rootToken))[0];
+assert.equal(reactivatedPayment.id, adminGuestPayment.id, "re-registration reuses the payment");
+assert.equal(reactivatedPayment.active, true);
+assert.equal(reactivatedPayment.status, "PAID", "reactivation does not reset paid status");
+assert.equal(reactivatedPayment.amountCents, 380, "reactivation does not update amount snapshot");
+const paymentSummary = expectStatus(await request("GET", "/api/bvhub/admin/payment-summary", { token: adminLogin.token }), 200, "admin reads compact payment summary");
+assert.ok(paymentSummary.items.some((item) => item.eventId === validEvent.id && item.totalPayments >= 2));
+const eventPaymentDetails = expectStatus(await request("GET", `/api/bvhub/admin/events/${validEvent.id}/payments`, { token: superLogin.token }), 200, "superadmin lazily loads event payments");
+assert.ok(eventPaymentDetails.items.some((payment) => payment.id === adminGuestPayment.id));
 const publicEventList = expectStatus(await request("GET", "/api/bvhub/events", { token: memberLoginToken }), 200, "member reads published events");
 assert.ok(publicEventList.items.some((item) => item.id === validEvent.id), "published future event appears in public event list");
 expectStatus(await request("GET", `/api/bvhub/events/${validEvent.id}`, { token: guestLoginToken }), 200, "guest reads published event detail");
@@ -536,6 +709,13 @@ const wuRegistration = expectStatus(await request("POST", `/api/bvhub/events/${v
   token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" },
 }), 201, "member registers for event");
 assert.equal(wuRegistration.status, "REGISTERED");
+const memberPayments = await paymentsForRegistration(wuRegistration.id, rootToken);
+assert.equal(memberPayments.length, 1, "member registration creates one payment");
+const memberPayment = memberPayments[0];
+assert.equal(memberPayment.roleSnapshot, "MEMBER");
+assert.equal(memberPayment.paymentRequired, false);
+assert.equal(memberPayment.amountCents, 0);
+assert.equal(memberPayment.status, "PAID");
 const dashboardAfterRegistration = expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: memberLoginToken }), 200, "dashboard after event registration");
 assert.equal(dashboardAfterRegistration.current.myUpcomingRegistrations, 1, "only the member's future REGISTERED event is counted");
 assert.match(await waitForMail(eventRegistrationMailBefore), /Anmeldung best/);
@@ -547,21 +727,31 @@ const repeatedRegistration = expectStatus(await request("POST", `/api/bvhub/even
   token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" },
 }), 201, "repeated registration is idempotent");
 assert.equal(repeatedRegistration.id, wuRegistration.id);
+assert.equal((await paymentsForRegistration(wuRegistration.id, rootToken)).length, 1, "duplicate registration does not duplicate payment");
 expectStatus(await request("GET", `/api/bvhub/events/${validEvent.id}/registration`, { token: memberLoginToken }), 200, "member reads own registration");
 const adminRemoveAgainMailBefore = smtpMessages.length;
 expectStatus(await request("DELETE", `/api/bvhub/admin/events/${validEvent.id}/participants/${member.id}`, { token: adminLogin.token }), 200, "admin removes participant immediate mail");
 assert.match(await waitForMail(adminRemoveAgainMailBefore), /abgemeldet/);
+assert.equal((await paymentsForRegistration(wuRegistration.id, rootToken))[0].active, false, "admin removal deactivates member payment");
 const rejoinMailBefore = smtpMessages.length;
 expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrations`, { token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" } }), 201, "member re-registers after admin remove");
 assert.match(await waitForMail(rejoinMailBefore), /Anmeldung best/);
+let reloadedMemberPayment = (await paymentsForRegistration(wuRegistration.id, rootToken))[0];
+assert.equal(reloadedMemberPayment.id, memberPayment.id);
+assert.equal(reloadedMemberPayment.active, true);
 const cancellationMailBefore = smtpMessages.length;
 expectStatus(await request("DELETE", `/api/bvhub/events/${validEvent.id}/registrations/me`, { token: memberLoginToken }), 200, "member cancels own registration");
 assert.match(await waitForMail(cancellationMailBefore), /Anmeldung storniert/);
+assert.equal((await paymentsForRegistration(wuRegistration.id, rootToken))[0].active, false, "self cancellation deactivates payment");
 const reRegistrationMailBefore = smtpMessages.length;
 expectStatus(await request("POST", `/api/bvhub/events/${validEvent.id}/registrations`, {
   token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" },
 }), 201, "member registers again after cancellation");
 assert.match(await waitForMail(reRegistrationMailBefore), /Anmeldung best/);
+reloadedMemberPayment = (await paymentsForRegistration(wuRegistration.id, rootToken))[0];
+assert.equal(reloadedMemberPayment.id, memberPayment.id);
+assert.equal(reloadedMemberPayment.active, true);
+assert.equal(reloadedMemberPayment.status, "PAID");
 const outbox = expectStatus(await request("GET", `/api/collections/notification_outbox/records?filter=${encodeURIComponent(`registration = "${wuRegistration.id}"`)}`, { token: rootToken }), 200, "registration creates notification outbox");
 assert.equal(outbox.items.length, 5, "each registration state transition creates one notification outbox item");
 assert.deepEqual(outbox.items.map((item) => item.kind).sort(), [
@@ -577,6 +767,7 @@ expectStatus(await request("POST", `/api/bvhub/events/${waitingEvent.id}/registr
 const waitingMailBefore = smtpMessages.length;
 const waitingRegistration = expectStatus(await request("POST", `/api/bvhub/events/${waitingEvent.id}/registrations`, { token: guestLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" } }), 201, "join waiting list");
 assert.equal(waitingRegistration.status, "WAITING");
+assert.equal((await paymentsForRegistration(waitingRegistration.id, rootToken)).length, 0, "waiting registration has no payment");
 assert.match(await waitForMail(waitingMailBefore), /Warteliste/);
 const promotionMailBefore = smtpMessages.length;
 expectStatus(await request("DELETE", `/api/bvhub/events/${waitingEvent.id}/registrations/me`, { token: memberLoginToken }), 200, "cancel and promote waiting member");
@@ -584,15 +775,38 @@ assert.match(await waitForMail(promotionMailBefore), /nachger/);
 assert.match(smtpMessages.at(-1), /WU-05 Waiting Event/);
 const promotedRegistration = expectStatus(await request("GET", `/api/bvhub/events/${waitingEvent.id}/registration`, { token: guestLoginToken }), 200, "read promoted registration");
 assert.equal(promotedRegistration.status, "REGISTERED");
+const promotedPayments = await paymentsForRegistration(waitingRegistration.id, rootToken);
+assert.equal(promotedPayments.length, 1, "waiting-list promotion creates a payment atomically");
+assert.equal(promotedPayments[0].roleSnapshot, "GUEST");
+assert.equal(promotedPayments[0].amountCents, 380);
+assert.equal(promotedPayments[0].status, "UNPAID");
 const promotedOutbox = expectStatus(await request("GET", `/api/collections/notification_outbox/records?filter=${encodeURIComponent(`registration = "${waitingRegistration.id}"`)}`, { token: rootToken }), 200, "waiting-list outbox");
 assert.deepEqual(promotedOutbox.items.map((item) => item.kind).sort(), ["EVENT_WAITING_LIST_JOINED", "EVENT_WAITING_LIST_PROMOTED"].sort());
 
 const voluntaryEvent = expectStatus(await request("POST", "/api/bvhub/admin/events", { token: adminLogin.token, body: { ...eventPayload, title: "WU-05 Voluntary Waiting Event", capacity: 1, published: true, status: "OPEN_TO_ALL" } }), 201, "create voluntary waiting event");
 expectStatus(await request("POST", `/api/bvhub/events/${voluntaryEvent.id}/registrations`, { token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" } }), 201, "fill voluntary event");
 const voluntary = expectStatus(await request("POST", `/api/bvhub/events/${voluntaryEvent.id}/registrations`, { token: guestLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" } }), 201, "voluntarily join waiting list");
+assert.equal((await paymentsForRegistration(voluntary.id, rootToken)).length, 0, "voluntary waiting registration has no payment");
 const voluntaryMailBefore = smtpMessages.length;
 expectStatus(await request("DELETE", `/api/bvhub/events/${voluntaryEvent.id}/registrations/me`, { token: guestLoginToken }), 200, "leave waiting list");
 assert.match(await waitForMail(voluntaryMailBefore), /Warteliste verlassen/);
+assert.equal((await paymentsForRegistration(voluntary.id, rootToken)).length, 0, "cancelled waiting registration remains without payment");
+
+const freeEvent = expectStatus(await request("POST", "/api/bvhub/admin/events", {
+  token: adminLogin.token, body: { ...eventPayload, title: "WU-05 Free Guest Event", guestFeeCents: 0, published: true, status: "OPEN_TO_ALL" },
+}), 201, "create zero-fee guest event");
+const freeAddMailBefore = smtpMessages.length;
+const freeRegistration = expectStatus(await request("POST", `/api/bvhub/admin/events/${freeEvent.id}/participants`, {
+  token: adminLogin.token, body: { userId: paymentGuest.id },
+}), 201, "admin adds guest to zero-fee event");
+await waitForMail(freeAddMailBefore);
+const freePayment = (await paymentsForRegistration(freeRegistration.registrationId, rootToken))[0];
+assert.equal(freePayment.amountCents, 0);
+assert.equal(freePayment.paymentRequired, false);
+assert.equal(freePayment.status, "PAID");
+expectStatus(await request("PATCH", `/api/bvhub/admin/events/${freeEvent.id}`, { token: adminLogin.token, body: { status: "CANCELLED" } }), 200, "cancel zero-fee event before deletion");
+expectStatus(await request("DELETE", `/api/bvhub/admin/events/${freeEvent.id}`, { token: adminLogin.token }), 204, "event deletion purges payment dependencies");
+expectStatus(await request("GET", `/api/collections/payments/records/${freePayment.id}`, { token: rootToken }), 404, "event payment is purged during hard delete");
 
 const closedCancellationEvent = expectStatus(await request("POST", "/api/bvhub/admin/events", { token: adminLogin.token, body: { ...eventPayload, title: "WU-05 Closed Cancellation Event", status: "OPEN_TO_ALL", published: true, abmeldefrist: "2020-01-01T12:00:00.000Z" } }), 201, "create event with passed cancellation deadline");
 const closedRegistration = expectStatus(await request("POST", `/api/bvhub/events/${closedCancellationEvent.id}/registrations`, { token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" } }), 201, "register before testing closed cancellation");
@@ -614,6 +828,7 @@ assert.equal(cancelledEvent.status, "CANCELLED");
 assert.equal(cancelledEvent.canDelete, true, "cancelled event can be explicitly hard deleted");
 expectStatus(await request("DELETE", `/api/bvhub/admin/events/${validEvent.id}`, { token: adminLogin.token }), 204, "registered event hard delete purges dependencies");
 expectStatus(await request("GET", `/api/collections/events/records/${validEvent.id}`, { token: rootToken }), 404, "registered event is deleted");
+expectStatus(await request("GET", `/api/collections/payments/records/${adminGuestPayment.id}`, { token: rootToken }), 404, "registered event payment is deleted with dependencies");
 expectStatus(await request("DELETE", "/api/bvhub/admin/events/not-an-id", { token: adminLogin.token }), 400, "invalid event id");
 expectStatus(await request("DELETE", `/api/bvhub/admin/events/zzzzzzzzzzzzzzz`, { token: adminLogin.token }), 404, "unknown event id");
 for (const [label, token, displayName] of [["admin", adminLogin.token, "Updated Admin"], ["superadmin", superLogin.token, "Updated Superadmin"]]) {
@@ -728,7 +943,8 @@ const issuedRawMemberCardTokens = [memberCardIssued.token];
 assert.match(memberCardIssued.token, /^[A-Za-z0-9]{48}$/);
 assert.ok(Date.parse(memberCardIssued.expiresAt) > Date.now());
 assert.ok(Date.parse(memberCardIssued.refreshAt) < Date.parse(memberCardIssued.expiresAt));
-assert.equal(Date.parse(memberCardIssued.expiresAt) - Date.parse(memberCardIssued.refreshAt), 20_000, "member-card refresh lead matches settings");
+const memberCardRefreshLeadMs = Date.parse(memberCardIssued.expiresAt) - Date.parse(memberCardIssued.refreshAt);
+assert.ok(memberCardRefreshLeadMs >= 19_999 && memberCardRefreshLeadMs <= 20_000, "member-card refresh lead matches settings within date serialization precision");
 const storedMemberCardTokens = expectStatus(await request("GET", `/api/collections/member_card_tokens/records?filter=${encodeURIComponent(`user = "${member.id}"`)}`, { token: rootToken }), 200, "superuser reads member-card token records");
 assert.equal(storedMemberCardTokens.items.length > 0, true);
 assert.match(storedMemberCardTokens.items.at(-1).tokenHash, /^[a-f0-9]{64}$/);
@@ -853,6 +1069,11 @@ const audits = expectStatus(await request("GET", "/api/collections/audit_events/
 assert.ok(audits.items.some((event) => event.eventType === "USER_ROLE_CHANGED"), "role changes are audited");
 assert.ok(audits.items.some((event) => event.eventType === "USER_GROUPS_CHANGED"), "group changes are audited");
 assert.ok(audits.items.some((event) => event.eventType === "MEMBER_CARD_SETTINGS_CHANGED"), "member-card settings changes are audited");
+assert.ok(audits.items.some((event) => event.eventType === "PAYMENT_SETTINGS_CHANGED"), "payment settings changes are audited");
+assert.ok(audits.items.some((event) => event.eventType === "PAYMENT_STATUS_CHANGED"), "payment status changes are audited");
+for (const iban of ["DE12500105170648489890", "DE89370400440532013000"]) {
+  assert.ok(audits.items.every((event) => !String(event.metadata || "").includes(iban)), "audit metadata contains no full IBAN");
+}
 assert.ok(audits.items.every((event) => !Object.hasOwn(event, "email") && !Object.hasOwn(event, "token")), "audit events contain no token or email");
 for (const rawToken of issuedRawMemberCardTokens) {
   assert.ok(audits.items.every((event) => !String(event.metadata || "").includes(rawToken)), "audit metadata contains no raw member-card token");
