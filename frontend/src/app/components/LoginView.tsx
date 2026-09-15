@@ -4,6 +4,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import logoSrc from "../../imports/logo1-high-resolution.png";
 import { useAuth } from "../../features/auth/AuthProvider";
+import { AuthServiceError, authErrorCodes } from "../../features/auth/authService";
 import { LanguageSwitcher, useI18n } from "../../i18n";
 
 interface LoginViewProps {
@@ -73,8 +74,8 @@ export default function LoginView({ onLogin, sessionExpired = false }: LoginView
       } else {
         setError(t("auth.genericError"));
       }
-    } catch {
-      setError(t("auth.genericError"));
+    } catch (error) {
+      setError(error instanceof AuthServiceError && error.code === authErrorCodes.otpAccountUnavailable ? t("auth.otpAccountUnavailable") : t("auth.genericError"));
     } finally {
       setLoading(false);
     }
