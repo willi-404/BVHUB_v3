@@ -64,6 +64,7 @@ routerAdd("PATCH", "/api/bvhub/admin/users/{id}/role", (e) => {
   $app.runInTransaction((txApp) => {
     txApp.db().newQuery("UPDATE users SET role = {:role}, tokenKey = {:tokenKey} WHERE id = {:id}").bind({ role: payload.role, tokenKey, id: targetId }).execute();
     service.audit(txApp, current.id, targetId, "USER_ROLE_CHANGED");
+    require(`${__hooks}/dashboard-statistics-service.js`).upsertSnapshot(txApp, new Date());
   });
   return e.json(200, service.userDto($app, service.findUser($app, targetId)));
 }, $apis.requireAuth("users"));

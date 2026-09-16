@@ -28,8 +28,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   render(): ReactNode {
     if (!this.state.hasError) return this.props.children;
     return (
-      <main role="alert" className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-6 text-foreground">
-        <h1 className="text-xl font-bold">{this.props.translate?.("errors.unexpected_title") ?? "Something went wrong"}</h1>
+      <main role="alert" className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-4 py-6 text-foreground">
+        <h1 className="page-title">{this.props.translate?.("errors.unexpected_title") ?? "Something went wrong"}</h1>
         <p className="text-sm text-muted-foreground">{this.props.translate?.("errors.unexpected_message") ?? "An unexpected error occurred."}</p>
         <button type="button" onClick={() => window.location.reload()} className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90">
           {this.props.translate?.("common.reload") ?? "Reload"}

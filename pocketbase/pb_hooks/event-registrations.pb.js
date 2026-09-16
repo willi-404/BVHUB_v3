@@ -13,6 +13,7 @@ routerAdd("GET", "/api/bvhub/events/{id}/registration", (e) => {
 routerAdd("POST", "/api/bvhub/events/{id}/registrations", (e) => {
   const api = require(`${__hooks}/venue-event-service.js`);
   const registrations = require(`${__hooks}/event-registration-service.js`);
+  const payments = require(`${__hooks}/payment-service.js`);
   const user = api.requireAuthenticatedReader(e);
   if (!user) throw new ForbiddenError("Zugriff nicht erlaubt");
   const event = api.event($app, api.idOf(e));
@@ -26,7 +27,11 @@ routerAdd("POST", "/api/bvhub/events/{id}/registrations", (e) => {
     const txUser = api.userRecord(txApp, user.id);
     const txVenue = api.venue(txApp, txEvent.getString("venue"));
     const current = registrations.registrationFor(txApp, txEvent, txUser);
-    if (current && ["REGISTERED", "WAITING"].includes(current.getString("status"))) { result = current; return; }
+    if (current && ["REGISTERED", "WAITING"].includes(current.getString("status"))) {
+      if (current.getString("status") === "REGISTERED") payments.ensurePaymentForRegistration(txApp, current, txUser, txEvent);
+      result = current;
+      return;
+    }
     const previousStatus = current ? current.getString("status") : null;
     const count = api.registrationCount(txApp, txEvent.id);
     const now = api.nowIso();
@@ -35,6 +40,7 @@ routerAdd("POST", "/api/bvhub/events/{id}/registrations", (e) => {
     record.set("event", txEvent.id); record.set("user", txUser.id); record.set("checkoutRegion", body.checkoutRegion); record.set("termsVersion", body.termsVersion); record.set("termsAcceptedAt", now);
     registrations.setStatus(record, status, now);
     txApp.save(record); result = record;
+    if (status === "REGISTERED") payments.ensurePaymentForRegistration(txApp, record, txUser, txEvent);
     if (!current || previousStatus === "CANCELLED") registrations.queueNotification(txApp, record, txUser, txEvent, txVenue, status === "WAITING" ? "EVENT_WAITING_LIST_JOINED" : "EVENT_REGISTRATION_CONFIRMED", now, {}, notificationIds);
   });
   registrations.deliverNotifications($app, notificationIds);
@@ -47,6 +53,14 @@ routerAdd("DELETE", "/api/bvhub/events/{id}/registrations/me", (e) => {
   const user = api.requireAuthenticatedReader(e);
   if (!user) throw new ForbiddenError("Zugriff nicht erlaubt");
   const event = api.event($app, api.idOf(e));
+  const existingRegistration = registrations.registrationFor($app, event, user);
+  if (existingRegistration && ["REGISTERED", "WAITING"].includes(existingRegistration.getString("status")) && Date.parse(event.getString("abmeldefrist")) <= Date.now()) {
+    return e.json(409, {
+      code: 409,
+      message: "Abmeldefrist ist abgelaufen",
+      data: { code: "CANCELLATION_DEADLINE_PASSED" },
+    });
+  }
   let result;
   const notificationIds = [];
   $app.runInTransaction((txApp) => {
@@ -81,6 +95,7 @@ routerAdd("GET", "/api/bvhub/events/{id}/participants", (e) => {
 routerAdd("POST", "/api/bvhub/admin/events/{id}/participants", (e) => {
   const api = require(`${__hooks}/venue-event-service.js`);
   const registrations = require(`${__hooks}/event-registration-service.js`);
+  const payments = require(`${__hooks}/payment-service.js`);
   const admin = api.requireAdminActor(e);
   if (!admin) throw new ForbiddenError("Zugriff nicht erlaubt");
   const event = api.event($app, api.idOf(e));
@@ -88,9 +103,12 @@ routerAdd("POST", "/api/bvhub/admin/events/{id}/participants", (e) => {
   if (Object.keys(body).length !== 1 || typeof body.userId !== "string") throw new BadRequestError("Ungültiger Teilnehmer");
   const target = api.userRecord($app, body.userId);
   if (!target.getBool("active") || !target.getBool("verified")) throw new ForbiddenError("Benutzer nicht aktiv");
-  if (!event.getBool("published") || ["CANCELLED", "COMPLETED"].includes(event.getString("status")) || Date.parse(event.getString("end")) <= Date.now()) throw new ApiError(409, "Event ist nicht registrierbar", {});
+  // Admin participant management is an explicit override of the public
+  // registration gates (publication state, audience, and target role). It
+  // still cannot mutate terminal or already-ended events.
+  if (["CANCELLED", "COMPLETED"].includes(event.getString("status")) || Date.parse(event.getString("end")) <= Date.now()) throw new ApiError(409, "Event ist nicht registrierbar", {});
   const venue = api.venue($app, event.getString("venue"));
-  if (!venue.getBool("active") || !venue.getString("checkoutRegion") || !api.roleCanRegister(target.getString("role"), event.getString("status"))) throw new ApiError(409, "Event ist nicht registrierbar", {});
+  if (!venue.getBool("active") || !venue.getString("checkoutRegion")) throw new ApiError(409, "Veranstaltungsort ist nicht konfiguriert", {});
   let result;
   const notificationIds = [];
   $app.runInTransaction((txApp) => {
@@ -98,13 +116,18 @@ routerAdd("POST", "/api/bvhub/admin/events/{id}/participants", (e) => {
     const txTarget = api.userRecord(txApp, target.id);
     const txVenue = api.venue(txApp, txEvent.getString("venue"));
     const current = txApp.findRecordsByFilter("event_registrations", `event = '${txEvent.id}' && user = '${txTarget.id}'`, "", 1, 0)[0] || null;
-    if (current && current.getString("status") === "REGISTERED") { result = current; return; }
+    if (current && current.getString("status") === "REGISTERED") {
+      payments.ensurePaymentForRegistration(txApp, current, txTarget, txEvent);
+      result = current;
+      return;
+    }
     if (api.registrationCount(txApp, txEvent.id) >= txEvent.getInt("capacity")) throw new ApiError(409, "Event ist ausgebucht", {});
     const registration = current || new Record(txApp.findCollectionByNameOrId("event_registrations"));
     const now = api.nowIso();
     registration.set("event", txEvent.id); registration.set("user", txTarget.id); registration.set("checkoutRegion", txVenue.getString("checkoutRegion")); registration.set("termsVersion", "ADMIN-MANUAL"); registration.set("termsAcceptedAt", now);
     registrations.setStatus(registration, "REGISTERED", now);
     txApp.save(registration); result = registration;
+    payments.ensurePaymentForRegistration(txApp, registration, txTarget, txEvent);
     registrations.queueNotification(txApp, registration, txTarget, txEvent, txVenue, "EVENT_ADMIN_ADDED", now, {}, notificationIds);
     const audit = new Record(txApp.findCollectionByNameOrId("audit_events")); audit.set("eventType", "PARTICIPANT_ADDED"); audit.set("actorUser", admin.id); audit.set("targetUser", target.id); audit.set("metadata", JSON.stringify({ eventId: txEvent.id })); txApp.save(audit);
   });
@@ -115,6 +138,7 @@ routerAdd("POST", "/api/bvhub/admin/events/{id}/participants", (e) => {
 routerAdd("DELETE", "/api/bvhub/admin/events/{id}/participants/{userId}", (e) => {
   const api = require(`${__hooks}/venue-event-service.js`);
   const registrations = require(`${__hooks}/event-registration-service.js`);
+  const payments = require(`${__hooks}/payment-service.js`);
   const admin = api.requireAdminActor(e);
   if (!admin) throw new ForbiddenError("Verwaltungszugriff nicht erlaubt");
   const event = api.event($app, api.idOf(e));
@@ -132,6 +156,7 @@ routerAdd("DELETE", "/api/bvhub/admin/events/{id}/participants/{userId}", (e) =>
     if (!current || current.getString("status") !== "REGISTERED") { result = current; return; }
     const now = api.nowIso();
     current.set("status", "CANCELLED"); current.set("cancelledAt", now); txApp.save(current); result = current;
+    payments.deactivatePaymentForRegistration(txApp, current);
     registrations.queueNotification(txApp, current, txTarget, txEvent, txVenue, "EVENT_ADMIN_REMOVED", now, {}, notificationIds);
     registrations.promoteNextWaiting(txApp, txEvent, now, notificationIds);
     const audit = new Record(txApp.findCollectionByNameOrId("audit_events")); audit.set("eventType", "PARTICIPANT_REMOVED"); audit.set("actorUser", admin.id); audit.set("targetUser", target.id); audit.set("metadata", JSON.stringify({ eventId: event.id })); txApp.save(audit);

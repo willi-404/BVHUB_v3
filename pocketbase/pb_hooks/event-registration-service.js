@@ -20,7 +20,7 @@ function queueNotification(app, registration, user, event, venue, kind, now, ext
   if (existing) return existing;
   const record = new Record(app.findCollectionByNameOrId("notification_outbox"));
   record.set("kind", kind); record.set("registration", registration.id); record.set("recipient", user.getString("email"));
-  const payload = { eventTitle: event.getString("title"), venue: venue.getString("name"), address: venue.getString("address"), start: event.getString("start"), end: event.getString("end"), displayName: user.getString("displayName") || user.getString("firstName"), locale: "de", ...(extra || {}) };
+  const payload = { eventTitle: event.getString("title"), venue: venue.getString("name"), venueDescription: venue.getString("description"), address: venue.getString("address"), start: event.getString("start"), end: event.getString("end"), displayName: user.getString("displayName") || user.getString("firstName"), locale: "de", ...(extra || {}) };
   record.set("payload", JSON.stringify(payload));
   record.set("status", "PENDING"); record.set("attempts", 1); record.set("dedupeKey", dedupeKey); record.set("nextAttemptAt", stateAt); record.set("lastError", ""); record.set("processingStartedAt", "");
   app.save(record);
@@ -41,6 +41,7 @@ function promoteNextWaiting(app, event, now, deliveryIds) {
   const user = app.findRecordById("users", waiting.getString("user"));
   const venue = app.findRecordById("venues", event.getString("venue"));
   setStatus(waiting, "REGISTERED", now); app.save(waiting);
+  require(`${__hooks}/payment-service.js`).ensurePaymentForRegistration(app, waiting, user, event);
   queueNotification(app, waiting, user, event, venue, "EVENT_WAITING_LIST_PROMOTED", now, {}, deliveryIds);
   return waiting;
 }
@@ -49,6 +50,7 @@ function cancelRegistration(app, event, user, record, now, deliveryIds) {
   const previous = record ? record.getString("status") : null;
   if (!record || !["REGISTERED", "WAITING"].includes(previous)) return { record, previous, promoted: null };
   record.set("status", "CANCELLED"); record.set("cancelledAt", now); app.save(record);
+  require(`${__hooks}/payment-service.js`).deactivatePaymentForRegistration(app, record);
   const venue = app.findRecordById("venues", event.getString("venue"));
   queueNotification(app, record, user, event, venue, previous === "WAITING" ? "EVENT_WAITING_LIST_LEFT" : "EVENT_REGISTRATION_CANCELLED", now, {}, deliveryIds);
   const promoted = previous === "REGISTERED" ? promoteNextWaiting(app, event, now, deliveryIds) : null;

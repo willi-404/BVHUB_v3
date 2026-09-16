@@ -97,8 +97,8 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
           <button onClick={onBack} aria-label={t("common.back")} className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-[var(--muted)] text-[var(--muted-foreground)] transition-colors shrink-0">
             <Icon d={ic.chevronLeft} size={18} />
           </button>
-          <div className="flex-1">
-            <h1 className="font-bold text-base text-[var(--foreground)]">{t("admin.members.title")}</h1>
+          <div className="min-w-0 flex-1">
+            <h1 className="page-title">{t("admin.members.title")}</h1>
             <p className="text-[10px] text-[var(--muted-foreground)]">{t("admin.members.count", { count: membersQuery.data?.totalItems ?? 0 })}</p>
           </div>
           <button onClick={() => setFilterOpen(true)} aria-label={t("common.filter")}

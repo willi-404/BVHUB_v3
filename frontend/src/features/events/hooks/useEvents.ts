@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect } from "react"
 import { pb } from "../../../lib/pocketbase"
-import { eventKeys, venueKeys } from "../../../lib/queryKeys"
+import { dashboardKeys, eventKeys, venueKeys } from "../../../lib/queryKeys"
 import * as api from "../api/eventsApi"
 import type { EventInput } from "../types"
 export function useEvents() {
@@ -56,6 +56,7 @@ export function useRegisterEvent() {
       void client.invalidateQueries({
         queryKey: eventKeys.participants(variables.id),
       })
+      void client.invalidateQueries({ queryKey: dashboardKeys.all })
     },
   })
 }
@@ -67,6 +68,7 @@ export function useCancelRegistration() {
       void client.invalidateQueries({ queryKey: eventKeys.all })
       void client.invalidateQueries({ queryKey: eventKeys.detail(id) })
       void client.invalidateQueries({ queryKey: eventKeys.participants(id) })
+      void client.invalidateQueries({ queryKey: dashboardKeys.all })
     },
   })
 }
@@ -87,6 +89,7 @@ export function useAddParticipant() {
       void client.invalidateQueries({
         queryKey: eventKeys.participants(variables.eventId),
       })
+      void client.invalidateQueries({ queryKey: dashboardKeys.all })
     },
   })
 }
@@ -100,6 +103,7 @@ export function useRemoveParticipant() {
       void client.invalidateQueries({
         queryKey: eventKeys.participants(variables.eventId),
       })
+      void client.invalidateQueries({ queryKey: dashboardKeys.all })
     },
   })
 }
@@ -117,7 +121,10 @@ export function useEventRealtime() {
     void pb
       .collection("events")
       .subscribe("*", () => {
-        if (active) void client.invalidateQueries({ queryKey: eventKeys.all })
+        if (active) {
+          void client.invalidateQueries({ queryKey: eventKeys.all })
+          void client.invalidateQueries({ queryKey: dashboardKeys.all })
+        }
       })
       .catch(() => undefined)
     return () => {
@@ -129,6 +136,7 @@ export function useEventRealtime() {
 function invalidate(client: ReturnType<typeof useQueryClient>) {
   void client.invalidateQueries({ queryKey: eventKeys.all })
   void client.invalidateQueries({ queryKey: venueKeys.all })
+  void client.invalidateQueries({ queryKey: dashboardKeys.all })
 }
 export function useEventMutation() {
   const client = useQueryClient()
@@ -160,6 +168,7 @@ export function useDeleteEventDraft() {
       client.removeQueries({ queryKey: eventKeys.participants(id) })
       client.removeQueries({ queryKey: [...eventKeys.detail(id), "changelog"] })
       await client.invalidateQueries({ queryKey: eventKeys.all })
+      await client.invalidateQueries({ queryKey: dashboardKeys.all })
     },
   })
 }

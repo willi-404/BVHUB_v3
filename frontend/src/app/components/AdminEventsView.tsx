@@ -20,8 +20,9 @@ import type {
   EventStatus,
   Venue,
 } from "../../features/events/types"
-import { useI18n, type MessageKey } from "../../i18n"
+import { berlinDateTimeInputToIso, formatBerlinDateTimeInput, useI18n, type MessageKey } from "../../i18n"
 import { mapPBError } from "../../lib/errorMapper"
+import { formatEuroInput, parseEuroCents } from "../../features/payments/paymentUtils"
 
 const emptyEvent = {
   title: "",
@@ -29,7 +30,9 @@ const emptyEvent = {
   venue: "",
   start: "",
   end: "",
+  abmeldefrist: "",
   capacity: 1,
+  guestFee: "3,80",
   published: false,
   status: "MEMBERS_ONLY" as EventStatus,
 }
@@ -67,9 +70,11 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
             title: event.title,
             description: event.description,
             venue: event.venue.id,
-            start: event.start.slice(0, 16),
-            end: event.end.slice(0, 16),
+            start: formatBerlinDateTimeInput(event.start),
+            end: formatBerlinDateTimeInput(event.end),
+            abmeldefrist: formatBerlinDateTimeInput(event.abmeldefrist),
             capacity: event.capacity,
+            guestFee: formatEuroInput(event.guestFeeCents),
             published: event.published,
             status: event.status,
           }
@@ -91,32 +96,40 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
     )
   }
   async function saveEvent(options: { published?: boolean } = {}) {
-    const published = options.published ?? (editingEvent ? eventForm.published : false)
-    await eventMutation.mutateAsync({
-      id: editingEvent?.id,
-      input: {
-        ...eventForm,
-        published,
-        start: new Date(eventForm.start).toISOString(),
-        end: new Date(eventForm.end).toISOString(),
-      },
-    })
-    setEventFormOpen(false)
-    setEditingEvent(null)
+    setActionError(null)
+    try {
+      const published = options.published ?? (editingEvent ? eventForm.published : false)
+      const { guestFee, ...formValues } = eventForm
+      await eventMutation.mutateAsync({
+        id: editingEvent?.id,
+        input: {
+          ...formValues,
+          guestFeeCents: parseEuroCents(guestFee),
+          published,
+          start: berlinDateTimeInputToIso(eventForm.start),
+          end: berlinDateTimeInputToIso(eventForm.end),
+          abmeldefrist: berlinDateTimeInputToIso(eventForm.abmeldefrist),
+        },
+      })
+      setEventFormOpen(false)
+      setEditingEvent(null)
+    } catch (error) {
+      setActionError(error instanceof RangeError ? "errors.invalid_request" : mapPBError(error))
+    }
   }
   async function saveVenue() {
     await venueMutation.mutateAsync({ id: editingVenue?.id, input: venueForm })
     setVenueFormOpen(false)
     setEditingVenue(null)
   }
-  const failure = eventMutation.isError || venueMutation.isError || cancelOrDelete.isError || deleteDraft.isError
+  const failure = Boolean(actionError) || eventMutation.isError || venueMutation.isError || cancelOrDelete.isError || deleteDraft.isError
 
   return (
     <div className="min-h-full bg-[var(--background)] px-4 py-5 lg:px-8">
       <div className="mx-auto max-w-6xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{t("admin.title")}</h1>
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="page-title">{t("admin.title")}</h1>
             <p className="mt-1 text-sm text-[var(--muted-foreground)]">
               {tab === "events"
                 ? t("admin.events.title")
@@ -529,7 +542,7 @@ function EventPanel({
                 ))}
             </Select>
           </label>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2">
             <label className="grid gap-1 text-sm">
               {t("start")}
               <Input
@@ -552,6 +565,11 @@ function EventPanel({
             </label>
           </div>
           <label className="grid gap-1 text-sm">
+            {t("admin.events.cancellationDeadline")}
+            <Input required type="datetime-local" value={form.abmeldefrist} max={form.start} onChange={(e) => onChange({ ...form, abmeldefrist: e.target.value })} className="h-10" />
+            <span className="text-xs text-[var(--muted-foreground)]">{t("admin.events.cancellationDeadlineHint")}</span>
+          </label>
+          <label className="grid gap-1 text-sm">
             {t("admin.events.capacity")}
             <Input
               required
@@ -564,6 +582,18 @@ function EventPanel({
               }
               className="h-10"
             />
+          </label>
+          <label className="grid gap-1 text-sm">
+            {t("admin.events.guestFee")}
+            <Input
+              required
+              inputMode="decimal"
+              pattern="[0-9]+([,.][0-9]{1,2})?"
+              value={form.guestFee}
+              onChange={(e) => onChange({ ...form, guestFee: e.target.value })}
+              className="h-10"
+            />
+            <span className="text-xs text-[var(--muted-foreground)]">{t("admin.events.guestFeeHint")}</span>
           </label>
           <label className="flex items-center gap-2 text-sm">
             <Checkbox

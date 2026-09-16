@@ -145,14 +145,14 @@ export function MemberCard({ name, memberId, activeSince, group }: MemberCardPro
       </div>
 
       {/* Top row: club name + group chip */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", position: "relative" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+      <div style={{ display: "flex", minWidth: 0, alignItems: "flex-start", justifyContent: "space-between", gap: "8px", position: "relative" }}>
+        <div style={{ display: "flex", minWidth: 0, alignItems: "center", gap: "8px" }}>
           <img
             src={logoSrc}
             alt={t("brand.logoAlt")}
             style={{ width: "36px", height: "36px", objectFit: "contain", borderRadius: "6px", background: "rgba(255,255,255,0.12)", padding: "2px" }}
           />
-          <div>
+          <div style={{ minWidth: 0 }}>
             <p style={{ fontSize: "10px", fontWeight: 600, color: cfg.textSecondary, letterSpacing: "0.04em", textTransform: "uppercase", margin: 0 }}>
               {t("brand.name")}
             </p>
@@ -185,18 +185,18 @@ export function MemberCard({ name, memberId, activeSince, group }: MemberCardPro
           <p style={{ fontSize: "10px", fontWeight: 500, color: cfg.textSecondary, letterSpacing: "0.06em", textTransform: "uppercase", margin: 0 }}>
             {t("memberCard.memberName")}
           </p>
-          <p style={{ fontSize: "16px", fontWeight: 700, color: cfg.textPrimary, margin: "2px 0 0", letterSpacing: "-0.01em" }}>
+          <p style={{ fontSize: "16px", fontWeight: 700, color: cfg.textPrimary, margin: "2px 0 0", letterSpacing: "-0.01em", overflowWrap: "anywhere" }}>
             {name}
           </p>
         </div>
 
         {/* Member ID + Active Since */}
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <p style={{ fontSize: "10px", fontWeight: 500, color: cfg.textSecondary, letterSpacing: "0.06em", textTransform: "uppercase", margin: 0 }}>
               {t("memberCard.memberId")}
             </p>
-            <p style={{ fontSize: "13px", fontWeight: 600, color: cfg.textPrimary, margin: "2px 0 0", letterSpacing: "0.06em", fontFamily: "monospace" }}>
+            <p style={{ fontSize: "13px", fontWeight: 600, color: cfg.textPrimary, margin: "2px 0 0", letterSpacing: "0.06em", fontFamily: "monospace", overflowWrap: "anywhere" }}>
               {memberId}
             </p>
           </div>

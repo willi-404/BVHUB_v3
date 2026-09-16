@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useNavigate, Link } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Badge } from "../app/components/ui/badge";
@@ -28,6 +28,10 @@ import type { ProfileDto, ProfilePatch } from "../features/profile/types";
 import { primaryNavMessageKey, type PrimaryNavTab } from "./navigationLabels";
 import { useEvents, useEventRealtime } from "../features/events/hooks/useEvents";
 import type { EventRecord } from "../features/events/types";
+import DashboardStatisticsPanel from "../features/dashboard/components/DashboardStatisticsPanel";
+import MemberQr from "../features/memberCard/components/MemberQr";
+import PaymentsView from "../features/payments/components/PaymentsView";
+import { useMyPayments, usePaymentRealtime } from "../features/payments/hooks/usePayments";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -65,6 +69,7 @@ const icons = {
   camera: "M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8",
   pencil: "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z",
   x: "M18 6 6 18M6 6l12 12",
+  menu: "M4 6h16M4 12h16M4 18h16",
 };
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
@@ -82,15 +87,6 @@ interface Event {
   registered: number;
   isRegistered: boolean;
   level: string;
-}
-
-interface Payment {
-  id: number;
-  eventTitle: string;
-  date: string;
-  time: string;
-  price: number;
-  paid: boolean;
 }
 
 const EVENTS: Event[] = [
@@ -142,12 +138,6 @@ const EVENTS: Event[] = [
     isRegistered: true,
     level: "All",
   },
-];
-
-const INITIAL_PAYMENTS: Payment[] = [
-  { id: 1, eventTitle: "Tuesday Evening Training", date: "Sep 2, 2026", time: "7:00 PM – 9:00 PM", price: 5, paid: false },
-  { id: 2, eventTitle: "Club Singles Championship", date: "Sep 6, 2026", time: "9:00 AM – 6:00 PM", price: 15, paid: false },
-  { id: 3, eventTitle: "End-of-Season Social Night", date: "Sep 14, 2026", time: "6:30 PM – 10:00 PM", price: 10, paid: true },
 ];
 
 const NEWS = [
@@ -210,6 +200,7 @@ function MemberCardOverlay({ onClose }: { onClose: () => void }) {
       <div className="flex items-center justify-between px-5 pt-12 pb-2 shrink-0">
         <button
           onClick={onClose}
+          aria-label={t("common.close")}
           className="h-9 w-9 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-colors"
         >
           <Icon d={icons.chevronLeft} size={20} />
@@ -236,21 +227,7 @@ function MemberCardOverlay({ onClose }: { onClose: () => void }) {
 
       {/* QR Code */}
       <div className="flex flex-col items-center mt-8 px-6 pb-12 shrink-0">
-        <div className="bg-white rounded-2xl p-5 flex flex-col items-center gap-3" style={{ width: "180px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(9,1fr)", gap: "2.5px", width: "110px", height: "110px" }}>
-            {Array.from({ length: 81 }).map((_, i) => {
-              const finderTL = [0,1,2,3,4,5,6,9,15,18,24,27,28,29,30,31,32,33,10,11,12,13,14,19,20,21,22,23].includes(i);
-              const finderTR = [2,3,4,5,6,7,8,11,17,20,26,29,30,31,32,33,34,35,12,13,14,15,16,21,22,23,24,25].map(x=>x+54).includes(i);
-              const finderBL = [54,55,56,57,58,59,60,63,69,72,78,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77].includes(i);
-              const seed = ((i * 1664525 + 1013904223) >>> 0) % 100;
-              const on = finderTL || finderTR || finderBL || seed < 55;
-              return (
-                <div key={i} style={{ borderRadius: "1.5px", background: on ? "#0f2d1a" : "transparent" }} />
-              );
-            })}
-          </div>
-          <p className="text-[10px] text-gray-400 font-medium text-center leading-snug">{t("profile.scanToVerify")}</p>
-        </div>
+        <MemberQr />
         <p className="text-white/35 text-[10px] mt-4 text-center">{memberId}</p>
       </div>
     </div>
@@ -288,7 +265,7 @@ function EditProfileOverlay({ onClose }: { onClose: () => void }) {
   const field = (key: keyof ProfilePatch, label: string, type = "text") => (
     <label className="flex flex-col gap-1.5" key={key}>
       <span className="text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">{label}</span>
-      <input type={type} value={String(values[key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))} className="w-full h-11 px-3 rounded-lg border border-[var(--border)] bg-[var(--card)] text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 transition-all" />
+      <input type={type} value={String(values[key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))} className="w-full h-11 min-w-0 px-3 rounded-lg border border-[var(--border)] bg-[var(--card)] text-base text-[var(--foreground)] outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 transition-[border-color,box-shadow] md:text-sm" />
     </label>
   );
 
@@ -328,9 +305,9 @@ function EditProfileOverlay({ onClose }: { onClose: () => void }) {
               { label: t("profile.role"), value: data.user.role },
               { label: t("profile.verified"), value: data.user.verified ? t("common.yes") : t("common.no") },
             ].map(({ label, value }) => (
-              <div key={label} className="flex items-center justify-between px-3 py-2.5">
+              <div key={label} className="flex min-w-0 flex-wrap items-center justify-between gap-2 px-3 py-2.5">
                 <span className="text-xs text-[var(--muted-foreground)]">{label}</span>
-                <span className="text-xs font-medium text-[var(--foreground)]">{value}</span>
+                <span className="min-w-0 break-words text-xs font-medium text-[var(--foreground)]">{value}</span>
               </div>
             ))}
           </div>
@@ -342,25 +319,6 @@ function EditProfileOverlay({ onClose }: { onClose: () => void }) {
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
-function StatBar() {
-  const { t } = useI18n();
-  return (
-    <div className="grid grid-cols-3 gap-3">
-      {[
-        { label: t("dashboard.members"), value: "148", sub: t("dashboard.thisMonthChange"), color: "var(--primary)" },
-        { label: t("dashboard.events"), value: "6", sub: t("dashboard.thisMonth"), color: "hsl(38,92%,50%)" },
-        { label: t("dashboard.registered"), value: "2", sub: t("dashboard.byYou"), color: "hsl(217,91%,60%)" },
-      ].map((stat) => (
-        <Card key={stat.label} className="text-center py-3 px-2">
-          <div className="text-2xl font-bold" style={{ color: stat.color }}>{stat.value}</div>
-          <div className="text-xs font-semibold text-[var(--foreground)] mt-0.5">{stat.label}</div>
-          <div className="text-[10px] text-[var(--muted-foreground)] mt-0.5">{stat.sub}</div>
-        </Card>
-      ))}
-    </div>
-  );
-}
-
 function QuickActions() {
   const { t, locale } = useI18n();
   const websiteLocale = locale === "zh-CN" ? "zh" : "de";
@@ -370,7 +328,7 @@ function QuickActions() {
     { label: t("dashboard.contactUs"), icon: icons.bell, color: "hsl(38,92%,50%)", bg: "hsl(38,92%,94%)", href: `https://bv-erlangen2025.de/${websiteLocale}/kontakt/` },
   ];
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div data-responsive-grid="quick-actions" className="grid grid-cols-1 gap-2 md:grid-cols-3">
       {actions.map((a) => {
         const content = (
           <div className="h-11 w-11 rounded-full flex items-center justify-center" style={{ background: a.bg, color: a.color }}>
@@ -478,47 +436,6 @@ function EventCard({ event, onToggle }: { event: Event; onToggle: (id: number) =
   );
 }
 
-function PaymentCard({ payment, onPay }: { payment: Payment; onPay: (id: number) => void }) {
-  const { t, locale } = useI18n();
-  return (
-    <Card className="overflow-hidden">
-      <div className="p-4 pb-3">
-        <div className="flex items-center gap-2 mb-2">
-          <Badge variant={payment.paid ? "success" : "destructive"}>
-            {payment.paid ? t("payments.paid") : t("payments.unpaid")}
-          </Badge>
-        </div>
-        <h3 className="font-semibold text-sm text-[var(--foreground)] leading-tight mb-2">{t(eventTitleKeys[payment.eventTitle] ?? "demo.event.social")}</h3>
-        <div className="flex flex-col gap-1 mb-3">
-          <div className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]">
-            <Icon d={icons.calendar} size={12} />
-            <span>{formatLocaleDate(payment.date, locale)}</span>
-            <span className="mx-1 opacity-30">·</span>
-            <Icon d={icons.clock} size={12} />
-            <span>{payment.time}</span>
-          </div>
-        </div>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wide font-medium">{t("payments.amount")}</p>
-            <p className="text-xl font-bold text-[var(--foreground)] mt-0.5">€{payment.price.toFixed(2)}</p>
-          </div>
-          {payment.paid ? (
-            <div className="flex items-center gap-1.5 text-emerald-600 text-sm font-semibold">
-              <Icon d={icons.check} size={16} />
-              {t("common.done")}
-            </div>
-          ) : (
-            <Button size="md" onClick={() => onPay(payment.id)} className="px-5">
-              {t("payments.payNow")}
-            </Button>
-          )}
-        </div>
-      </div>
-    </Card>
-  );
-}
-
 function ActivityFeed() {
   const { t } = useI18n();
   const iconMap: Record<string, string> = { check: icons.check, shield: icons.shield, trophy: icons.trophy };
@@ -555,12 +472,12 @@ function DashboardView({ events, liveEvents, onToggle, onOpenCard, profile }: { 
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs text-[var(--muted-foreground)]">{t("dashboard.welcome")}</p>
-          <h1 className="text-xl font-bold text-[var(--foreground)]">{displayName}</h1>
+          <h1 id="view-title-dashboard" tabIndex={-1} className="page-title text-[var(--foreground)]">{displayName}</h1>
         </div>
         <div className="flex items-center gap-2">
-          <button className="relative h-9 w-9 rounded-full flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
+          <button aria-label={t("common.notifications")} className="relative flex h-11 w-11 items-center justify-center rounded-full text-[var(--muted-foreground)] transition-colors hover:bg-[var(--muted)]">
             <Icon d={icons.bell} size={18} />
             <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 border-2 border-[var(--background)]" />
           </button>
@@ -576,7 +493,7 @@ function DashboardView({ events, liveEvents, onToggle, onOpenCard, profile }: { 
         </p>
       </button>
 
-      <StatBar />
+      <DashboardStatisticsPanel />
 
       <div>
         <h2 className="text-sm font-semibold text-[var(--foreground)] mb-3">{t("dashboard.quickActions")}</h2>
@@ -612,7 +529,7 @@ function EventsView({ events, loading, error }: { events: EventRecord[]; loading
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-xl font-bold text-[var(--foreground)]">{t("events.title")}</h1>
+        <h1 id="view-title-events" tabIndex={-1} className="page-title text-[var(--foreground)]">{t("events.title")}</h1>
         <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{t("events.subtitle")}</p>
       </div>
       {loading && <p className="text-sm text-[var(--muted-foreground)]">{t("common.loading")}</p>}
@@ -625,33 +542,10 @@ function EventsView({ events, loading, error }: { events: EventRecord[]; loading
 function LiveEventCards({ events }: { events: EventRecord[] }) {
   const { t, locale } = useI18n();
   if (!events.length) return <p className="text-sm text-[var(--muted-foreground)]">{t("events.empty")}</p>;
-  return <div className="flex max-h-[min(62vh,44rem)] flex-col gap-3 overflow-y-auto pr-1">{events.map((event) => <Card key={event.id} className="p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="font-bold text-[var(--foreground)]">{event.title}</h3><p className="mt-1 text-xs text-[var(--muted-foreground)]">{event.venue.name}</p></div><Badge variant={event.status === "CANCELLED" || event.status === "COMPLETED" ? "destructive" : "success"}>{t(`events.status.${event.status}` as MessageKey)}</Badge></div><div className="mt-3 grid gap-1 text-xs text-[var(--muted-foreground)] sm:grid-cols-2"><span>{formatLocaleDateTime(event.start, locale)} - {formatLocaleDateTime(event.end, locale)}</span><span>{t("events.capacity")}: {event.registeredCount}/{event.capacity} ({event.spotsLeft} {t("events.spotsLeftLabel")})</span></div><Link className="mt-3 inline-flex text-xs font-semibold text-[var(--primary)] underline" to={`/events/${encodeURIComponent(event.id)}`}>{t("events.details")}</Link></Card>)}</div>;
+  return <div className="flex max-h-[min(62vh,44rem)] flex-col gap-3 overflow-y-auto pr-1">{events.map((event) => <Card key={event.id} className="p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="break-words font-bold text-[var(--foreground)]">{event.title}</h3><p className="mt-1 break-words text-xs text-[var(--muted-foreground)]">{event.venue.name}</p></div><Badge variant={event.status === "CANCELLED" || event.status === "COMPLETED" ? "destructive" : "success"}>{t(`events.status.${event.status}` as MessageKey)}</Badge></div><div className="mt-3 grid gap-1 text-xs text-[var(--muted-foreground)] md:grid-cols-2"><span>{formatLocaleDateTime(event.start, locale)} - {formatLocaleDateTime(event.end, locale)}</span><span>{t("events.capacity")}: {event.registeredCount}/{event.capacity} ({event.spotsLeft} {t("events.spotsLeftLabel")})</span></div><Link className="mt-3 inline-flex text-xs font-semibold text-[var(--primary)] underline" to={`/events/${encodeURIComponent(event.id)}`}>{t("events.details")}</Link></Card>)}</div>;
 }
 
-function PaymentsView({ payments, onPay }: { payments: Payment[]; onPay: (id: number) => void }) {
-  const { t } = useI18n();
-  return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-xl font-bold text-[var(--foreground)]">{t("payments.title")}</h1>
-        <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{t("payments.subtitle")}</p>
-      </div>
-      {payments.length === 0 ? (
-        <div className="flex flex-col items-center py-16 text-[var(--muted-foreground)]">
-          <Icon d={icons.creditCard} size={32} />
-          <p className="text-sm mt-3 font-medium">{t("payments.empty")}</p>
-          <p className="text-xs mt-1">{t("payments.emptyHint")}</p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {payments.map((p) => <PaymentCard key={p.id} payment={p} onPay={onPay} />)}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function AdminDrawer({ onClose, onAdminMembers, onAdminPayments, onAdminEvents }: { onClose: () => void; onAdminMembers: () => void; onAdminPayments: () => void; onAdminEvents: () => void }) {
+function AdminDrawer({ onClose, onAdminMembers, onAdminPayments, onAdminEvents, onAdminScanner }: { onClose: () => void; onAdminMembers: () => void; onAdminPayments: () => void; onAdminEvents: () => void; onAdminScanner: () => void }) {
   const { t } = useI18n();
   return (
     <>
@@ -675,7 +569,7 @@ function AdminDrawer({ onClose, onAdminMembers, onAdminPayments, onAdminEvents }
             <Icon d={icons.shieldAdmin} size={14} />
           </div>
           <span className="text-sm font-bold text-[var(--foreground)]">{t("admin.area")}</span>
-          <button onClick={onClose} className="ml-auto text-[var(--muted-foreground)] hover:text-[var(--foreground)] h-8 w-8 flex items-center justify-center rounded-full hover:bg-[var(--muted)]">
+          <button onClick={onClose} aria-label={t("common.close")} className="ml-auto text-[var(--muted-foreground)] hover:text-[var(--foreground)] h-8 w-8 flex items-center justify-center rounded-full hover:bg-[var(--muted)]">
             <Icon d={icons.x} size={16} />
           </button>
         </div>
@@ -685,13 +579,13 @@ function AdminDrawer({ onClose, onAdminMembers, onAdminPayments, onAdminEvents }
           {ADMIN_ITEMS.map((item) => (
             <button
               key={item.label}
-              onClick={() => { onClose(); if (item.label === "Members") onAdminMembers(); else if (item.label === "Payments") onAdminPayments(); else if (item.label === "Event Manage") onAdminEvents(); }}
+              onClick={() => { onClose(); if (item.label === "Members") onAdminMembers(); else if (item.label === "Payments") onAdminPayments(); else if (item.label === "Event Manage") onAdminEvents(); else onAdminScanner(); }}
               className="flex items-center gap-3 px-4 py-3.5 rounded-lg bg-amber-50 border border-amber-100 text-amber-800 font-medium text-sm hover:bg-amber-100 active:scale-[0.98] transition-all w-full"
             >
               <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700 shrink-0">
                 <Icon d={item.icon} size={17} />
               </div>
-              {t(item.label === "Members" ? "admin.members.title" : item.label === "Payments" ? "admin.payments.title" : "admin.events.title")}
+              {t(item.label === "Members" ? "admin.members.title" : item.label === "Payments" ? "admin.payments.title" : item.label === "Event Manage" ? "admin.events.title" : "admin.scanMemberCard")}
               <Icon d={icons.chevronRight} size={14} className="ml-auto text-amber-500" />
             </button>
           ))}
@@ -701,11 +595,11 @@ function AdminDrawer({ onClose, onAdminMembers, onAdminPayments, onAdminEvents }
   );
 }
 
-function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, onAdminPayments, onAdminEvents, canAccessAdmin }: { profile: ProfileDto | null; onEditProfile: () => void; onLogout: () => void; onAdminMembers: () => void; onAdminPayments: () => void; onAdminEvents: () => void; canAccessAdmin: boolean }) {
+function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, onAdminPayments, onAdminEvents, onAdminScanner, canAccessAdmin }: { profile: ProfileDto | null; onEditProfile: () => void; onLogout: () => void; onAdminMembers: () => void; onAdminPayments: () => void; onAdminEvents: () => void; onAdminScanner: () => void; canAccessAdmin: boolean }) {
   const { t, locale } = useI18n();
   const [adminOpen, setAdminOpen] = useState(false);
 
-  if (!profile) return <div className="flex flex-col gap-4"><Card><CardContent className="p-5"><h1 className="text-lg font-bold">{t("profile.title")}</h1><p className="text-sm text-[var(--muted-foreground)] mt-2">{t("profile.incompleteDetails")}</p><Button className="mt-4" onClick={onEditProfile}>{t("profile.edit")}</Button></CardContent></Card><Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 gap-2" onClick={onLogout}><Icon d={icons.logout} size={15} /> {t("auth.signOut")}</Button></div>;
+  if (!profile) return <div className="flex flex-col gap-4"><Card><CardContent className="p-5"><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p className="text-sm text-[var(--muted-foreground)] mt-2">{t("profile.incompleteDetails")}</p><Button className="mt-4" onClick={onEditProfile}>{t("profile.edit")}</Button></CardContent></Card><Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 gap-2" onClick={onLogout}><Icon d={icons.logout} size={15} /> {t("auth.signOut")}</Button></div>;
   const initials = `${profile.user.firstName[0] || ""}${profile.user.lastName[0] || ""}`.toUpperCase() || "?";
   const address = profile.profile ? `${profile.profile.street} ${profile.profile.houseNumber}, ${profile.profile.postalCode} ${profile.profile.city}` : t("profile.incomplete");
   const localizedBirthDate = profile.profile?.birthDate ? formatLocaleDate(`${profile.profile.birthDate}T12:00:00Z`, locale) : "-";
@@ -714,12 +608,12 @@ function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, onAdmin
     <div className="flex flex-col gap-4">
       <div className="flex flex-col items-center pt-4 pb-2">
         <Avatar fallback={initials} size="lg" className="h-16 w-16 text-lg mb-3" />
-        <h1 className="text-lg font-bold">{profile.user.displayName}</h1>
-        <p className="text-xs text-[var(--muted-foreground)]">{profile.user.email}</p>
+        <h1 id="view-title-profile" tabIndex={-1} className="page-title max-w-full break-words text-center">{profile.user.displayName}</h1>
+        <p className="max-w-full break-words text-center text-xs text-[var(--muted-foreground)]">{profile.user.email}</p>
         <Badge variant={profile.user.active ? "success" : "outline"} className="mt-2">{profile.user.role === "SUPER_ADMIN" ? t("roles.superAdmin") : profile.user.role === "ADMIN" ? t("roles.admin") : profile.user.role === "MEMBER" ? t("roles.member") : t("roles.guest")}</Badge>
       </div>
 
-      <Card><CardContent className="p-4 flex flex-col gap-2 text-sm"><div><span className="text-[var(--muted-foreground)]">{t("profile.name")}: </span>{profile.user.firstName} {profile.user.lastName}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.address")}: </span>{address}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.birthDate")}: </span>{localizedBirthDate}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.phone")}: </span>{profile.profile?.phone || "-"}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.contactInfo")}: </span>{profile.profile?.contactInfo || "-"}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.groups")}: </span>{profile.groups.length ? profile.groups.map((group) => group.name).join(", ") : "-"}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.userId")}: </span>{profile.user.id}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.status")}: </span>{profile.user.active ? t("profile.active") : t("profile.inactive")} / {profile.user.verified ? t("profile.verified") : t("profile.unverified")}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.createdAt")}: </span>{profile.user.created}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.updatedAt")}: </span>{profile.user.updated}</div></CardContent></Card>
+      <Card><CardContent className="flex min-w-0 flex-col gap-2 break-words p-4 text-sm"><div><span className="text-[var(--muted-foreground)]">{t("profile.name")}: </span>{profile.user.firstName} {profile.user.lastName}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.address")}: </span>{address}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.birthDate")}: </span>{localizedBirthDate}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.phone")}: </span>{profile.profile?.phone || "-"}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.contactInfo")}: </span>{profile.profile?.contactInfo || "-"}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.groups")}: </span>{profile.groups.length ? profile.groups.map((group) => group.name).join(", ") : "-"}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.userId")}: </span>{profile.user.id}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.status")}: </span>{profile.user.active ? t("profile.active") : t("profile.inactive")} / {profile.user.verified ? t("profile.verified") : t("profile.unverified")}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.createdAt")}: </span>{profile.user.created}</div><div><span className="text-[var(--muted-foreground)]">{t("profile.updatedAt")}: </span>{profile.user.updated}</div></CardContent></Card>
 
       <Card>
         <CardContent className="p-0">
@@ -754,7 +648,7 @@ function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, onAdmin
         <Icon d={icons.logout} size={15} /> {t("auth.signOut")}
       </Button>
 
-      {adminOpen && <AdminDrawer onClose={() => setAdminOpen(false)} onAdminMembers={() => { setAdminOpen(false); onAdminMembers(); }} onAdminPayments={() => { setAdminOpen(false); onAdminPayments(); }} onAdminEvents={() => { setAdminOpen(false); onAdminEvents(); }} />}
+      {adminOpen && <AdminDrawer onClose={() => setAdminOpen(false)} onAdminMembers={() => { setAdminOpen(false); onAdminMembers(); }} onAdminPayments={() => { setAdminOpen(false); onAdminPayments(); }} onAdminEvents={() => { setAdminOpen(false); onAdminEvents(); }} onAdminScanner={() => { setAdminOpen(false); onAdminScanner(); }} />}
     </div>
   );
 }
@@ -765,6 +659,7 @@ const ADMIN_ITEMS = [
   { label: "Members", icon: icons.usersAdmin },
   { label: "Payments", icon: icons.creditCard },
   { label: "Event Manage", icon: icons.clipboardList },
+  { label: "Scan Member Card", icon: icons.qrCode },
 ];
 
 const NAV_ITEMS: Array<{ key: NavTab; label: string; icon: string }> = [
@@ -785,7 +680,7 @@ function BottomNav({
 }) {
   const { t } = useI18n();
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-[var(--card)] border-t border-[var(--border)] flex lg:hidden">
+    <nav aria-label={t("navigation.primary")} className="fixed bottom-0 left-0 right-0 z-50 hidden border-t border-[var(--border)] bg-[var(--card)] md:flex lg:hidden">
       {NAV_ITEMS.map((item) => {
         const isActive = active === item.key;
         const showDot = item.key === "payments" && unpaidCount > 0;
@@ -811,6 +706,204 @@ function BottomNav({
   );
 }
 
+const FOCUSABLE_DRAWER_ELEMENTS = [
+  "button:not([disabled])",
+  "a[href]",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(",");
+
+function MobileNavigationDrawer({
+  open,
+  onOpenChange,
+  active,
+  onSelect,
+  unpaidCount,
+  canAccessAdmin,
+  onAdminMembers,
+  onAdminPayments,
+  onAdminEvents,
+  onAdminScanner,
+  onLogout,
+  triggerRef,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  active: NavTab;
+  onSelect: (tab: NavTab) => void;
+  unpaidCount: number;
+  canAccessAdmin: boolean;
+  onAdminMembers: () => void;
+  onAdminPayments: () => void;
+  onAdminEvents: () => void;
+  onAdminScanner: () => void;
+  onLogout: () => void;
+  triggerRef: RefObject<HTMLButtonElement | null>;
+}) {
+  const { t } = useI18n();
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const wasOpen = useRef(false);
+
+  useEffect(() => {
+    if (!open) {
+      if (wasOpen.current) triggerRef.current?.focus();
+      wasOpen.current = false;
+      return;
+    }
+
+    wasOpen.current = true;
+    const scrollY = window.scrollY;
+    const previous = {
+      overflow: document.body.style.overflow,
+      position: document.body.style.position,
+      top: document.body.style.top,
+      width: document.body.style.width,
+    };
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+
+    const frame = window.requestAnimationFrame(() => {
+      const focusable = drawerRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_DRAWER_ELEMENTS);
+      focusable?.[0]?.focus();
+    });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onOpenChange(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(drawerRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_DRAWER_ELEMENTS) ?? []);
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previous.overflow;
+      document.body.style.position = previous.position;
+      document.body.style.top = previous.top;
+      document.body.style.width = previous.width;
+      window.scrollTo({ top: scrollY, behavior: "instant" });
+    };
+  }, [onOpenChange, open, triggerRef]);
+
+  const runAdminAction = (action: () => void) => {
+    onOpenChange(false);
+    action();
+  };
+
+  return (
+    <div className="md:hidden">
+      <div
+        aria-hidden="true"
+        className="mobile-drawer-backdrop fixed inset-0 z-[70] bg-black/45"
+        data-open={open}
+        onClick={() => onOpenChange(false)}
+      />
+      <div
+        ref={drawerRef}
+        id="mobile-navigation-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="mobile-navigation-title"
+        aria-hidden={!open}
+        inert={!open}
+        data-open={open}
+        className="mobile-drawer-panel fixed inset-y-0 right-0 z-[71] flex w-[min(88vw,22rem)] max-w-full flex-col overscroll-contain border-l border-[var(--border)] bg-[var(--card)] shadow-2xl"
+      >
+        <div className="flex min-h-16 items-center justify-between gap-3 border-b border-[var(--border)] px-4">
+          <h2 id="mobile-navigation-title" className="text-base font-bold text-[var(--foreground)]">
+            {t("navigation.menu")}
+          </h2>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            aria-label={t("common.close")}
+            className="flex size-11 items-center justify-center rounded-lg text-[var(--muted-foreground)] transition-colors hover:bg-[var(--muted)] hover:text-[var(--foreground)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
+          >
+            <Icon d={icons.x} size={20} />
+          </button>
+        </div>
+
+        <nav aria-label={t("navigation.primary")} className="flex flex-1 flex-col gap-1 overflow-y-auto p-4">
+          {NAV_ITEMS.map((item) => {
+            const isActive = active === item.key;
+            const showCount = item.key === "payments" && unpaidCount > 0;
+            return (
+              <button
+                key={item.key}
+                type="button"
+                aria-current={isActive ? "page" : undefined}
+                onClick={() => onSelect(item.key)}
+                className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] ${isActive ? "bg-[var(--secondary)] text-[var(--primary)]" : "text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"}`}
+              >
+                <Icon d={item.icon} size={18} />
+                <span className="min-w-0 flex-1 break-words">{t(primaryNavMessageKey(item.key))}</span>
+                {showCount && (
+                  <span className="flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+                    {unpaidCount}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+
+          {canAccessAdmin && (
+            <div className="mt-4 border-t border-[var(--border)] pt-4">
+              <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+                {t("admin.management")}
+              </p>
+              {ADMIN_ITEMS.map((item) => {
+                const action = item.label === "Members" ? onAdminMembers : item.label === "Payments" ? onAdminPayments : item.label === "Event Manage" ? onAdminEvents : onAdminScanner;
+                return (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={() => runAdminAction(action)}
+                    className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-[var(--muted-foreground)] transition-colors hover:bg-amber-50 hover:text-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
+                  >
+                    <Icon d={item.icon} size={18} />
+                    <span className="min-w-0 flex-1 break-words">
+                      {t(item.label === "Members" ? "admin.members.title" : item.label === "Payments" ? "admin.payments.title" : item.label === "Event Manage" ? "admin.events.title" : "admin.scanMemberCard")}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </nav>
+
+        <div className="border-t border-[var(--border)] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          <button
+            type="button"
+            onClick={() => runAdminAction(onLogout)}
+            className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
+          >
+            <Icon d={icons.logout} size={18} />
+            {t("auth.signOut")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Sidebar({
   active,
   onChange,
@@ -819,6 +912,7 @@ function Sidebar({
   onAdminMembers,
   onAdminPayments,
   onAdminEvents,
+  onAdminScanner,
   canAccessAdmin,
   profile,
 }: {
@@ -829,6 +923,7 @@ function Sidebar({
   onAdminMembers: () => void;
   onAdminPayments: () => void;
   onAdminEvents: () => void;
+  onAdminScanner: () => void;
   canAccessAdmin: boolean;
   profile: ProfileDto | null;
 }) {
@@ -860,7 +955,7 @@ function Sidebar({
             <p className="text-[10px] text-[var(--muted-foreground)]">{role}</p>
             <div className="text-[10px] text-[var(--muted-foreground)]/75 leading-tight">{groups.length ? groups.map((group) => <p key={group} className="truncate">{group}</p>) : <p>-</p>}</div>
           </div>
-          <button className="ml-auto text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
+          <button aria-label={t("common.notifications")} className="ml-auto text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
             <Icon d={icons.bell} size={16} />
           </button>
         </div>
@@ -902,11 +997,11 @@ function Sidebar({
         {ADMIN_ITEMS.map((item) => (
           <button
             key={item.label}
-            onClick={item.label === "Members" ? onAdminMembers : item.label === "Payments" ? onAdminPayments : item.label === "Event Manage" ? onAdminEvents : undefined}
+            onClick={item.label === "Members" ? onAdminMembers : item.label === "Payments" ? onAdminPayments : item.label === "Event Manage" ? onAdminEvents : onAdminScanner}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium w-full text-[var(--muted-foreground)] hover:bg-amber-50 hover:text-amber-700 transition-all duration-150"
           >
             <Icon d={item.icon} size={17} />
-            {t(item.label === "Members" ? "admin.members.title" : item.label === "Payments" ? "admin.payments.title" : "admin.events.title")}
+            {t(item.label === "Members" ? "admin.members.title" : item.label === "Payments" ? "admin.payments.title" : item.label === "Event Manage" ? "admin.events.title" : "admin.scanMemberCard")}
           </button>
         ))}
       </div>}
@@ -925,30 +1020,31 @@ function Sidebar({
 // ─── AppShell (dashboard without login gate, used by FramePreview) ────────────
 
 export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: NavTab; onLogout?: () => void }) {
+  const navigate = useNavigate();
   const { logout: authLogout } = useAuth();
   const { data: user } = useAuthUser();
   const { t } = useI18n();
   const liveEvents = useEvents();
   useEventRealtime();
+  usePaymentRealtime();
+  const myPayments = useMyPayments();
   const { data: profile, isLoading: profileLoading, isError: profileError, refetch: refetchProfile } = useMyProfile();
   const canAccessAdmin = isAdminRole(user?.role);
   const [tab, setTab] = useState<NavTab>(initialTab);
   const [events, setEvents] = useState<Event[]>(EVENTS);
-  const [payments, setPayments] = useState<Payment[]>(INITIAL_PAYMENTS);
   const [cardOpen, setCardOpen] = useState(false);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [adminView, setAdminView] = useState<"members" | "payments" | "events" | null>(null);
+  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
+  const mobileNavigationTrigger = useRef<HTMLButtonElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
 
-  const unpaidCount = payments.filter((p) => !p.paid).length;
+  const unpaidCount = myPayments.data?.filter((payment) => payment.status === "UNPAID").length ?? 0;
 
   function toggleRegistration(id: number) {
     setEvents((prev) =>
       prev.map((e) => e.id === id ? { ...e, isRegistered: !e.isRegistered, registered: e.isRegistered ? e.registered - 1 : e.registered + 1 } : e)
     );
-  }
-
-  function handlePay(id: number) {
-    setPayments((prev) => prev.map((p) => p.id === id ? { ...p, paid: true } : p));
   }
 
   const tabLabel: Record<NavTab, string> = {
@@ -960,6 +1056,20 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
 
   const logout = onLogout ?? authLogout;
 
+  function selectFromMobileNavigation(nextTab: NavTab) {
+    setTab(nextTab);
+    setMobileNavigationOpen(false);
+    window.requestAnimationFrame(() => {
+      const target = document.getElementById(`app-view-${nextTab}`);
+      const heading = document.getElementById(`view-title-${nextTab}`);
+      (heading ?? target)?.focus({ preventScroll: true });
+      target?.scrollIntoView({
+        block: "start",
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      });
+    });
+  }
+
   function renderView() {
     switch (tab) {
       case "dashboard":
@@ -967,24 +1077,25 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
       case "events":
         return <EventsView events={liveEvents.data ?? []} loading={liveEvents.isPending} error={liveEvents.isError} />;
       case "payments":
-        return <PaymentsView payments={payments} onPay={handlePay} />;
+        return <PaymentsView />;
       case "profile":
-        if (profileLoading) return <div className="text-sm text-[var(--muted-foreground)]">{t("profile.loading")}</div>;
-        if (profileError) return <Card><CardContent className="p-5"><p role="alert" className="text-sm text-red-600">{t("profile.loadError")}</p><Button className="mt-4" onClick={() => void refetchProfile()}>{t("common.retry")}</Button></CardContent></Card>;
-        return <ProfileView profile={profile || null} onEditProfile={() => setEditProfileOpen(true)} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} canAccessAdmin={canAccessAdmin} />;
+        if (profileLoading) return <div><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p className="mt-2 text-sm text-[var(--muted-foreground)]">{t("profile.loading")}</p></div>;
+        if (profileError) return <Card><CardContent className="p-5"><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p role="alert" className="mt-2 text-sm text-red-600">{t("profile.loadError")}</p><Button className="mt-4" onClick={() => void refetchProfile()}>{t("common.retry")}</Button></CardContent></Card>;
+        return <ProfileView profile={profile || null} onEditProfile={() => setEditProfileOpen(true)} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} onAdminScanner={() => navigate("/admin/member-card-scanner")} canAccessAdmin={canAccessAdmin} />;
     }
   }
 
   return (
-    <div className="h-full flex bg-[var(--background)]" style={{ fontFamily: "var(--font-sans)" }}>
-      <Sidebar active={tab} onChange={setTab} unpaidCount={unpaidCount} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} canAccessAdmin={canAccessAdmin} profile={profile || null} />
+    <div className="relative h-full bg-[var(--background)]" style={{ fontFamily: "var(--font-sans)" }}>
+      <div className="app-shell-background flex h-full" data-drawer-open={mobileNavigationOpen} inert={mobileNavigationOpen ? true : undefined}>
+        <Sidebar active={tab} onChange={setTab} unpaidCount={unpaidCount} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} onAdminScanner={() => navigate("/admin/member-card-scanner")} canAccessAdmin={canAccessAdmin} profile={profile || null} />
 
-      <main className="min-w-0 w-full max-w-full flex-1 overflow-x-hidden overflow-y-auto">
+        <main ref={mainRef} id="app-main-content" className="min-w-0 w-full max-w-full flex-1 overflow-x-hidden overflow-y-auto">
         <div className="hidden lg:flex items-center justify-between px-8 py-5 border-b border-[var(--border)] bg-[var(--card)] sticky top-0 z-10">
-          <h1 className="text-base font-semibold text-[var(--foreground)]">{tabLabel[tab]}</h1>
+          <span className="text-base font-semibold text-[var(--foreground)]">{tabLabel[tab]}</span>
           <div className="flex items-center gap-3">
             <LanguageSwitcher className="text-[var(--foreground)]" />
-            <button className="relative h-9 w-9 rounded-full flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
+            <button aria-label={t("common.notifications")} className="relative h-10 w-10 rounded-full flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
               <Icon d={icons.bell} size={18} />
               <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 border-2 border-[var(--card)]" />
             </button>
@@ -992,19 +1103,38 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
           </div>
         </div>
 
-        <div className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--card)] sticky top-0 z-10">
+        <div className="sticky top-0 z-10 flex min-h-16 items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--card)] px-4 md:hidden">
+          <span className="text-sm font-semibold text-[var(--foreground)]">{tabLabel[tab]}</span>
+          <div className="flex shrink-0 items-center gap-1">
+            <LanguageSwitcher className="text-[var(--foreground)]" />
+            <button
+              ref={mobileNavigationTrigger}
+              type="button"
+              aria-label={t("navigation.openMenu")}
+              aria-expanded={mobileNavigationOpen}
+              aria-controls="mobile-navigation-drawer"
+              onClick={() => setMobileNavigationOpen(true)}
+              className="flex size-11 items-center justify-center rounded-lg text-[var(--foreground)] transition-colors hover:bg-[var(--muted)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
+            >
+              <Icon d={icons.menu} size={22} />
+            </button>
+          </div>
+        </div>
+        <div className="sticky top-0 z-10 hidden items-center justify-between border-b border-[var(--border)] bg-[var(--card)] px-4 py-3 md:flex lg:hidden">
           <span className="text-sm font-semibold text-[var(--foreground)]">{tabLabel[tab]}</span>
           <LanguageSwitcher className="text-[var(--foreground)]" />
         </div>
         <div className="min-w-0 w-full max-w-2xl px-4 py-5 pb-24 lg:max-w-none lg:px-8 lg:py-7 lg:pb-8">
-          {renderView()}
+          <section id={`app-view-${tab}`} tabIndex={-1} aria-label={tabLabel[tab]} className="min-w-0 scroll-mt-20">
+            {renderView()}
+          </section>
         </div>
-      </main>
+        </main>
 
-      <BottomNav active={tab} onChange={setTab} unpaidCount={unpaidCount} />
+        <BottomNav active={tab} onChange={setTab} unpaidCount={unpaidCount} />
 
-      {cardOpen && <MemberCardOverlay onClose={() => setCardOpen(false)} />}
-      {editProfileOpen && <EditProfileOverlay onClose={() => setEditProfileOpen(false)} />}
+        {cardOpen && <MemberCardOverlay onClose={() => setCardOpen(false)} />}
+        {editProfileOpen && <EditProfileOverlay onClose={() => setEditProfileOpen(false)} />}
 
       {/* Admin overlays */}
       {canAccessAdmin && adminView === "members" && (
@@ -1017,11 +1147,27 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
           <AdminPaymentsView onBack={() => setAdminView(null)} />
         </div>
       )}
-      {canAccessAdmin && adminView === "events" && (
+        {canAccessAdmin && adminView === "events" && (
         <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "var(--background)", display: "flex", flexDirection: "column" }}>
           <AdminEventManageView onBack={() => setAdminView(null)} />
         </div>
       )}
+      </div>
+
+      <MobileNavigationDrawer
+        open={mobileNavigationOpen}
+        onOpenChange={setMobileNavigationOpen}
+        active={tab}
+        onSelect={selectFromMobileNavigation}
+        unpaidCount={unpaidCount}
+        canAccessAdmin={canAccessAdmin}
+        onAdminMembers={() => setAdminView("members")}
+        onAdminPayments={() => setAdminView("payments")}
+        onAdminEvents={() => setAdminView("events")}
+        onAdminScanner={() => navigate("/admin/member-card-scanner")}
+        onLogout={logout}
+        triggerRef={mobileNavigationTrigger}
+      />
     </div>
   );
 }
@@ -1031,7 +1177,7 @@ function AdminRoutePage({ kind }: { kind: "members" | "payments" | "events" }) {
   const onBack = () => navigate("/");
 
   return (
-    <div className="min-h-full bg-[var(--background)]">
+    <div className="flex min-h-screen flex-col overflow-hidden bg-[var(--background)]">
       {kind === "members" && <AdminMembersView onBack={onBack} />}
       {kind === "payments" && <AdminPaymentsView onBack={onBack} />}
       {kind === "events" && <AdminEventManageView onBack={onBack} />}

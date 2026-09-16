@@ -20,7 +20,9 @@ import {
 } from "../features/events/hooks/useEvents"
 import { useMembers } from "../features/members/hooks/useMembers"
 import type { EventStatus } from "../features/events/types"
-import { formatLocaleDateTime, useI18n, type MessageKey } from "../i18n"
+import { berlinDateTimeInputToIso, formatBerlinDateTimeInput, formatLocaleDateTime, useI18n, type MessageKey } from "../i18n"
+import { mapPBError } from "../lib/errorMapper"
+import { formatEuroInput, parseEuroCents } from "../features/payments/paymentUtils"
 
 type Form = {
   title: string
@@ -28,28 +30,11 @@ type Form = {
   venue: string
   start: string
   end: string
+  abmeldefrist: string
   capacity: number
+  guestFee: string
   status: EventStatus
   published: boolean
-}
-const toLocalInput = (value: string) => {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ""
-  const parts = new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "Europe/Berlin",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  })
-    .formatToParts(date)
-    .reduce<Record<string, string>>((out, part) => {
-      out[part.type] = part.value
-      return out
-    }, {})
-  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`
 }
 const empty: Form = {
   title: "",
@@ -57,7 +42,9 @@ const empty: Form = {
   venue: "",
   start: "",
   end: "",
+  abmeldefrist: "",
   capacity: 1,
+  guestFee: "3,80",
   status: "MEMBERS_ONLY",
   published: false,
 }
@@ -74,6 +61,7 @@ export default function AdminEventDetailPage() {
   const deleteMutation = useDeleteEventDraft()
   const changelog = useEventChangelog(eventId)
   const [form, setForm] = useState<Form>(empty)
+  const [formError, setFormError] = useState<string | null>(null)
   const event = events.data?.find((item) => item.id === eventId)
   useEffect(() => {
     if (event)
@@ -81,18 +69,20 @@ export default function AdminEventDetailPage() {
         title: event.title,
         description: event.description,
         venue: event.venue.id,
-        start: toLocalInput(event.start),
-        end: toLocalInput(event.end),
+        start: formatBerlinDateTimeInput(event.start),
+        end: formatBerlinDateTimeInput(event.end),
+        abmeldefrist: formatBerlinDateTimeInput(event.abmeldefrist),
         capacity: event.capacity,
+        guestFee: formatEuroInput(event.guestFeeCents),
         status: event.status,
         published: event.published,
       })
   }, [event])
   if (events.isPending && !event)
-    return <div className="p-6">{t("common.loading")}</div>
+    return <div className="px-4 py-6">{t("common.loading")}</div>
   if (events.isError || !event)
     return (
-      <div className="p-6">
+      <div className="px-4 py-6">
         <p role="alert" className="text-sm text-red-700">
           {t("events.notFound")}
         </p>
@@ -102,19 +92,23 @@ export default function AdminEventDetailPage() {
       </div>
     )
   const save = async (publish = form.published) => {
+    setFormError(null)
     try {
+      const { guestFee, ...formValues } = form
       await mutation.mutateAsync({
         id: event.id,
         input: {
-          ...form,
+          ...formValues,
+          guestFeeCents: parseEuroCents(guestFee),
           published: publish,
-          start: new Date(form.start).toISOString(),
-          end: new Date(form.end).toISOString(),
+          start: berlinDateTimeInputToIso(form.start),
+          end: berlinDateTimeInputToIso(form.end),
+          abmeldefrist: berlinDateTimeInputToIso(form.abmeldefrist),
         },
       })
       navigate("/dashboard")
-    } catch {
-      /* mutation state renders the error */
+    } catch (error) {
+      setFormError(error instanceof RangeError ? "errors.invalid_request" : mapPBError(error))
     }
   }
   const selectedVenue = venues.data?.find((venue) => venue.id === form.venue)
@@ -130,20 +124,20 @@ export default function AdminEventDetailPage() {
           {t("common.back")}
         </Link>
         <Card className="mt-4 p-5 lg:p-8">
-          <div className="flex items-center justify-between gap-3">
-            <h1 className="text-2xl font-bold">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+            <h1 className="page-title min-w-0 break-words">
               {t("common.edit")}: {event.title}
             </h1>
             <span className="text-xs">
               {t(`events.status.${form.status}` as MessageKey)}
             </span>
           </div>
-          {mutation.isError && (
+          {(mutation.isError || formError) && (
             <p
               role="alert"
               className="mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700"
             >
-              {t("admin.events.publishVenueRequired")}
+              {t((formError ?? "errors.generic") as MessageKey)}
             </p>
           )}
           <form
@@ -191,7 +185,7 @@ export default function AdminEventDetailPage() {
                   ))}
               </Select>
             </label>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-2">
               <label className="grid gap-1 text-sm">
                 {t("start")}
                 <Input
@@ -214,6 +208,20 @@ export default function AdminEventDetailPage() {
               </label>
             </div>
             <label className="grid gap-1 text-sm">
+              {t("admin.events.cancellationDeadline")}
+              <Input
+                required
+                type="datetime-local"
+                value={form.abmeldefrist}
+                max={form.start}
+                onChange={(e) => setForm({ ...form, abmeldefrist: e.target.value })}
+                className="h-10"
+              />
+              <span className="text-xs text-[var(--muted-foreground)]">
+                {t("admin.events.cancellationDeadlineHint")}
+              </span>
+            </label>
+            <label className="grid gap-1 text-sm">
               {t("admin.events.capacity")}
               <Input
                 required
@@ -226,6 +234,18 @@ export default function AdminEventDetailPage() {
                 }
                 className="h-10"
               />
+            </label>
+            <label className="grid gap-1 text-sm">
+              {t("admin.events.guestFee")}
+              <Input
+                required
+                inputMode="decimal"
+                pattern="[0-9]+([,.][0-9]{1,2})?"
+                value={form.guestFee}
+                onChange={(e) => setForm({ ...form, guestFee: e.target.value })}
+                className="h-10"
+              />
+              <span className="text-xs text-[var(--muted-foreground)]">{t("admin.events.guestFeeHint")}</span>
             </label>
             <label className="grid gap-1 text-sm">
               {t("admin.events.status")}

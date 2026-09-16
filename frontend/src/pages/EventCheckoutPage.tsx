@@ -14,14 +14,14 @@ export default function EventCheckoutPage() {
   const mutation = useRegisterEvent()
   if (event.isPending)
     return (
-      <div className="p-6">
+      <div className="px-4 py-6">
         <Navigation t={t} />
         <p className="mt-4">{t("common.loading")}</p>
       </div>
     )
   if (event.isError || !event.data)
     return (
-      <div className="p-6">
+      <div className="px-4 py-6">
         <Navigation t={t} />
         <p role="alert" className="mt-4">
           {t("events.notFound")}
@@ -54,32 +54,42 @@ export default function EventCheckoutPage() {
     <main className="min-h-full bg-[var(--background)] px-4 py-6 lg:px-8">
       <div className="mx-auto max-w-3xl">
         <Navigation t={t} detailId={event.data.id} />
-        <article className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--card)] p-5">
-          <h1 className="text-2xl font-bold">{t("events.checkoutTitle")}</h1>
-          <p className="mt-2 text-sm text-[var(--muted-foreground)]">
+        <article className="mobile-cta-content mt-4 min-w-0 rounded-lg border border-[var(--border)] bg-[var(--card)] p-5">
+          <h1 className="page-title">{t("events.checkoutTitle")}</h1>
+          <p className="mt-2 break-words text-sm text-[var(--muted-foreground)]">
             {event.data.title}
           </p>
-          <div className="prose prose-sm mt-6 max-w-none">
-            <ReactMarkdown>{terms}</ReactMarkdown>
+          <div className="prose prose-sm mt-6 max-w-none break-words [overflow-wrap:anywhere]">
+            <ReactMarkdown
+              components={{
+                h1: ({ children }) => <h2>{children}</h2>,
+                h2: ({ children }) => <h3>{children}</h3>,
+                h3: ({ children }) => <h4>{children}</h4>,
+              }}
+            >
+              {terms}
+            </ReactMarkdown>
           </div>
           {!terms && (
             <p role="alert" className="mt-4 text-red-700">
               {t("events.checkoutUnavailable")}
             </p>
           )}
-          <Button
-            size="lg"
-            className="mt-8 w-full"
-            disabled={!terms || mutation.isPending || !event.data.canRegister}
-            onClick={() => void accept()}
-          >
-            {mutation.isPending ? t("common.saving") : t("events.acceptTerms")}
-          </Button>
           {mutation.isError && (
-            <p role="alert" className="mt-3 text-sm text-red-700">
+            <p role="alert" className="mt-4 text-sm text-red-700">
               {t("events.registrationError")}
             </p>
           )}
+          <div className="mobile-cta mt-8">
+            <Button
+              size="lg"
+              className="h-11 w-full"
+              disabled={!terms || mutation.isPending || !event.data.canRegister}
+              onClick={() => void accept()}
+            >
+              {mutation.isPending ? t("common.saving") : t("events.acceptTerms")}
+            </Button>
+          </div>
         </article>
       </div>
     </main>

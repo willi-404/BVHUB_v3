@@ -50,6 +50,11 @@ function capacity(value) {
   return value;
 }
 
+function guestFeeCents(value) {
+  if (!Number.isInteger(value) || value < 0 || value > 99999999999) throw new BadRequestError("Ungültige Gastgebühr");
+  return value;
+}
+
 function status(value) {
   if (!["MEMBERS_ONLY", "OPEN_TO_ALL", "CANCELLED", "COMPLETED"].includes(value)) throw new BadRequestError("Ungültiger Status");
   return value;
@@ -73,7 +78,7 @@ function eventDto(app, record) {
   const v = venue(app, record.getString("venue"));
   const registeredCount = registrationCount(app, record.id);
   const spotsLeft = Math.max(0, record.getInt("capacity") - registeredCount);
-  return { id: record.id, title: record.getString("title"), description: record.getString("description"), venue: venueDto(v), start: record.getString("start"), end: record.getString("end"), capacity: record.getInt("capacity"), registeredCount, spotsLeft, status: record.getString("status"), published: record.getBool("published"), firstPublishedAt: record.getString("firstPublishedAt") || null, canDelete: canDeleteEvent(app, record), createdBy: record.getString("createdBy"), created: record.getString("created"), updated: record.getString("updated") };
+  return { id: record.id, title: record.getString("title"), description: record.getString("description"), venue: venueDto(v), start: record.getString("start"), end: record.getString("end"), abmeldefrist: record.getString("abmeldefrist"), capacity: record.getInt("capacity"), guestFeeCents: record.getInt("guestFeeCents"), registeredCount, spotsLeft, status: record.getString("status"), published: record.getBool("published"), firstPublishedAt: record.getString("firstPublishedAt") || null, canDelete: canDeleteEvent(app, record), createdBy: record.getString("createdBy"), created: record.getString("created"), updated: record.getString("updated") };
 }
 function canDeleteEvent(app, record) {
   return Boolean(record && record.id);
@@ -82,6 +87,7 @@ function purgeEventDependencies(app, eventId) {
   const registrations = app.findRecordsByFilter("event_registrations", `event = '${eventId}'`, "", 100000, 0);
   registrations.forEach((registration) => {
     app.findRecordsByFilter("notification_outbox", `registration = '${registration.id}'`, "", 100000, 0).forEach((entry) => app.delete(entry));
+    app.findRecordsByFilter("payments", `registration = '${registration.id}'`, "", 100000, 0).forEach((payment) => app.delete(payment));
     app.delete(registration);
   });
   app.findRecordsByFilter("event_changelog", `event = '${eventId}'`, "", 100000, 0).forEach((entry) => app.delete(entry));
@@ -100,7 +106,7 @@ function eventDtoForUser(app, record, userRecord) {
   dto.myRegistrationStatus = mine ? mine.getString("status") : null;
   const now = Date.now();
   dto.canRegister = dto.published === true && roleCanRegister(userRecord.getString("role"), dto.status) && dto.venue.active === true && Boolean(dto.venue.checkoutRegion) && Date.parse(dto.end) > now && dto.myRegistrationStatus !== "REGISTERED" && dto.myRegistrationStatus !== "WAITING";
-  dto.canCancel = ["REGISTERED", "WAITING"].includes(dto.myRegistrationStatus);
+  dto.canCancel = ["REGISTERED", "WAITING"].includes(dto.myRegistrationStatus) && Date.parse(dto.abmeldefrist) > now;
   return dto;
 }
 function idOf(e) {
@@ -156,12 +162,15 @@ function parseEvent(value, existing) {
   const start = date(value.start !== undefined ? value.start : existing ? existing.getString("start") : "");
   const end = date(value.end !== undefined ? value.end : existing ? existing.getString("end") : "");
   if (Date.parse(start) >= Date.parse(end)) throw new BadRequestError("Beginn muss vor dem Ende liegen");
+  const cancellationDeadline = date(value.abmeldefrist !== undefined ? value.abmeldefrist : existing ? existing.getString("abmeldefrist") : "");
+  if (Date.parse(cancellationDeadline) > Date.parse(start)) throw new BadRequestError("Abmeldefrist darf nicht nach dem Beginn liegen");
   const title = value.title !== undefined ? value.title : existing ? existing.getString("title") : "";
   const description = value.description !== undefined ? value.description : existing ? existing.getString("description") : "";
   const venueId = value.venue !== undefined ? value.venue : existing ? existing.getString("venue") : "";
   const cap = value.capacity !== undefined ? value.capacity : existing ? existing.getInt("capacity") : 0;
+  const fee = value.guestFeeCents !== undefined ? value.guestFeeCents : existing ? existing.getInt("guestFeeCents") : undefined;
   const eventStatus = value.status !== undefined ? value.status : existing ? existing.getString("status") : "MEMBERS_ONLY";
-  return { title: text(title, MAX_TITLE), description: text(description, MAX_DESCRIPTION, false), venue: String(venueId), start, end, capacity: capacity(cap), published: boolean(value.published, existing ? existing.getBool("published") : false), status: status(eventStatus) };
+  return { title: text(title, MAX_TITLE), description: text(description, MAX_DESCRIPTION, false), venue: String(venueId), start, end, abmeldefrist: cancellationDeadline, capacity: capacity(cap), guestFeeCents: guestFeeCents(fee), published: boolean(value.published, existing ? existing.getBool("published") : false), status: status(eventStatus) };
 }
 function nowIso() { return new Date().toISOString(); }
 function correlationId() { return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`; }

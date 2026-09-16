@@ -8,13 +8,31 @@ function escapeHtml(value) {
 function formatDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value || "-";
-  return `${String(date.getUTCDate()).padStart(2, "0")}.${String(date.getUTCMonth() + 1).padStart(2, "0")}.${date.getUTCFullYear()}`;
+  const local = berlinDate(date);
+  return `${String(local.getUTCDate()).padStart(2, "0")}.${String(local.getUTCMonth() + 1).padStart(2, "0")}.${local.getUTCFullYear()}`;
 }
 
 function formatTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
-  return `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")} UTC`;
+  const local = berlinDate(date);
+  return `${String(local.getUTCHours()).padStart(2, "0")}:${String(local.getUTCMinutes()).padStart(2, "0")} Uhr`;
+}
+
+function lastSundayDay(year, month) {
+  const last = new Date(Date.UTC(year, month + 1, 0));
+  return last.getUTCDate() - last.getUTCDay();
+}
+
+function berlinOffsetMinutes(date) {
+  const year = date.getUTCFullYear();
+  const summerStart = Date.UTC(year, 2, lastSundayDay(year, 2), 1, 0, 0);
+  const summerEnd = Date.UTC(year, 9, lastSundayDay(year, 9), 1, 0, 0);
+  return date.getTime() >= summerStart && date.getTime() < summerEnd ? 120 : 60;
+}
+
+function berlinDate(date) {
+  return new Date(date.getTime() + berlinOffsetMinutes(date) * 60 * 1000);
 }
 
 function parsePayload(entry) {
@@ -56,12 +74,13 @@ function copyFor(kind) {
 function renderHtml(kind, payload) {
   const title = escapeHtml(payload.eventTitle || "Event");
   const venue = escapeHtml(payload.venue || "-");
+  const venueDescription = escapeHtml(payload.venueDescription || "");
   const address = escapeHtml(payload.address || "");
   const name = escapeHtml(payload.displayName || "Mitglied");
   const date = escapeHtml(formatDate(payload.start));
   const time = `${escapeHtml(formatTime(payload.start))}–${escapeHtml(formatTime(payload.end))}`;
   const copy = copyFor(kind);
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:0;padding:0;background-color:#f4f7f5;"><tr><td align="center" style="padding:24px 12px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:680px;border-collapse:separate;border-spacing:0;background-color:#ffffff;border:1px solid #e2e8e4;border-radius:12px;overflow:hidden;"><tr><td style="padding:28px 24px;background-color:#0f2d1a;background-image:linear-gradient(145deg,#0a1f10 0%,#14532d 100%);font-family:'Outfit','Segoe UI',Arial,sans-serif;"><div style="font-size:24px;line-height:30px;font-weight:700;color:#ffffff;">bvHub</div><div style="margin-top:4px;font-size:13px;line-height:20px;color:#b9d9c3;">Badminton Verein Erlangen n.e.V. · Member Portal</div></td></tr><tr><td style="padding:32px 24px 16px;font-family:'Outfit','Segoe UI',Arial,sans-serif;color:#1a211d;"><h1 style="margin:0;font-size:24px;line-height:32px;font-weight:700;">${escapeHtml(subjectFor(kind))}</h1><p style="margin:14px 0 0;font-size:15px;line-height:24px;color:#5f6963;">Hallo ${name},<br>${escapeHtml(copy[0])}</p></td></tr><tr><td style="padding:12px 24px 20px;"><div style="padding:18px 16px;background-color:#eefbf3;border:1px solid #bbf7d0;border-radius:10px;font-family:'Outfit','Segoe UI',Arial,sans-serif;"><div style="font-size:18px;line-height:25px;font-weight:700;color:#15803d;">${title}</div><div style="margin-top:8px;font-size:14px;line-height:22px;color:#1a211d;">${date}<br>${time}<br>${venue}${address ? `<br>${address}` : ""}</div></div></td></tr><tr><td style="padding:0 24px 32px;font-family:'Outfit','Segoe UI',Arial,sans-serif;"><p style="margin:0;font-size:14px;line-height:22px;color:#5f6963;">${escapeHtml(copy[1])}</p><p style="margin:18px 0 0;padding:12px 14px;font-size:13px;line-height:20px;color:#6b5b16;background-color:#fff8e1;border-left:4px solid #f59e0b;">Dies ist eine automatisch versendete Nachricht. Bitte antworte nicht auf diese E-Mail.</p></td></tr><tr><td style="padding:18px 24px;border-top:1px solid #e7ebe8;background-color:#fafbfa;font-family:'Outfit','Segoe UI',Arial,sans-serif;text-align:center;"><p style="margin:0;font-size:12px;line-height:19px;color:#89918c;">Badminton Verein Erlangen n.e.V. · Est. 2025</p><p style="margin:4px 0 0;font-size:11px;line-height:18px;color:#a0a7a3;">Automatisch versendete Event-Benachrichtigung</p></td></tr></table></td></tr></table>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:0;padding:0;background-color:#f4f7f5;"><tr><td align="center" style="padding:24px 12px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:680px;border-collapse:separate;border-spacing:0;background-color:#ffffff;border:1px solid #e2e8e4;border-radius:12px;overflow:hidden;"><tr><td style="padding:28px 24px;background-color:#0f2d1a;background-image:linear-gradient(145deg,#0a1f10 0%,#14532d 100%);font-family:'Outfit','Segoe UI',Arial,sans-serif;"><div style="font-size:24px;line-height:30px;font-weight:700;color:#ffffff;">bvHub</div><div style="margin-top:4px;font-size:13px;line-height:20px;color:#b9d9c3;">Badminton Verein Erlangen n.e.V. · Member Portal</div></td></tr><tr><td style="padding:32px 24px 16px;font-family:'Outfit','Segoe UI',Arial,sans-serif;color:#1a211d;"><h1 style="margin:0;font-size:24px;line-height:32px;font-weight:700;">${escapeHtml(subjectFor(kind))}</h1><p style="margin:14px 0 0;font-size:15px;line-height:24px;color:#5f6963;">Hallo ${name},<br>${escapeHtml(copy[0])}</p></td></tr><tr><td style="padding:12px 24px 20px;"><div style="padding:18px 16px;background-color:#eefbf3;border:1px solid #bbf7d0;border-radius:10px;font-family:'Outfit','Segoe UI',Arial,sans-serif;"><div style="font-size:18px;line-height:25px;font-weight:700;color:#15803d;">${title}</div><div style="margin-top:8px;font-size:14px;line-height:22px;color:#1a211d;">${date}<br>${time}<br>${venue}${address ? `<br>${address}` : ""}${venueDescription ? `<br><span style="color:#5f6963;">${venueDescription}</span>` : ""}</div></div></td></tr><tr><td style="padding:0 24px 32px;font-family:'Outfit','Segoe UI',Arial,sans-serif;"><p style="margin:0;font-size:14px;line-height:22px;color:#5f6963;">${escapeHtml(copy[1])}</p><p style="margin:18px 0 0;padding:12px 14px;font-size:13px;line-height:20px;color:#6b5b16;background-color:#fff8e1;border-left:4px solid #f59e0b;">Dies ist eine automatisch versendete Nachricht. Bitte antworte nicht auf diese E-Mail.</p></td></tr><tr><td style="padding:18px 24px;border-top:1px solid #e7ebe8;background-color:#fafbfa;font-family:'Outfit','Segoe UI',Arial,sans-serif;text-align:center;"><p style="margin:0;font-size:12px;line-height:19px;color:#89918c;">Badminton Verein Erlangen n.e.V. · Est. 2025</p><p style="margin:4px 0 0;font-size:11px;line-height:18px;color:#a0a7a3;">Automatisch versendete Event-Benachrichtigung</p></td></tr></table></td></tr></table>`;
 }
 
 function send(entry) {

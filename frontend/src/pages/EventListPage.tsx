@@ -16,7 +16,7 @@ export default function EventListPage() {
           <Link className="mb-4 inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground" to="/dashboard">
             {t("events.backToDashboard")}
           </Link>
-          <h1 className="text-2xl font-bold">{t("events.title")}</h1>
+          <h1 className="page-title">{t("events.title")}</h1>
           <p className="mt-1 text-sm text-[var(--muted-foreground)]">
             {t("events.listDescription")}
           </p>
@@ -49,9 +49,9 @@ export default function EventListPage() {
         )}
         <div className="grid gap-4 md:grid-cols-2">
           {query.data?.map((event) => (
-            <Card key={event.id} className="p-5">
+            <Card key={event.id} className="min-w-0 p-5">
               <div className="flex items-start justify-between gap-3">
-                <h2 className="text-lg font-bold">{event.title}</h2>
+                <h2 className="min-w-0 break-words text-lg font-bold">{event.title}</h2>
                 <Badge
                   variant={
                     event.status !== "CANCELLED" && event.status !== "COMPLETED"
@@ -64,11 +64,11 @@ export default function EventListPage() {
                   {t(`events.status.${event.status}` as MessageKey)}
                 </Badge>
               </div>
-              <p className="mt-3 text-sm text-[var(--muted-foreground)]">
+              <p className="mt-3 break-words text-sm text-[var(--muted-foreground)]">
                 {formatLocaleDateTime(event.start, locale)} –{" "}
                 {formatLocaleDateTime(event.end, locale)}
               </p>
-              <p className="mt-2 text-sm">
+              <p className="mt-2 break-words text-sm">
                 <span className="font-semibold">{event.venue.name}</span>
                 <br />
                 <span className="text-[var(--muted-foreground)]">

@@ -65,6 +65,43 @@ export function formatLocaleDateTime(
   }).format(date)
 }
 
+function berlinParts(value: Date): Record<string, string> {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Berlin",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(value).reduce<Record<string, string>>((out, part) => {
+    out[part.type] = part.value
+    return out
+  }, {})
+}
+
+export function formatBerlinDateTimeInput(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return ""
+  const parts = berlinParts(date)
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`
+}
+
+export function berlinDateTimeInputToIso(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value)
+  if (!match) throw new RangeError("Invalid Europe/Berlin date-time")
+  const wanted = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]))
+  let instant = wanted
+  for (let iteration = 0; iteration < 3; iteration += 1) {
+    const parts = berlinParts(new Date(instant))
+    const rendered = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute))
+    instant += wanted - rendered
+  }
+  const result = new Date(instant)
+  if (formatBerlinDateTimeInput(result) !== value) throw new RangeError("Invalid Europe/Berlin date-time")
+  return result.toISOString()
+}
+
 function interpolate(template: string, params?: MessageParams): string {
   if (!params) return template
   return template.replace(/\{(\w+)\}/g, (_, name: string) =>

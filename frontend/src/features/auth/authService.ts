@@ -19,6 +19,7 @@ export class AuthServiceError extends Error {
 }
 
 const GENERIC_AUTH_ERROR = "errors.generic";
+const OTP_ACCOUNT_UNAVAILABLE = "OTP_ACCOUNT_UNAVAILABLE";
 
 function normalizeError(error: unknown): AuthServiceError {
   if (error instanceof AuthServiceError) return error;
@@ -63,12 +64,18 @@ export async function requestOtp(email: string): Promise<string> {
     logInfo("auth.login.success", { email: redactEmail(input.email), method: "otp" });
     return result.otpId;
   } catch (error) {
-    // Keep the same public error for unknown, inactive and invalid accounts.
     const normalized = normalizeError(error);
-    logWarn("auth.login.failed", { reason: normalized.message, method: "otp" });
-    throw normalized;
+    // PocketBase intentionally uses the same 400 response for unknown,
+    // inactive, unverified, and OTP-disallowed accounts.
+    const classified = normalized.status === 400
+      ? new AuthServiceError(normalized.message, normalized.status, OTP_ACCOUNT_UNAVAILABLE)
+      : normalized;
+    logWarn("auth.login.failed", { reason: classified.message, method: "otp" });
+    throw classified;
   }
 }
+
+export const authErrorCodes = { otpAccountUnavailable: OTP_ACCOUNT_UNAVAILABLE } as const;
 
 /** Completes OTP authentication. @param {string} otpId The OTP request identifier. @param {string} otp The one-time code entered by the user. @returns {Promise<AuthUser>} The authenticated application user. @throws {AuthServiceError} If the code is invalid or the response is unusable. */
 export async function verifyOtp(otpId: string, otp: string): Promise<AuthUser> {
