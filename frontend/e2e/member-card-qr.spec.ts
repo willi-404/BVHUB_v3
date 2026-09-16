@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test"
+import { e2ePocketBaseApiRoute } from "./test-endpoints"
 
 const token = "A".repeat(48)
 const user = {
@@ -26,7 +27,7 @@ async function mockMemberSession(page: Page, record = user, groups = [{ membersh
     window.sessionStorage.setItem("pb_auth", JSON.stringify({ token: initialToken, record }))
     window.sessionStorage.setItem("bvhub.locale", "en")
   }, { initialToken: sessionToken, record })
-  await page.route("http://127.0.0.1:18099/api/**", async (route: Route) => {
+  await page.route(e2ePocketBaseApiRoute, async (route: Route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname
     if (path === "/api/collections/users/auth-refresh") return route.fulfill({ json: { token: sessionToken, record } })
@@ -61,7 +62,7 @@ test("guest account renders its issued QR instead of the unavailable state", asy
 
 test("verification page fits a phone viewport", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 844 })
-  await page.route("http://127.0.0.1:18099/api/**", async (route) => {
+  await page.route(e2ePocketBaseApiRoute, async (route) => {
     const path = new URL(route.request().url()).pathname
     if (path === "/api/bvhub/member-card/verify") return route.fulfill({ json: { valid: false } })
     return route.fulfill({ json: { items: [] } })

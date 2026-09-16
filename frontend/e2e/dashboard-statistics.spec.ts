@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test"
+import { e2ePocketBaseApiRoute } from "./test-endpoints"
 
 function authToken() {
   const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url")
@@ -40,7 +41,7 @@ async function mockDashboard(page: Page, handler: (route: Route) => Promise<void
     window.sessionStorage.setItem("bvhub.locale", "en")
   }, { initialToken: token, record: user })
 
-  await page.route("http://127.0.0.1:18099/api/**", async (route) => {
+  await page.route(e2ePocketBaseApiRoute, async (route) => {
     const path = new URL(route.request().url()).pathname
     if (path === "/api/bvhub/dashboard/statistics") return handler(route)
     if (path === "/api/collections/users/auth-refresh") return route.fulfill({ json: { token, record: user } })
@@ -83,10 +84,15 @@ test("renders four real metrics, a two-series area chart, tooltip, and legend", 
 
 test("shows loading, retryable failure, one-month tracking, and exact-data gaps", async ({ page }) => {
   let requests = 0
+  let releaseFirstResponse: () => void
+  let confirmFirstRequest: () => void
+  const firstResponse = new Promise<void>((resolve) => { releaseFirstResponse = resolve })
+  const firstRequest = new Promise<void>((resolve) => { confirmFirstRequest = resolve })
   await mockDashboard(page, async (route) => {
     requests += 1
     if (requests === 1) {
-      await new Promise((resolve) => setTimeout(resolve, 250))
+      confirmFirstRequest()
+      await firstResponse
       await route.fulfill({ status: 500, json: { message: "failed" } })
       return
     }
@@ -101,7 +107,9 @@ test("shows loading, retryable failure, one-month tracking, and exact-data gaps"
     })
   })
   await page.goto("/dashboard")
+  await firstRequest
   await expect(page.getByText("Loading real statistics…")).toBeVisible()
+  releaseFirstResponse()
   await expect(page.getByText("Statistics could not be loaded")).toBeVisible()
   await page.getByRole("button", { name: "Try again" }).click()
   await expect(page.getByText("Tracking starts this month")).toBeVisible()

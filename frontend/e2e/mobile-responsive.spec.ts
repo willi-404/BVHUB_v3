@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test"
+import { e2ePocketBaseApiRoute } from "./test-endpoints"
 
 type Role = "MEMBER" | "ADMIN"
 
@@ -78,7 +79,7 @@ async function mockSession(
     { token, record: user },
   )
 
-  await page.route("http://127.0.0.1:18099/api/**", async (route) => {
+  await page.route(e2ePocketBaseApiRoute, async (route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname
     if (path === "/api/collections/users/auth-refresh") {
@@ -390,7 +391,7 @@ test.describe("mobile event calls to action", () => {
       canCancel: false,
       myRegistrationStatus: null,
     })
-    await page.unroute("http://127.0.0.1:18099/api/**")
+    await page.unroute(e2ePocketBaseApiRoute)
     await mockSession(page, { event: unavailableEvent })
     await page.goto(`/events/${unavailableEvent.id}`)
     await expect(page.locator(".mobile-cta")).toHaveCount(0)

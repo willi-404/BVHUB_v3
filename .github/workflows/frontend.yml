@@ -45,8 +45,6 @@ jobs:
 
       - name: Playwright E2E
         working-directory: frontend
-        env:
-          VITE_POCKETBASE_URL: http://127.0.0.1:18102
         run: pnpm exec playwright test
         continue-on-error: false
 

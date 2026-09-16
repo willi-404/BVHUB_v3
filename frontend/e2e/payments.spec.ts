@@ -4,8 +4,9 @@ import { mkdtempSync, openSync, closeSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { e2ePocketBaseListenAddress, e2ePocketBaseUrl } from "./test-endpoints"
 
-const apiBase = "http://127.0.0.1:18099"
+const apiBase = e2ePocketBaseUrl
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..")
 const pbDir = join(repoRoot, "pocketbase")
 const binary = join(pbDir, "pocketbase")
@@ -133,7 +134,7 @@ test.describe.serial("payments with isolated PocketBase", () => {
     runPocketBase(["migrate", "up", `--dir=${dataDir}`, `--migrationsDir=${migrationsDir}`, `--hooksDir=${hooksDir}`])
     runPocketBase(["superuser", "create", superuserEmail, superuserPassword, `--dir=${dataDir}`])
     logFd = openSync(join(dataDir, "server.log"), "a")
-    server = spawn(binary, ["serve", "--http=127.0.0.1:18099", `--dir=${dataDir}`, `--migrationsDir=${migrationsDir}`, `--hooksDir=${hooksDir}`], { cwd: pbDir, stdio: ["ignore", logFd, logFd] })
+    server = spawn(binary, ["serve", `--http=${e2ePocketBaseListenAddress}`, `--dir=${dataDir}`, `--migrationsDir=${migrationsDir}`, `--hooksDir=${hooksDir}`], { cwd: pbDir, stdio: ["ignore", logFd, logFd] })
     await waitForPocketBase()
     seed = await seedPocketBase()
   })
