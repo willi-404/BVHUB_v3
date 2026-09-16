@@ -1,3 +1,18 @@
+routerAdd("POST", "/api/bvhub/auth/account-status", (e) => {
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const body = e.requestInfo().body;
+  if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).length !== 1 || !Object.hasOwn(body, "email")) throw new BadRequestError("Ungültige E-Mail-Adresse");
+  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+  if (!email || email.length > 254 || !emailRe.test(email)) throw new BadRequestError("Ungültige E-Mail-Adresse");
+
+  try {
+    $app.findFirstRecordByData("users", "email", email);
+    return e.json(200, { exists: true });
+  } catch (_) {
+    return e.json(200, { exists: false });
+  }
+}, $apis.requireGuestOnly());
+
 routerAdd("POST", "/api/bvhub/register", (e) => {
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   // Unicode-safe name guard: no digits or control/underscore characters.

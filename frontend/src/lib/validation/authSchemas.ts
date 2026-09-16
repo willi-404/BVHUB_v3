@@ -25,7 +25,10 @@ export const RegisterPayload = z.object({
 
 export const OtpPayload = z.object({ email: z.string().email() });
 
+export const AccountStatusResponse = z.object({ exists: z.boolean() });
+
 export type PocketBaseUserResponse = z.infer<typeof PocketBaseUserResponse>;
 export type PocketBaseAuthResponse = z.infer<typeof PocketBaseAuthResponse>;
 export type RegisterPayload = z.infer<typeof RegisterPayload>;
 export type OtpPayload = z.infer<typeof OtpPayload>;
+export type AccountStatusResponse = z.infer<typeof AccountStatusResponse>;

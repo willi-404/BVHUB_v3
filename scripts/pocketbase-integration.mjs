@@ -220,6 +220,12 @@ const registeredUsers = expectStatus(await request(
 ), 200, "find registered guest");
 assert.equal(registeredUsers.items.length, 1, "registration creates one user");
 const registeredUser = registeredUsers.items[0];
+const registeredEmailStatus = expectStatus(await request("POST", "/api/bvhub/auth/account-status", { body: { email: registrationEmail } }), 200, "registered email status");
+assert.equal(registeredEmailStatus.exists, true, "registered email is reported as existing");
+const unknownEmailStatus = expectStatus(await request("POST", "/api/bvhub/auth/account-status", { body: { email: "unknown@example.test" } }), 200, "unknown email status");
+assert.equal(unknownEmailStatus.exists, false, "unknown email is reported as not existing");
+expectStatus(await request("POST", "/api/bvhub/auth/account-status", { body: { email: "not-an-email" } }), 400, "invalid email status request");
+expectStatus(await request("POST", "/api/bvhub/auth/account-status", { body: { email: registrationEmail, role: "ADMIN" } }), 400, "account status rejects extra fields");
 assert.equal(registeredUser.displayName, registrationDisplayName, "registration stores one public name");
 assert.equal(registeredUser.role, "GUEST");
 assert.equal(registeredUser.active, false);

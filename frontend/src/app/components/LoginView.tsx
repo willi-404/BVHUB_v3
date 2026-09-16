@@ -29,7 +29,7 @@ const icons = {
 };
 
 export default function LoginView({ onLogin, sessionExpired = false }: LoginViewProps) {
-  const { requestOtp, verifyOtp, loginWithPassword } = useAuth();
+  const { isRegisteredEmail, requestOtp, verifyOtp, loginWithPassword } = useAuth();
   const { t } = useI18n();
   const [mode, setMode] = useState<"otp" | "password">("otp");
   const [email, setEmail] = useState("");
@@ -58,13 +58,18 @@ export default function LoginView({ onLogin, sessionExpired = false }: LoginView
     setError("");
     setNotice("");
     if (!email.trim()) {
-      setError(t("auth.genericError"));
+      setError(t("auth.invalidEmail"));
       return;
     }
 
     setLoading(true);
     try {
       if (!otpId) {
+        const isRegistered = await isRegisteredEmail(email);
+        if (!isRegistered) {
+          setError(t("auth.accountNotFound"));
+          return;
+        }
         const nextOtpId = await requestOtp(email);
         setOtpId(nextOtpId);
         setNotice(t("auth.codeSent"));
@@ -75,7 +80,9 @@ export default function LoginView({ onLogin, sessionExpired = false }: LoginView
         setError(t("auth.genericError"));
       }
     } catch (error) {
-      setError(error instanceof AuthServiceError && error.code === authErrorCodes.otpAccountUnavailable ? t("auth.otpAccountUnavailable") : t("auth.genericError"));
+      if (error instanceof AuthServiceError && error.code === authErrorCodes.invalidEmail) setError(t("auth.invalidEmail"));
+      else if (error instanceof AuthServiceError && error.code === authErrorCodes.otpAccountUnavailable) setError(t("auth.otpAccountUnavailable"));
+      else setError(t("auth.genericError"));
     } finally {
       setLoading(false);
     }

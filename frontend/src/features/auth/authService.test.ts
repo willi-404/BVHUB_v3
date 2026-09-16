@@ -1,22 +1,24 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { ClientResponseError } from "pocketbase"
 
-const { collection, clear, requestOTP, authWithOTP, authWithPassword } = vi.hoisted(() => ({
+const { collection, clear, requestOTP, authWithOTP, authWithPassword, send } = vi.hoisted(() => ({
   collection: vi.fn(),
   clear: vi.fn(),
   requestOTP: vi.fn(),
   authWithOTP: vi.fn(),
   authWithPassword: vi.fn(),
+  send: vi.fn(),
 }))
 
 vi.mock("../../lib/pocketbase", () => ({
   pb: {
     collection,
+    send,
     authStore: { clear, record: null, isValid: false },
   },
 }))
 
-import { AuthServiceError, authErrorCodes, loginWithPassword, requestOtp, verifyOtp } from "./authService"
+import { AuthServiceError, authErrorCodes, isRegisteredEmail, loginWithPassword, requestOtp, verifyOtp } from "./authService"
 
 const pocketBaseBadRequest = () => new ClientResponseError({ status: 400, response: { message: "Failed to request OTP.", data: {} } })
 
@@ -48,6 +50,16 @@ describe("auth service error classification", () => {
   it("returns the OTP id for a usable account", async () => {
     collection.mockReturnValue({ requestOTP: requestOTP.mockResolvedValueOnce({ otpId: "otp-123" }) })
     await expect(requestOtp("member@example.test")).resolves.toBe("otp-123")
+  })
+
+  it("checks registration status only for a valid email address", async () => {
+    send.mockResolvedValueOnce({ exists: false })
+    await expect(isRegisteredEmail("unknown@example.test")).resolves.toBe(false)
+    expect(send).toHaveBeenCalledWith("/api/bvhub/auth/account-status", { method: "POST", body: { email: "unknown@example.test" } })
+
+    const error = await isRegisteredEmail("not-an-email").catch((value: unknown) => value)
+    expect(error).toMatchObject({ code: authErrorCodes.invalidEmail })
+    expect(send).toHaveBeenCalledTimes(1)
   })
 
   it("does not classify an invalid OTP or admin password as an unavailable account", async () => {

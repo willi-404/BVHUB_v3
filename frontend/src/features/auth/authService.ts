@@ -3,7 +3,7 @@ import { ClientResponseError } from "pocketbase";
 import { pb } from "../../lib/pocketbase";
 import { isUsableUser, toAuthUser, type AuthUser } from "./policy";
 import { mapPBError } from "../../lib/errorMapper";
-import { OtpPayload, PocketBaseAuthResponse, PocketBaseUserResponse } from "../../lib/validation/authSchemas";
+import { AccountStatusResponse, OtpPayload, PocketBaseAuthResponse, PocketBaseUserResponse } from "../../lib/validation/authSchemas";
 import { logInfo, logWarn, redactEmail } from "../../lib/logger";
 
 export class AuthServiceError extends Error {
@@ -20,6 +20,7 @@ export class AuthServiceError extends Error {
 
 const GENERIC_AUTH_ERROR = "errors.generic";
 const OTP_ACCOUNT_UNAVAILABLE = "OTP_ACCOUNT_UNAVAILABLE";
+const INVALID_EMAIL = "INVALID_EMAIL";
 
 function normalizeError(error: unknown): AuthServiceError {
   if (error instanceof AuthServiceError) return error;
@@ -31,6 +32,12 @@ function normalizeError(error: unknown): AuthServiceError {
 
 function invalidResponse(): AuthServiceError {
   return new AuthServiceError("errors.invalid_response", undefined, "INVALID_RESPONSE");
+}
+
+function parseEmail(email: string) {
+  const parsed = OtpPayload.safeParse({ email: email.trim() });
+  if (!parsed.success) throw new AuthServiceError("errors.invalid_email", undefined, INVALID_EMAIL);
+  return parsed.data.email;
 }
 
 function parseUserRecord(record: unknown): AuthUser {
@@ -54,14 +61,26 @@ export function currentUser(): AuthUser {
   return parseUserRecord(pb.authStore.record);
 }
 
+/** Checks whether an email is registered before requesting an OTP. @param {string} email The email address to check. @returns {Promise<boolean>} Whether the address exists in the user collection. @throws {AuthServiceError} If the email or server response is invalid. */
+export async function isRegisteredEmail(email: string): Promise<boolean> {
+  const identity = parseEmail(email);
+  try {
+    const result = await pb.send<unknown>("/api/bvhub/auth/account-status", { method: "POST", body: { email: identity } });
+    const parsed = AccountStatusResponse.safeParse(result);
+    if (!parsed.success) throw invalidResponse();
+    return parsed.data.exists;
+  } catch (error) {
+    throw normalizeError(error);
+  }
+}
+
 /** Requests an email one-time password. @param {string} email The email address to send the code to. @returns {Promise<string>} The OTP request identifier. @throws {AuthServiceError} If validation or the PocketBase request fails. */
 export async function requestOtp(email: string): Promise<string> {
-  const identity = email.trim();
+  const identity = parseEmail(email);
   try {
-    const input = OtpPayload.parse({ email: identity });
-    const result = await pb.collection("users").requestOTP(input.email);
+    const result = await pb.collection("users").requestOTP(identity);
     if (!result || typeof result.otpId !== "string" || !result.otpId) throw invalidResponse();
-    logInfo("auth.login.success", { email: redactEmail(input.email), method: "otp" });
+    logInfo("auth.login.success", { email: redactEmail(identity), method: "otp" });
     return result.otpId;
   } catch (error) {
     const normalized = normalizeError(error);
@@ -75,7 +94,7 @@ export async function requestOtp(email: string): Promise<string> {
   }
 }
 
-export const authErrorCodes = { otpAccountUnavailable: OTP_ACCOUNT_UNAVAILABLE } as const;
+export const authErrorCodes = { invalidEmail: INVALID_EMAIL, otpAccountUnavailable: OTP_ACCOUNT_UNAVAILABLE } as const;
 
 /** Completes OTP authentication. @param {string} otpId The OTP request identifier. @param {string} otp The one-time code entered by the user. @returns {Promise<AuthUser>} The authenticated application user. @throws {AuthServiceError} If the code is invalid or the response is unusable. */
 export async function verifyOtp(otpId: string, otp: string): Promise<AuthUser> {
