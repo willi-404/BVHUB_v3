@@ -1,0 +1,87 @@
+name-template: "v$RESOLVED_VERSION"
+tag-template: "v$RESOLVED_VERSION"
+change-template: "- $TITLE (#$NUMBER)"
+change-title-escapes: '\\<*_&'
+
+template: |
+  ## User summary
+  <!-- Before publishing, add a short, plain-language summary for members. -->
+
+  ## Maintenance changelog
+  $CHANGES
+
+categories:
+  - type: pre-exclude
+    when:
+      label: skip-changelog
+
+  - title: Security
+    semver-increment: patch
+    exclusive: true
+    when:
+      - labels:
+          - security
+          - security-fix
+      - conventional:
+          type: fix
+          scope: security
+
+  - title: Features
+    semver-increment: minor
+    exclusive: true
+    when:
+      - labels:
+          - feature
+          - enhancement
+      - conventional:
+          type: feat
+
+  - title: Fixes
+    semver-increment: patch
+    exclusive: true
+    when:
+      - labels:
+          - bug
+          - bugfix
+          - fix
+      - conventional:
+          types:
+            - fix
+            - perf
+
+  - title: Maintenance
+    semver-increment: patch
+    exclusive: true
+    when:
+      - labels:
+          - chore
+          - dependencies
+          - documentation
+          - refactor
+          - test
+      - conventional:
+          types:
+            - build
+            - chore
+            - ci
+            - docs
+            - refactor
+            - style
+            - test
+
+  # The only category without `when`: retain irregular or legacy PR titles.
+  - title: Other changes
+    semver-increment: patch
+    exclusive: true
+
+  - type: version-resolver
+    semver-increment: major
+    when:
+      - labels:
+          - breaking-change
+          - major
+      - conventional:
+          breaking: true
+
+  - type: version-resolver
+    semver-increment: patch
