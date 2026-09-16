@@ -39,3 +39,12 @@ This project uses **Tailwind CSS v4** through the `@tailwindcss/vite` plugin con
 - Use double quotes for strings containing apostrophes (`"We're here to help"`), or escape them in single-quoted strings. An unescaped apostrophe in a single-quoted string breaks the build.
 - Ensure JSX tags are closed and braces are balanced.
 - Export components as default exports.
+
+## Release Metadata
+
+Frontend changes are releasable work. Before creating a commit or pull request,
+read `../docs/RELEASE_WORKFLOW.md` and follow the repository-level `AGENTS.md`.
+Use a Conventional Commit PR title and commit message, for example
+`feat(frontend): add member statistics` or `fix(payments): preserve EPC purpose`.
+Do not push releasable work directly to `master`: Release Drafter reliably
+builds changelog entries from merged pull requests.

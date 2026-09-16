@@ -47,6 +47,15 @@ pnpm check
 
 `pnpm check` führt Typecheck, die Auth-/Guard-Regressionstests und den Production-Build aus.
 
+## Release workflow
+
+Release Drafter aktualisiert nach einem Merge nach `master` den Entwurf fuer
+den naechsten GitHub Release. Releases werden weiterhin manuell veroeffentlicht.
+PR-Titel und Commit-Nachrichten muessen Conventional Commits verwenden, damit
+die Release Notes korrekt kategorisiert werden. Die verbindlichen Regeln,
+Labels und die Checkliste stehen in
+[docs/RELEASE_WORKFLOW.md](docs/RELEASE_WORKFLOW.md).
+
 ## Production-Preview
 
 ```bash

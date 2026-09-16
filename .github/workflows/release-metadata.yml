@@ -1,0 +1,91 @@
+name: Release Metadata
+
+on:
+  pull_request:
+    branches:
+      - master
+    types:
+      - opened
+      - edited
+      - labeled
+      - unlabeled
+      - reopened
+      - ready_for_review
+      - synchronize
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  validate:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate release metadata
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_PATH: ${{ github.event_path }}
+        run: |
+          set -euo pipefail
+
+          pattern='^(feat|fix|perf|build|chore|ci|docs|refactor|style|test)(\([a-z0-9][a-z0-9._/-]*\))?!?: .+$'
+          breaking_pattern='^(feat|fix|perf|build|chore|ci|docs|refactor|style|test)(\([a-z0-9][a-z0-9._/-]*\))?!:'
+
+          validate_subject() {
+            local subject="$1"
+            local label="$2"
+
+            if [[ ! "$subject" =~ $pattern ]]; then
+              echo "${label} must use: type(optional-scope): concise summary"
+              echo "Allowed types: feat, fix, perf, build, chore, ci, docs, refactor, style, test"
+              echo "Received: ${subject}"
+              exit 1
+            fi
+          }
+
+          has_label() {
+            jq -e --arg label "$1" \
+              '.pull_request.labels | any(.name == $label)' \
+              "$EVENT_PATH" >/dev/null
+          }
+
+          validate_subject "$PR_TITLE" "PR title"
+
+          while IFS= read -r subject; do
+            validate_subject "$subject" "Commit subject"
+          done < <(git log --format=%s "$BASE_SHA..$HEAD_SHA")
+
+          is_security_fix=false
+          has_security_label=false
+          is_breaking_change=false
+          has_major_label=false
+
+          if [[ "$PR_TITLE" =~ ^fix\(security\): ]]; then
+            is_security_fix=true
+          fi
+          if has_label security || has_label security-fix; then
+            has_security_label=true
+          fi
+          if [[ "$PR_TITLE" =~ $breaking_pattern ]]; then
+            is_breaking_change=true
+          fi
+          if has_label breaking-change || has_label major; then
+            has_major_label=true
+          fi
+
+          if [[ "$is_security_fix" != "$has_security_label" ]]; then
+            echo "Security changes require both fix(security): in the PR title and a security or security-fix label."
+            exit 1
+          fi
+
+          if [[ "$is_breaking_change" != "$has_major_label" ]]; then
+            echo "Breaking changes require both ! in the PR title and a breaking-change or major label."
+            exit 1
+          fi
