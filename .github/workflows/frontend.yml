@@ -39,6 +39,9 @@ jobs:
         working-directory: frontend
         run: pnpm build
 
+      - name: Set up PocketBase for E2E
+        run: ./scripts/setup-pocketbase.sh
+
       - name: Install Playwright browsers
         working-directory: frontend
         run: pnpm exec playwright install --with-deps chromium
