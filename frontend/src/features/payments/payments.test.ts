@@ -313,6 +313,7 @@ describe("payment API and query keys", () => {
       .mockResolvedValueOnce(payment)
       .mockResolvedValueOnce({ items: [] })
       .mockResolvedValueOnce({ items: [] })
+      .mockResolvedValueOnce({ items: [] })
       .mockResolvedValueOnce(payment)
       .mockResolvedValueOnce(payment.paymentSettings)
       .mockResolvedValueOnce(payment.paymentSettings)
@@ -320,6 +321,7 @@ describe("payment API and query keys", () => {
     await paymentApi.getMyPayments()
     await paymentApi.getPayment(payment.id)
     await paymentApi.getAdminPaymentSummary()
+    await paymentApi.getAdminPaymentSummary(true)
     await paymentApi.getAdminEventPayments(payment.event.id)
     await paymentApi.setPaymentStatus(payment.id, "PAID")
     await paymentApi.getPaymentSettings()
@@ -334,17 +336,27 @@ describe("payment API and query keys", () => {
       { method: "GET" },
     )
     expect(send).toHaveBeenNthCalledWith(
+      3,
+      "/api/bvhub/admin/payment-summary",
+      { method: "GET" },
+    )
+    expect(send).toHaveBeenNthCalledWith(
       4,
-      `/api/bvhub/admin/events/${payment.event.id}/payments`,
+      "/api/bvhub/admin/payment-summary?showAll=true",
       { method: "GET" },
     )
     expect(send).toHaveBeenNthCalledWith(
       5,
+      `/api/bvhub/admin/events/${payment.event.id}/payments`,
+      { method: "GET" },
+    )
+    expect(send).toHaveBeenNthCalledWith(
+      6,
       `/api/bvhub/admin/payments/${payment.id}/status`,
       { method: "PATCH", body: { status: "PAID" } },
     )
     expect(send).toHaveBeenNthCalledWith(
-      7,
+      8,
       "/api/bvhub/admin/payment-settings",
       {
         method: "PATCH",
@@ -364,7 +376,8 @@ describe("payment API and query keys", () => {
       "detail",
       payment.id,
     ])
-    expect(paymentKeys.adminSummary()).toEqual(["payments", "admin", "summary"])
+    expect(paymentKeys.adminSummary()).toEqual(["payments", "admin", "summary", { showAll: false }])
+    expect(paymentKeys.adminSummary(true)).toEqual(["payments", "admin", "summary", { showAll: true }])
     expect(paymentKeys.adminEvent(payment.event.id)).toEqual([
       "payments",
       "admin",
@@ -399,7 +412,7 @@ describe("payment realtime", () => {
     )
     expect(invalidatedKeys).toContainEqual(paymentKeys.me())
     expect(invalidatedKeys).toContainEqual(paymentKeys.detail(payment.id))
-    expect(invalidatedKeys).toContainEqual(paymentKeys.adminSummary())
+    expect(invalidatedKeys).toContainEqual(paymentKeys.adminSummaries())
     expect(invalidatedKeys).toContainEqual(
       paymentKeys.adminEvent(payment.event.id),
     )

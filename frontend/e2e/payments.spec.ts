@@ -20,7 +20,7 @@ type Seed = {
   rootToken: string
   users: { guest: SeedUser; waitingGuest: SeedUser; member: SeedUser; admin: SeedUser }
   tokens: Record<"guest" | "waitingGuest" | "member" | "admin", string>
-  events: { guest: { id: string; title: string }; waiting: { id: string; title: string } }
+  events: { guest: { id: string; title: string }; waiting: { id: string; title: string }; historical: { id: string; title: string } }
   waitingRegistrationId: string
   waitingFillerRegistrationId: string
   guestPaymentId?: string
@@ -101,7 +101,41 @@ async function seedPocketBase(): Promise<Seed> {
   const events = {
     guest: await createEvent(tokens.admin, venue.id, "Guest Fee Training", 10),
     waiting: await createEvent(tokens.admin, venue.id, "Waiting List Training", 1),
+    historical: await api<{ id: string; title: string }>("POST", "/api/bvhub/admin/events", tokens.admin, {
+      title: "Historic payment event",
+      description: "An event outside the recent payment window",
+      venue: venue.id,
+      start: "2020-01-01T18:00:00.000Z",
+      end: "2020-01-01T20:00:00.000Z",
+      abmeldefrist: "2019-12-31T18:00:00.000Z",
+      capacity: 10,
+      guestFeeCents: 380,
+      published: true,
+      status: "COMPLETED",
+    }),
   }
+  const historicalRegistration = await api<{ id: string }>("POST", "/api/collections/event_registrations/records", rootToken, {
+    event: events.historical.id,
+    user: users.guest.id,
+    status: "REGISTERED",
+    registeredAt: "2019-12-01T12:00:00.000Z",
+    checkoutRegion: "ER",
+    termsVersion: "PAYMENTS-E2E-HISTORICAL",
+    termsAcceptedAt: "2019-12-01T12:00:00.000Z",
+  })
+  const historicalPaymentId = "historypay00001"
+  await api("POST", "/api/collections/payments/records", rootToken, {
+    id: historicalPaymentId,
+    registration: historicalRegistration.id,
+    event: events.historical.id,
+    user: users.guest.id,
+    roleSnapshot: "GUEST",
+    paymentRequired: true,
+    amountCents: 380,
+    status: "UNPAID",
+    purpose: `BVHUB-EVT-${events.historical.id}-PAY-${historicalPaymentId}`,
+    active: true,
+  })
   await api("PATCH", "/api/bvhub/admin/payment-settings", tokens.admin, { recipientName: "Badminton Verein Erlangen", iban: "DE89370400440532013000", bic: "COBADEFFXXX" })
   const waitingFiller = await api<{ id: string }>("POST", `/api/bvhub/events/${events.waiting.id}/registrations`, tokens.member, { checkoutRegion: "ER", termsVersion: "ER-v1" })
   const waitingRegistration = await api<{ id: string; status: string }>("POST", `/api/bvhub/events/${events.waiting.id}/registrations`, tokens.waitingGuest, { checkoutRegion: "ER", termsVersion: "ER-v1" })
@@ -213,6 +247,7 @@ test.describe.serial("payments with isolated PocketBase", () => {
     expect(unpaidTrackColor).not.toBe("rgb(255, 255, 255)")
     expect(unpaidTrackColor).not.toBe("rgb(226, 232, 240)")
     await statusSwitch.click()
+    await expect.poll(() => statusSwitch.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe(unpaidTrackColor)
     const paidTrackColor = await statusSwitch.evaluate((element) => getComputedStyle(element).backgroundColor)
     expect(paidTrackColor).not.toBe(unpaidTrackColor)
     expect(paidTrackColor).not.toBe("rgb(255, 255, 255)")
@@ -222,6 +257,15 @@ test.describe.serial("payments with isolated PocketBase", () => {
     await expect(guestSession.page.getByTestId("download-payment-qr")).toHaveCount(0)
     await guestSession.context.close()
     await adminSession.context.close()
+  })
+
+  test("admin payment summaries reveal historical events only after Show all", async ({ browser }) => {
+    const { context, page } = await sessionPage(browser, seed.users.admin, seed.tokens.admin)
+    await page.goto("/admin/payments")
+    await expect(page.getByText(seed.events.historical.title, { exact: true })).toHaveCount(0)
+    await page.getByRole("button", { name: "Show all" }).click()
+    await expect(page.getByTestId(`payment-event-${seed.events.historical.id}`)).toBeVisible()
+    await context.close()
   })
 
   test("waiting payment appears after atomic promotion without reloading", async ({ browser }) => {

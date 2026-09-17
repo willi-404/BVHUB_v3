@@ -10,7 +10,7 @@ const EventsPage = lazy(() => import("../pages/EventsPage"));
 const EventDetailPage = lazy(() => import("../pages/EventDetailPage"));
 const EventCheckoutPage = lazy(() => import("../pages/EventCheckoutPage"));
 const AdminEventDetailPage = lazy(() => import("../pages/AdminEventDetailPage"));
-const AdminEventsPage = lazy(() => import("../app/components/AdminEventsView"));
+const AdminEventsPage = lazy(() => import("../pages/AdminEventsPage"));
 const AdminPage = lazy(() => import("../pages/AdminPage"));
 const MemberCardScannerPage = lazy(() => import("../pages/MemberCardScannerPage"));
 const PaymentDetailPage = lazy(() => import("../pages/PaymentDetailPage"));

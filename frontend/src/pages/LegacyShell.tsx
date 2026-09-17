@@ -1034,7 +1034,7 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
   const [events, setEvents] = useState<Event[]>(EVENTS);
   const [cardOpen, setCardOpen] = useState(false);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
-  const [adminView, setAdminView] = useState<"members" | "payments" | "events" | null>(null);
+  const [adminView, setAdminView] = useState<"members" | "payments" | null>(null);
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const mobileNavigationTrigger = useRef<HTMLButtonElement>(null);
   const mainRef = useRef<HTMLElement>(null);
@@ -1081,14 +1081,14 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
       case "profile":
         if (profileLoading) return <div><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p className="mt-2 text-sm text-[var(--muted-foreground)]">{t("profile.loading")}</p></div>;
         if (profileError) return <Card><CardContent className="p-5"><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p role="alert" className="mt-2 text-sm text-red-600">{t("profile.loadError")}</p><Button className="mt-4" onClick={() => void refetchProfile()}>{t("common.retry")}</Button></CardContent></Card>;
-        return <ProfileView profile={profile || null} onEditProfile={() => setEditProfileOpen(true)} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} onAdminScanner={() => navigate("/admin/member-card-scanner")} canAccessAdmin={canAccessAdmin} />;
+        return <ProfileView profile={profile || null} onEditProfile={() => setEditProfileOpen(true)} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => navigate("/admin/events")} onAdminScanner={() => navigate("/admin/member-card-scanner")} canAccessAdmin={canAccessAdmin} />;
     }
   }
 
   return (
     <div className="relative h-full bg-[var(--background)]" style={{ fontFamily: "var(--font-sans)" }}>
       <div className="app-shell-background flex h-full" data-drawer-open={mobileNavigationOpen} inert={mobileNavigationOpen ? true : undefined}>
-        <Sidebar active={tab} onChange={setTab} unpaidCount={unpaidCount} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} onAdminScanner={() => navigate("/admin/member-card-scanner")} canAccessAdmin={canAccessAdmin} profile={profile || null} />
+        <Sidebar active={tab} onChange={setTab} unpaidCount={unpaidCount} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => navigate("/admin/events")} onAdminScanner={() => navigate("/admin/member-card-scanner")} canAccessAdmin={canAccessAdmin} profile={profile || null} />
 
         <main ref={mainRef} id="app-main-content" className="min-w-0 w-full max-w-full flex-1 overflow-x-hidden overflow-y-auto">
         <div className="hidden lg:flex items-center justify-between px-8 py-5 border-b border-[var(--border)] bg-[var(--card)] sticky top-0 z-10">
@@ -1147,11 +1147,6 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
           <AdminPaymentsView onBack={() => setAdminView(null)} />
         </div>
       )}
-        {canAccessAdmin && adminView === "events" && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "var(--background)", display: "flex", flexDirection: "column" }}>
-          <AdminEventManageView onBack={() => setAdminView(null)} />
-        </div>
-      )}
       </div>
 
       <MobileNavigationDrawer
@@ -1163,7 +1158,7 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
         canAccessAdmin={canAccessAdmin}
         onAdminMembers={() => setAdminView("members")}
         onAdminPayments={() => setAdminView("payments")}
-        onAdminEvents={() => setAdminView("events")}
+        onAdminEvents={() => navigate("/admin/events")}
         onAdminScanner={() => navigate("/admin/member-card-scanner")}
         onLogout={logout}
         triggerRef={mobileNavigationTrigger}

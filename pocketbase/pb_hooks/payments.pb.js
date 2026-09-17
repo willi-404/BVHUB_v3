@@ -21,6 +21,9 @@ routerAdd("GET", "/api/bvhub/admin/payment-summary", (e) => {
   const service = require(`${__hooks}/payment-service.js`);
   service.requireAdmin(e);
   service.noStore(e);
+  const query = e.requestInfo().query || {};
+  const showAll = String(query.showAll || "") === "true";
+  const recentSince = Date.now() - 30 * 24 * 60 * 60 * 1000;
   const summaries = {};
   $app.findRecordsByFilter("payments", "active = true", "", 100000, 0).forEach((payment) => {
     const eventId = payment.getString("event");
@@ -50,7 +53,9 @@ routerAdd("GET", "/api/bvhub/admin/payment-summary", (e) => {
       summary.openAmountCents += amount;
     }
   });
-  const items = Object.values(summaries).sort((left, right) => Date.parse(right.start) - Date.parse(left.start));
+  const items = Object.values(summaries)
+    .filter((summary) => showAll || Date.parse(summary.start) >= recentSince)
+    .sort((left, right) => Date.parse(right.start) - Date.parse(left.start));
   return e.json(200, { items, totalItems: items.length });
 }, $apis.requireAuth("users"));
 

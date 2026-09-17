@@ -13,8 +13,8 @@ export function usePayment(id: string | undefined) {
   return useQuery({ queryKey: paymentKeys.detail(id ?? ""), queryFn: () => api.getPayment(id as string), enabled: Boolean(id) })
 }
 
-export function useAdminPaymentSummary() {
-  return useQuery({ queryKey: paymentKeys.adminSummary(), queryFn: api.getAdminPaymentSummary })
+export function useAdminPaymentSummary(showAll = false) {
+  return useQuery({ queryKey: paymentKeys.adminSummary(showAll), queryFn: () => api.getAdminPaymentSummary(showAll) })
 }
 
 export function useAdminEventPayments(eventId: string | undefined, enabled = true) {
@@ -57,7 +57,7 @@ export function useSetPaymentStatus() {
 export function invalidatePaymentQueries(client: QueryClient, payment?: { id?: string; event?: string }) {
   void client.invalidateQueries({ queryKey: paymentKeys.me() })
   if (payment?.id) void client.invalidateQueries({ queryKey: paymentKeys.detail(payment.id) })
-  void client.invalidateQueries({ queryKey: paymentKeys.adminSummary() })
+  void client.invalidateQueries({ queryKey: paymentKeys.adminSummaries() })
   if (payment?.event) void client.invalidateQueries({ queryKey: paymentKeys.adminEvent(payment.event) })
   void client.invalidateQueries({ queryKey: dashboardKeys.all })
 }

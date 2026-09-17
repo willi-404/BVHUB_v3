@@ -121,20 +121,21 @@ function listVenues(app, admin) {
   const records = app.findRecordsByFilter("venues", admin ? "id != ''" : "active = true", "", 100, 0);
   return { items: records.map(venueDto), totalItems: records.length };
 }
-function listPublishedEvents(app) {
+function listPublishedEvents(app, showAll = false) {
   const pageSize = 200;
   const records = [];
   let offset = 0;
   while (true) {
-    const batch = app.findRecordsByFilter("events", "published = true", "", pageSize, offset);
+    const statusFilter = showAll ? "" : " && (status = 'MEMBERS_ONLY' || status = 'OPEN_TO_ALL')";
+    const batch = app.findRecordsByFilter("events", `published = true${statusFilter}`, "", pageSize, offset);
     records.push(...batch);
     if (batch.length < pageSize) break;
     offset += pageSize;
   }
   records.sort((a, b) => {
-    const startDelta = Date.parse(a.getString("start")) - Date.parse(b.getString("start"));
+    const startDelta = Date.parse(b.getString("start")) - Date.parse(a.getString("start"));
     if (startDelta) return startDelta;
-    const createdDelta = Date.parse(a.getString("created")) - Date.parse(b.getString("created"));
+    const createdDelta = Date.parse(b.getString("created")) - Date.parse(a.getString("created"));
     if (createdDelta) return createdDelta;
     return String(a.id).localeCompare(String(b.id));
   });
@@ -147,7 +148,8 @@ function publicEvents(app, e, detailId) {
     if (!record.getBool("published")) throw new ApiError(404, "Event nicht gefunden", {});
     return eventDtoForUser(app, record, e.auth);
   }
-  const records = listPublishedEvents(app);
+  const query = e.requestInfo().query || {};
+  const records = listPublishedEvents(app, String(query.showAll || "") === "true");
   return { items: records.map((record) => eventDtoForUser(app, record, e.auth)), totalItems: records.length };
 }
 function parseVenue(value, existing) {
