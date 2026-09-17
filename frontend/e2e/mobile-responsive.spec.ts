@@ -127,14 +127,14 @@ async function mockSession(
       await route.fulfill({
         json: {
           timezone: "Europe/Berlin",
-          trackingSince: "2026-09",
+          trackingSince: "2026-04",
           current: { registeredUsers: 12, members: 8, publishedEventsThisMonth: 1, myUpcomingRegistrations: 1 },
           months: [
-            { month: "2026-04", registeredUsers: null, members: null, complete: false },
-            { month: "2026-05", registeredUsers: null, members: null, complete: false },
-            { month: "2026-06", registeredUsers: null, members: null, complete: false },
-            { month: "2026-07", registeredUsers: null, members: null, complete: false },
-            { month: "2026-08", registeredUsers: null, members: null, complete: false },
+            { month: "2026-04", registeredUsers: 7, members: 4, complete: true },
+            { month: "2026-05", registeredUsers: 8, members: 5, complete: true },
+            { month: "2026-06", registeredUsers: 9, members: 6, complete: true },
+            { month: "2026-07", registeredUsers: 10, members: 6, complete: true },
+            { month: "2026-08", registeredUsers: 11, members: 7, complete: true },
             { month: "2026-09", registeredUsers: 12, members: 8, complete: false },
           ],
         },

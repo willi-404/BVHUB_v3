@@ -11,19 +11,46 @@ assert.equal(dashboardTime.berlinMonthKey(new Date("2026-03-31T22:00:00.000Z")),
 assert.equal(dashboardTime.berlinMonthKey(new Date("2026-10-31T22:59:59.999Z")), "2026-10", "Berlin month remains October after DST ends");
 assert.equal(dashboardTime.berlinMonthKey(new Date("2026-10-31T23:00:00.000Z")), "2026-11", "Berlin winter-time month starts at 23:00 UTC");
 assert.deepEqual(dashboardTime.recentMonths("2026-01", 6), ["2025-08", "2025-09", "2025-10", "2025-11", "2025-12", "2026-01"], "cross-year cron month sequence is stable");
+assert.equal(dashboardTime.monthStartUtc("2026-04").toISOString(), "2026-03-31T22:00:00.000Z", "Berlin April starts at summer-time midnight");
+assert.equal(dashboardTime.monthStartUtc("2026-11").toISOString(), "2026-10-31T23:00:00.000Z", "Berlin November starts at winter-time midnight");
 globalThis.DynamicModel = class DynamicModel { constructor(shape) { Object.assign(this, shape); } };
-globalThis.$security = { randomString: () => "cronmonthtest01" };
-let cronUpsertParams;
-const cronTestQuery = {
-  bind(params) { cronUpsertParams = params; return this; },
-  one(model) { model.registeredUsers = 4; model.members = 3; },
-  execute() {},
-};
-const cronTestApp = { db: () => ({ newQuery: () => cronTestQuery }) };
-dashboardTime.upsertSnapshot(cronTestApp, new Date("2026-03-31T22:00:00.000Z"));
-assert.equal(cronUpsertParams.month, "2026-04", "cron upsert creates the new Berlin month at local midnight");
+const memberCountQueries = [];
+const dashboardTestApp = { db: () => ({ newQuery(sql) {
+  const query = {
+    bind(params) { this.params = params; return this; },
+    one(model) {
+      if (sql.includes("FROM users")) {
+        memberCountQueries.push({ sql, params: this.params });
+        const value = memberCountQueries.length;
+        model.registeredUsers = value === 1 ? 5 : value;
+        model.members = value === 1 ? 1 : value;
+      } else if (sql.includes("FROM events")) {
+        model.total = 7;
+      } else {
+        model.total = 2;
+      }
+    },
+  };
+  return query;
+} }) };
+const serviceStatistics = dashboardTime.dashboardStatistics(dashboardTestApp, "user-id", new Date("2026-09-17T12:00:00.000Z"));
+assert.equal(serviceStatistics.current.registeredUsers, 5, "all current user roles are registered users");
+assert.equal(serviceStatistics.current.members, 1, "only current MEMBER roles are formal members");
+assert.deepEqual(serviceStatistics.months.map((item) => item.month), ["2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09"], "dashboard returns six Berlin calendar months");
+assert.deepEqual(serviceStatistics.months.map((item) => item.registeredUsers), [2, 3, 4, 5, 6, 5], "each historical month has a cumulative registered-user count");
+assert.deepEqual(serviceStatistics.months.map((item) => item.members), [2, 3, 4, 5, 6, 1], "historical member counts use the user's current role");
+assert.deepEqual(memberCountQueries.slice(1).map((query) => query.params.createdBefore), [
+  "2026-04-30T22:00:00.000Z",
+  "2026-05-31T22:00:00.000Z",
+  "2026-06-30T22:00:00.000Z",
+  "2026-07-31T22:00:00.000Z",
+  "2026-08-31T22:00:00.000Z",
+], "historical counts end at the following Berlin month boundary");
+assert.ok(memberCountQueries.every((query) => query.sql.includes("COUNT(*) AS registeredUsers")), "registered users include every role");
+assert.ok(memberCountQueries.every((query) => query.sql.includes("role = 'MEMBER'")), "formal members are filtered by current MEMBER role");
+assert.equal(serviceStatistics.trackingSince, "2026-04", "tracking starts at the first returned month");
+assert.deepEqual(serviceStatistics.months.map((item) => item.complete), [true, true, true, true, true, false], "only the live month is incomplete");
 delete globalThis.DynamicModel;
-delete globalThis.$security;
 
 const baseUrl = process.env.PB_TEST_URL;
 const superuserEmail = process.env.PB_TEST_SUPERUSER_EMAIL;
@@ -454,14 +481,17 @@ expectStatus(await request("GET", "/api/bvhub/dashboard/statistics"), 401, "unau
 expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: inactiveAdminSession.token }), 403, "inactive account cannot read dashboard statistics");
 expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: unverifiedAdminSession.token }), 403, "unverified account cannot read dashboard statistics");
 const allUsersForDashboard = expectStatus(await request("GET", "/api/collections/users/records?perPage=500", { token: rootToken }), 200, "read users for dashboard boundary assertions").items;
-const expectedRegisteredUsers = allUsersForDashboard.filter((user) => ["GUEST", "MEMBER"].includes(user.role)).length;
+const expectedRegisteredUsers = allUsersForDashboard.length;
 const expectedMembers = allUsersForDashboard.filter((user) => user.role === "MEMBER").length;
+assert.ok(allUsersForDashboard.some((user) => user.role === "SUPER_ADMIN"), "dashboard fixture includes a superadmin");
+assert.ok(allUsersForDashboard.some((user) => user.role === "ADMIN"), "dashboard fixture includes an admin");
 for (const [label, token] of [["guest", guestLoginToken], ["member", memberLoginToken], ["admin", adminLogin.token], ["superadmin", superLogin.token]]) {
   const dashboard = expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token }), 200, `${label} reads dashboard statistics`);
   assert.equal(dashboard.timezone, "Europe/Berlin");
-  assert.equal(dashboard.current.registeredUsers, expectedRegisteredUsers, "guest and member roles are counted regardless of activation state");
+  assert.equal(dashboard.current.registeredUsers, expectedRegisteredUsers, "every current user role is counted regardless of activation state");
   assert.equal(dashboard.current.members, expectedMembers, "only member roles are counted");
   assert.equal(dashboard.months.length, 6);
+  assert.ok(dashboard.months.every((month) => Number.isInteger(month.registeredUsers) && Number.isInteger(month.members)), "all six dashboard months contain cumulative values");
   assert.equal(dashboard.months.at(-1).complete, false, "current month remains live rather than complete");
 }
 expectStatus(await request("GET", "/api/collections/dashboard_member_statistics/records", { token: memberLoginToken }), 403, "client cannot list private dashboard snapshots");
@@ -469,9 +499,6 @@ expectStatus(await request("POST", "/api/collections/dashboard_member_statistics
   token: memberLoginToken,
   body: { month: "2020-01", registeredUsers: 999, members: 999, capturedAt: new Date().toISOString() },
 }), 403, "client cannot write private dashboard snapshots");
-const rootSnapshots = expectStatus(await request("GET", "/api/collections/dashboard_member_statistics/records?perPage=20", { token: rootToken }), 200, "superuser reads dashboard snapshots");
-assert.equal(rootSnapshots.items.length, 1, "deployment initializes only the current month snapshot");
-assert.equal(rootSnapshots.items[0].registeredUsers, expectedRegisteredUsers, "user create and update hooks refresh the current snapshot");
 
 const transientDashboardGuest = expectStatus(await request("POST", "/api/collections/users/records", {
   token: rootToken,
@@ -898,11 +925,19 @@ expectStatus(await request("PATCH", `/api/bvhub/admin/users/${superAdmin.id}/rol
 expectStatus(await request("PATCH", `/api/bvhub/admin/users/${managed.id}/role`, {
   token: superLogin.token, body: { role: "MEMBER", confirmation: "ROLE_CHANGE" },
 }), 200, "superadmin demotes admin");
-const dashboardAfterRoleChange = expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: memberLoginToken }), 200, "dashboard after direct SQL role change");
-const currentDashboardMonth = dashboardTime.berlinMonthKey(new Date());
-const snapshotAfterRoleChange = expectStatus(await request("GET", `/api/collections/dashboard_member_statistics/records?filter=${encodeURIComponent(`month = "${currentDashboardMonth}"`)}`, { token: rootToken }), 200, "read snapshot after direct SQL role change").items[0];
-assert.equal(snapshotAfterRoleChange.registeredUsers, dashboardAfterRoleChange.current.registeredUsers, "role change transaction refreshes registered-user snapshot");
-assert.equal(snapshotAfterRoleChange.members, dashboardAfterRoleChange.current.members, "role change transaction refreshes member snapshot");
+const dashboardWithManagedMember = expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: memberLoginToken }), 200, "dashboard with managed member");
+expectStatus(await request("PATCH", `/api/bvhub/admin/users/${managed.id}/role`, {
+  token: adminLogin.token, body: { role: "GUEST", confirmation: "ROLE_CHANGE" },
+}), 200, "admin changes managed member to guest for dashboard statistics");
+const dashboardAfterRoleChange = expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: memberLoginToken }), 200, "dashboard reflects role change without a snapshot refresh");
+assert.equal(dashboardAfterRoleChange.current.registeredUsers, dashboardWithManagedMember.current.registeredUsers, "role changes keep the registered-user total stable");
+assert.equal(dashboardAfterRoleChange.current.members, dashboardWithManagedMember.current.members - 1, "role changes update formal-member totals on the next request");
+expectStatus(await request("PATCH", `/api/bvhub/admin/users/${managed.id}/role`, {
+  token: adminLogin.token, body: { role: "MEMBER", confirmation: "ROLE_CHANGE" },
+}), 200, "admin restores managed member after dashboard statistics test");
+const dashboardAfterRoleRestore = expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: memberLoginToken }), 200, "dashboard reflects restored role without a snapshot refresh");
+assert.equal(dashboardAfterRoleRestore.current.registeredUsers, dashboardWithManagedMember.current.registeredUsers);
+assert.equal(dashboardAfterRoleRestore.current.members, dashboardWithManagedMember.current.members);
 const roleSessionTarget = expectStatus(await request("POST", "/api/collections/users/records", {
   token: rootToken, body: userBody("role-session@example.test", "MEMBER"),
 }), 200, "create role session target");

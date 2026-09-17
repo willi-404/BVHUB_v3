@@ -34,7 +34,14 @@ async function mockMemberSession(page: Page, record = user, groups = [{ membersh
     if (path === "/api/bvhub/me/profile") return route.fulfill({ json: { user: record, profile: null, groups } })
     if (path === "/api/bvhub/me/member-card-token") return route.fulfill({ json: { token, expiresAt: "2099-01-01T00:02:00.000Z", refreshAt: "2099-01-01T00:01:40.000Z" } })
     if (path === "/api/bvhub/member-card/verify") return route.fulfill({ json: { valid: true, member: { id: record.id, displayName: record.displayName, groups: ["Member ER"] }, tokenExpiresAt: "2099-01-01T00:02:00.000Z", verifiedAt: "2026-09-14T20:00:00.000Z" } })
-    if (path === "/api/bvhub/dashboard/statistics") return route.fulfill({ json: { timezone: "Europe/Berlin", trackingSince: "2026-09", current: { registeredUsers: 1, members: 1, publishedEventsThisMonth: 0, myUpcomingRegistrations: 0 }, months: [] } })
+    if (path === "/api/bvhub/dashboard/statistics") return route.fulfill({ json: { timezone: "Europe/Berlin", trackingSince: "2026-04", current: { registeredUsers: 1, members: 1, publishedEventsThisMonth: 0, myUpcomingRegistrations: 0 }, months: [
+      { month: "2026-04", registeredUsers: 1, members: 1, complete: true },
+      { month: "2026-05", registeredUsers: 1, members: 1, complete: true },
+      { month: "2026-06", registeredUsers: 1, members: 1, complete: true },
+      { month: "2026-07", registeredUsers: 1, members: 1, complete: true },
+      { month: "2026-08", registeredUsers: 1, members: 1, complete: true },
+      { month: "2026-09", registeredUsers: 1, members: 1, complete: false },
+    ] } })
     if (path === "/api/bvhub/events") return route.fulfill({ json: { items: [] } })
     return route.fulfill({ json: { items: [] } })
   })

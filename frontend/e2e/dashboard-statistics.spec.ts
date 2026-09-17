@@ -82,7 +82,7 @@ test("renders four real metrics, a two-series area chart, tooltip, and legend", 
   await expect(tooltip).toContainText("84")
 })
 
-test("shows loading, retryable failure, one-month tracking, and exact-data gaps", async ({ page }) => {
+test("shows loading, retryable failure, and complete realtime history", async ({ page }) => {
   let requests = 0
   let releaseFirstResponse: () => void
   let confirmFirstRequest: () => void
@@ -96,15 +96,7 @@ test("shows loading, retryable failure, one-month tracking, and exact-data gaps"
       await route.fulfill({ status: 500, json: { message: "failed" } })
       return
     }
-    await route.fulfill({
-      json: {
-        ...completeStatistics,
-        trackingSince: "2026-09",
-        months: completeStatistics.months.map((item) => item.month === "2026-09"
-          ? { ...item, registeredUsers: 321, members: 87, complete: false }
-          : { ...item, registeredUsers: null, members: null, complete: false }),
-      },
-    })
+    await route.fulfill({ json: completeStatistics })
   })
   await page.goto("/dashboard")
   await firstRequest
@@ -112,8 +104,8 @@ test("shows loading, retryable failure, one-month tracking, and exact-data gaps"
   releaseFirstResponse()
   await expect(page.getByText("Statistics could not be loaded")).toBeVisible()
   await page.getByRole("button", { name: "Try again" }).click()
-  await expect(page.getByText("Tracking starts this month")).toBeVisible()
-  await expect(page.getByText("Some months have no exact snapshot; no values were interpolated")).toBeVisible()
+  await expect(page.getByText("Tracking starts this month")).toHaveCount(0)
+  await expect(page.getByText("Some months have no exact snapshot; no values were interpolated")).toHaveCount(0)
 })
 
 test("statistics layout has restrained motion and disables it for reduced-motion users", async ({ page }) => {

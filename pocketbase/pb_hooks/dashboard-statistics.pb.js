@@ -7,16 +7,3 @@ routerAdd("GET", "/api/bvhub/dashboard/statistics", (e) => {
   const statistics = require(`${__hooks}/dashboard-statistics-service.js`);
   return e.json(200, statistics.dashboardStatistics($app, e.auth.id, new Date()));
 }, $apis.requireAuth("users"));
-
-function refreshMemberStatistics() {
-  const statistics = require(`${__hooks}/dashboard-statistics-service.js`);
-  statistics.upsertSnapshot($app, new Date());
-}
-
-onRecordAfterCreateSuccess(refreshMemberStatistics, "users");
-onRecordAfterUpdateSuccess(refreshMemberStatistics, "users");
-onRecordAfterDeleteSuccess(refreshMemberStatistics, "users");
-
-cronAdd("dashboard-member-statistics", "0 * * * *", () => {
-  refreshMemberStatistics();
-});

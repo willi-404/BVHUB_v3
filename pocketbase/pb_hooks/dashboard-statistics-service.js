@@ -40,13 +40,16 @@ function queryOne(app, sql, shape, params) {
   return result;
 }
 
-function memberCounts(app) {
+function memberCounts(app, createdBefore) {
+  const historicalCutoff = createdBefore
+    ? "\n    WHERE datetime(created) < datetime({:createdBefore})"
+    : "";
   const result = queryOne(app, `
     SELECT
-      SUM(CASE WHEN role IN ('GUEST', 'MEMBER') THEN 1 ELSE 0 END) AS registeredUsers,
-      SUM(CASE WHEN role = 'MEMBER' THEN 1 ELSE 0 END) AS members
-    FROM users
-  `, { registeredUsers: 0, members: 0 });
+      COUNT(*) AS registeredUsers,
+      COALESCE(SUM(CASE WHEN role = 'MEMBER' THEN 1 ELSE 0 END), 0) AS members
+    FROM users${historicalCutoff}
+  `, { registeredUsers: 0, members: 0 }, createdBefore ? { createdBefore } : undefined);
   return {
     registeredUsers: Number(result.registeredUsers || 0),
     members: Number(result.members || 0),
@@ -81,68 +84,22 @@ function countUpcomingRegistrations(app, userId, now) {
   return Number(result.total || 0);
 }
 
-function upsertSnapshot(app, nowValue) {
-  const now = nowValue instanceof Date ? nowValue : new Date(nowValue || Date.now());
-  const month = berlinMonthKey(now);
-  const counts = memberCounts(app);
-  const timestamp = now.toISOString();
-  app.db().newQuery(`
-    INSERT INTO dashboard_member_statistics
-      (id, month, registeredUsers, members, capturedAt, created, updated)
-    VALUES
-      ({:id}, {:month}, {:registeredUsers}, {:members}, {:capturedAt}, {:created}, {:updated})
-    ON CONFLICT(month) DO UPDATE SET
-      registeredUsers = excluded.registeredUsers,
-      members = excluded.members,
-      capturedAt = excluded.capturedAt,
-      updated = excluded.updated
-  `).bind({
-    id: $security.randomString(15),
-    month,
-    registeredUsers: counts.registeredUsers,
-    members: counts.members,
-    capturedAt: timestamp,
-    created: timestamp,
-    updated: timestamp,
-  }).execute();
-  return { month, ...counts, capturedAt: timestamp };
-}
-
 function dashboardStatistics(app, userId, nowValue) {
   const now = nowValue instanceof Date ? nowValue : new Date(nowValue || Date.now());
   const currentMonth = berlinMonthKey(now);
-  // Keep the live month durable even when no user mutation or cron tick has
-  // occurred since the last read. The upsert is idempotent on the unique month
-  // key and uses the same app/transaction scope as the request.
-  upsertSnapshot(app, now);
   const keys = recentMonths(currentMonth, 6);
-  const snapshots = app.findRecordsByFilter(
-    "dashboard_member_statistics",
-    "month >= {:first} && month <= {:last}",
-    "month",
-    6,
-    0,
-    { first: keys[0], last: keys[keys.length - 1] },
-  );
-  const snapshotsByMonth = {};
-  snapshots.forEach((record) => {
-    snapshotsByMonth[record.getString("month")] = {
-      registeredUsers: record.getInt("registeredUsers"),
-      members: record.getInt("members"),
-    };
-  });
-  const trackingRecord = app.findRecordsByFilter("dashboard_member_statistics", "", "month", 1, 0)[0];
   const live = memberCounts(app);
   const months = keys.map((month) => {
     if (month === currentMonth) return { month, ...live, complete: false };
-    const snapshot = snapshotsByMonth[month];
-    return snapshot
-      ? { month, ...snapshot, complete: true }
-      : { month, registeredUsers: null, members: null, complete: false };
+    return {
+      month,
+      ...memberCounts(app, monthStartUtc(shiftMonth(month, 1)).toISOString()),
+      complete: true,
+    };
   });
   return {
     timezone: TIMEZONE,
-    trackingSince: trackingRecord ? trackingRecord.getString("month") : currentMonth,
+    trackingSince: keys[0],
     current: {
       ...live,
       publishedEventsThisMonth: countPublishedEventsThisMonth(app, currentMonth, now),
@@ -159,6 +116,5 @@ module.exports = {
   monthStartUtc,
   recentMonths,
   memberCounts,
-  upsertSnapshot,
   dashboardStatistics,
 };
