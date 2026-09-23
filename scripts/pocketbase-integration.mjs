@@ -5,6 +5,13 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const dashboardTime = require("../pocketbase/pb_hooks/dashboard-statistics-service.js");
+const paymentService = require("../pocketbase/pb_hooks/payment-service.js");
+
+const purposeEventId = "abc123def456ghi";
+assert.equal(paymentService.paymentPurpose(purposeEventId, "\u0000 \t"), `EVT-${purposeEventId}-PAY-MEMBER`, "an empty normalized payment name has a stable fallback");
+const normalizedPurpose = paymentService.paymentPurpose(purposeEventId, `${"A".repeat(200)}\nUnsafe[]`);
+assert.equal(normalizedPurpose.length, 140, "normalized payment purposes fit the EPC message limit");
+assert.match(normalizedPurpose, /^[A-Za-z0-9 /?:().,'+\-]+$/, "normalized payment purposes contain EPC-safe characters only");
 
 assert.equal(dashboardTime.berlinMonthKey(new Date("2026-03-31T21:59:59.999Z")), "2026-03", "Berlin month remains March before local midnight");
 assert.equal(dashboardTime.berlinMonthKey(new Date("2026-03-31T22:00:00.000Z")), "2026-04", "Berlin summer-time month starts at 22:00 UTC");
@@ -135,6 +142,10 @@ assert.equal(migratedPayment[0].paymentRequired, true);
 assert.equal(migratedPayment[0].amountCents, 380);
 assert.equal(migratedPayment[0].status, "UNPAID");
 assert.equal(migratedPayment[0].active, true);
+assert.match(migratedPayment[0].purpose, /^BVHUB-EVT-[a-z0-9]{15}-PAY-[a-z0-9]{15}$/, "legacy payment purpose remains unchanged");
+const paymentSchema = expectStatus(await request("GET", "/api/collections/payments", { token: rootToken }), 200, "read migrated payment schema");
+assert.equal(paymentSchema.fields.find((field) => field.name === "purpose").pattern, "", "new payment purposes are not constrained to the legacy format");
+assert.equal(paymentSchema.indexes.some((index) => index.includes("idx_payments_purpose")), false, "payment purposes are not unique");
 const migratedMemberRegistration = expectStatus(await request("GET", `/api/collections/event_registrations/records?filter=${encodeURIComponent('termsVersion = "LEGACY-PAYMENT-MIGRATION-MEMBER"')}`, { token: rootToken }), 200, "read migrated member registration").items[0];
 const migratedMemberPayment = await paymentsForRegistration(migratedMemberRegistration.id, rootToken);
 assert.equal(migratedMemberPayment.length, 1, "old registered member is backfilled exactly once");
@@ -645,6 +656,11 @@ assert.equal(publishedEvent.published, true);
 const dashboardAfterPublish = expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: memberLoginToken }), 200, "dashboard after event publish");
 assert.equal(dashboardAfterPublish.current.publishedEventsThisMonth, dashboardBeforePublish.current.publishedEventsThisMonth + 1, "first publication in the Berlin month is counted");
 const adminAddMailBefore = smtpMessages.length;
+const paymentPurposeNames = {
+  guest: expectStatus(await request("GET", `/api/collections/users/records/${guest.id}`, { token: rootToken }), 200, "read guest payment display name").displayName,
+  member: expectStatus(await request("GET", `/api/collections/users/records/${member.id}`, { token: rootToken }), 200, "read member payment display name").displayName,
+  paymentGuest: expectStatus(await request("GET", `/api/collections/users/records/${paymentGuest.id}`, { token: rootToken }), 200, "read second guest payment display name").displayName,
+};
 const adminAdded = expectStatus(await request("POST", `/api/bvhub/admin/events/${validEvent.id}/participants`, { token: adminLogin.token, body: { userId: guest.id } }), 201, "admin add participant immediate mail");
 assert.match(await waitForMail(adminAddMailBefore), /hinzugef/);
 const adminGuestPayments = await paymentsForRegistration(adminAdded.registrationId, rootToken);
@@ -656,7 +672,7 @@ assert.equal(adminGuestPayment.paymentRequired, true);
 assert.equal(adminGuestPayment.amountCents, 380);
 assert.equal(adminGuestPayment.status, "UNPAID");
 assert.equal(adminGuestPayment.active, true);
-assert.match(adminGuestPayment.purpose, new RegExp(`^BVHUB-EVT-${validEvent.id}-PAY-${adminGuestPayment.id}$`));
+assert.equal(adminGuestPayment.purpose, `EVT-${validEvent.id}-PAY-${paymentPurposeNames.guest}`, "admin-added participant uses the display name in its payment purpose");
 assert.ok(adminGuestPayment.purpose.length <= 140, "payment purpose fits EPC message limit");
 const guestOwnPayments = expectStatus(await request("GET", "/api/bvhub/me/payments", { token: guestLoginToken }), 200, "guest reads own payments");
 assert.ok(guestOwnPayments.items.some((payment) => payment.id === adminGuestPayment.id));
@@ -696,7 +712,7 @@ await waitForMail(secondAdminAddMailBefore);
 const secondGuestPayment = (await paymentsForRegistration(secondAdminAdded.registrationId, rootToken))[0];
 assert.equal(secondGuestPayment.amountCents, 500, "new payment uses the updated event fee");
 assert.equal(secondGuestPayment.status, "UNPAID");
-assert.notEqual(secondGuestPayment.purpose, adminGuestPayment.purpose, "payment purposes are unique");
+assert.equal(secondGuestPayment.purpose, `EVT-${validEvent.id}-PAY-${paymentPurposeNames.paymentGuest}`, "later payments use the current display name format");
 expectStatus(await request("PATCH", `/api/bvhub/admin/users/${paymentGuest.id}/role`, {
   token: superLogin.token, body: { role: "MEMBER", confirmation: "ROLE_CHANGE" },
 }), 200, "payment guest later becomes a member");
@@ -726,6 +742,11 @@ assert.equal(reactivatedPayment.status, "PAID", "reactivation does not reset pai
 assert.equal(reactivatedPayment.amountCents, 380, "reactivation does not update amount snapshot");
 const paymentSummary = expectStatus(await request("GET", "/api/bvhub/admin/payment-summary", { token: adminLogin.token }), 200, "admin reads compact payment summary");
 assert.ok(paymentSummary.items.some((item) => item.eventId === validEvent.id && item.totalPayments >= 2));
+const duplicatePurposePayment = expectStatus(await request("PATCH", `/api/collections/payments/records/${secondGuestPayment.id}`, {
+  token: rootToken,
+  body: { purpose: adminGuestPayment.purpose },
+}), 200, "duplicate payment purpose is accepted");
+assert.equal(duplicatePurposePayment.purpose, adminGuestPayment.purpose);
 const eventPaymentDetails = expectStatus(await request("GET", `/api/bvhub/admin/events/${validEvent.id}/payments`, { token: superLogin.token }), 200, "superadmin lazily loads event payments");
 assert.ok(eventPaymentDetails.items.some((payment) => payment.id === adminGuestPayment.id));
 const publicEventList = expectStatus(await request("GET", "/api/bvhub/events", { token: memberLoginToken }), 200, "member reads published events");
@@ -749,6 +770,7 @@ assert.equal(memberPayment.roleSnapshot, "MEMBER");
 assert.equal(memberPayment.paymentRequired, false);
 assert.equal(memberPayment.amountCents, 0);
 assert.equal(memberPayment.status, "PAID");
+assert.equal(memberPayment.purpose, `EVT-${validEvent.id}-PAY-${paymentPurposeNames.member}`, "self-registration uses the display name format");
 const dashboardAfterRegistration = expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: memberLoginToken }), 200, "dashboard after event registration");
 assert.equal(dashboardAfterRegistration.current.myUpcomingRegistrations, 1, "only the member's future REGISTERED event is counted");
 assert.match(await waitForMail(eventRegistrationMailBefore), /Anmeldung best/);
@@ -813,6 +835,7 @@ assert.equal(promotedPayments.length, 1, "waiting-list promotion creates a payme
 assert.equal(promotedPayments[0].roleSnapshot, "GUEST");
 assert.equal(promotedPayments[0].amountCents, 380);
 assert.equal(promotedPayments[0].status, "UNPAID");
+assert.equal(promotedPayments[0].purpose, `EVT-${waitingEvent.id}-PAY-${paymentPurposeNames.guest}`, "waiting-list promotion uses the display name format");
 const promotedOutbox = expectStatus(await request("GET", `/api/collections/notification_outbox/records?filter=${encodeURIComponent(`registration = "${waitingRegistration.id}"`)}`, { token: rootToken }), 200, "waiting-list outbox");
 assert.deepEqual(promotedOutbox.items.map((item) => item.kind).sort(), ["EVENT_WAITING_LIST_JOINED", "EVENT_WAITING_LIST_PROMOTED"].sort());
 
