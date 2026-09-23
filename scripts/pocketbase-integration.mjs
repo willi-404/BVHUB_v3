@@ -758,31 +758,44 @@ assert.equal(reactivatedPayment.status, "PAID", "reactivation does not reset pai
 assert.equal(reactivatedPayment.amountCents, 380, "reactivation does not update amount snapshot");
 const paymentSummary = expectStatus(await request("GET", "/api/bvhub/admin/payment-summary", { token: adminLogin.token }), 200, "admin reads compact payment summary");
 assert.ok(paymentSummary.items.some((item) => item.eventId === validEvent.id && item.totalPayments >= 2));
+
 const oldPaymentEvent = expectStatus(await request("POST", "/api/bvhub/admin/events", {
   token: adminLogin.token,
-  body: { ...eventPayload, title: "WU-05 Old Payment Event", start: "2020-01-01T16:00:00.000Z", end: "2020-01-01T18:00:00.000Z", abmeldefrist: "2019-12-31T16:00:00.000Z", published: true, status: "COMPLETED" },
+  body: { ...eventPayload, title: "WU-05 Old Payment Event", start: "2020-01-01T16:00:00.000Z", end: "2020-01-01T18:00:00.000Z", abmeldefrist: "2019-12-
+  31T16:00:00.000Z", published: true, status: "COMPLETED" },
 }), 201, "create old event with payment history");
 const oldRegistration = expectStatus(await request("POST", "/api/collections/event_registrations/records", {
   token: rootToken,
-  body: { event: oldPaymentEvent.id, user: guest.id, status: "REGISTERED", registeredAt: "2019-12-01T12:00:00.000Z", checkoutRegion: "ER", termsVersion: "PAYMENT-SUMMARY-OLD-EVENT", termsAcceptedAt: "2019-12-01T12:00:00.000Z" },
+  body: { event: oldPaymentEvent.id, user: guest.id, status: "REGISTERED", registeredAt: "2019-12-01T12:00:00.000Z", checkoutRegion: "ER", termsVersion:
+  "PAYMENT-SUMMARY-OLD-EVENT", termsAcceptedAt: "2019-12-01T12:00:00.000Z" },
 }), 200, "create old event registration");
 const oldPaymentId = "oldpayment00001";
 expectStatus(await request("POST", "/api/collections/payments/records", {
   token: rootToken,
-  body: { id: oldPaymentId, registration: oldRegistration.id, event: oldPaymentEvent.id, user: guest.id, roleSnapshot: "GUEST", paymentRequired: true, amountCents: 380, status: "UNPAID", purpose: `BVHUB-EVT-${oldPaymentEvent.id}-PAY-${oldPaymentId}`, active: true },
+  body: { id: oldPaymentId, registration: oldRegistration.id, event: oldPaymentEvent.id, user: guest.id, roleSnapshot: "GUEST", paymentRequired: true,
+  amountCents: 380, status: "UNPAID", purpose: `BVHUB-EVT-${oldPaymentEvent.id}-PAY-${oldPaymentId}`, active: true },
 }), 200, "create old event payment");
-const duplicatePurposePayment = expectStatus(await request("PATCH", `/api/collections/payments/records/${oldPaymentId}`, {
+
+const duplicatePurposePayment = expectStatus(await request("PATCH", `/api/collections/payments/records/${secondGuestPayment.id}`, {
   token: rootToken,
   body: { purpose: adminGuestPayment.purpose },
 }), 200, "duplicate payment purpose is accepted");
 assert.equal(duplicatePurposePayment.purpose, adminGuestPayment.purpose);
-const recentPaymentSummary = expectStatus(await request("GET", "/api/bvhub/admin/payment-summary", { token: adminLogin.token }), 200, "admin reads recent payment summary");
+
+const recentPaymentSummary = expectStatus(await request("GET", "/api/bvhub/admin/payment-summary", { token: adminLogin.token }), 200, "read recent payment
+summary");
 assert.ok(recentPaymentSummary.items.some((item) => item.eventId === validEvent.id), "recent payment summary keeps future events");
-assert.equal(recentPaymentSummary.items.some((item) => item.eventId === oldPaymentEvent.id), false, "recent payment summary hides events older than 30 days");
-assert.deepEqual(recentPaymentSummary.items.map((item) => item.start), [...recentPaymentSummary.items].map((item) => item.start).sort().reverse(), "recent payment summary is newest first");
-const allPaymentSummary = expectStatus(await request("GET", "/api/bvhub/admin/payment-summary?showAll=true", { token: adminLogin.token }), 200, "admin reads complete payment summary");
+assert.equal(recentPaymentSummary.items.some((item) => item.eventId === oldPaymentEvent.id), false, "recent payment summary hides events older than 30
+days");
+assert.deepEqual(recentPaymentSummary.items.map((item) => item.start), [...recentPaymentSummary.items].map((item) => item.start).sort().reverse(), "recent
+payment summary is newest first");
+
+const allPaymentSummary = expectStatus(await request("GET", "/api/bvhub/admin/payment-summary?showAll=true", { token: adminLogin.token }), 200, "read
+complete payment summary");
 assert.ok(allPaymentSummary.items.some((item) => item.eventId === oldPaymentEvent.id), "complete payment summary includes old events");
-assert.deepEqual(allPaymentSummary.items.map((item) => item.start), [...allPaymentSummary.items].map((item) => item.start).sort().reverse(), "complete payment summary is newest first");
+assert.deepEqual(allPaymentSummary.items.map((item) => item.start), [...allPaymentSummary.items].map((item) => item.start).sort().reverse(), "complete
+payment summary is newest first");
+
 const eventPaymentDetails = expectStatus(await request("GET", `/api/bvhub/admin/events/${validEvent.id}/payments`, { token: superLogin.token }), 200, "superadmin lazily loads event payments");
 assert.ok(eventPaymentDetails.items.some((payment) => payment.id === adminGuestPayment.id));
 const publicEventList = expectStatus(await request("GET", "/api/bvhub/events", { token: memberLoginToken }), 200, "member reads published events");
