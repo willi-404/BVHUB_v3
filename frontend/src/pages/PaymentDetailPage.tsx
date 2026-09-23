@@ -78,7 +78,7 @@ export default function PaymentDetailPage() {
                 </dl>
                 {!paid && epc && (
                   <div className="flex flex-col items-center gap-4">
-                    <div data-testid="epc-payment-qr" className="w-full max-w-64 rounded-lg bg-white p-4 shadow-sm outline outline-black/10"><QRCodeSVG value={epc.payload} size={224} level="M" marginSize={4} bgColor="#ffffff" fgColor="#111111" className="h-auto max-w-full" /></div>
+                    <div data-testid="epc-payment-qr" data-epc-payload={epc.payload} className="w-full max-w-64 rounded-lg bg-white p-4 shadow-sm outline outline-black/10"><QRCodeSVG value={epc.payload} size={224} level="M" marginSize={4} bgColor="#ffffff" fgColor="#111111" className="h-auto max-w-full" /></div>
                     <Button data-testid="download-payment-qr" variant="outline" onClick={() => void downloadQr()}><Download data-icon="inline-start" />{t("payments.downloadQr")}</Button>
                     {qrDownloadError && <p role="alert" className="text-sm text-destructive">{t("payments.qrDownloadError")}</p>}
                     <a data-testid="payto-link" href={epc.payto} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 sm:w-auto"><ExternalLink className="size-4" />{t("payments.openBankingApp")}</a>
