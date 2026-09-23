@@ -1,5 +1,19 @@
 const ROLES = ["GUEST", "MEMBER", "ADMIN", "SUPER_ADMIN"];
 const STATUSES = ["PAID", "UNPAID"];
+const EPC_MESSAGE_MAX_LENGTH = 140;
+const PAYMENT_PURPOSE_FALLBACK = "MEMBER";
+
+function paymentPurpose(eventId, displayName) {
+  const prefix = `EVT-${eventId}-PAY-`;
+  const maxNameLength = EPC_MESSAGE_MAX_LENGTH - prefix.length;
+  const normalizedName = String(displayName || "")
+    .replace(/[\x00-\x1F\x7F-\x9F]/g, " ")
+    .replace(/[^A-Za-z0-9 /?:().,'+\-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxNameLength);
+  return `${prefix}${normalizedName || PAYMENT_PURPOSE_FALLBACK}`;
+}
 
 function requireUser(e) {
   const user = e.auth;
@@ -68,7 +82,7 @@ function ensurePaymentForRegistration(app, registration, user, event) {
   payment.set("paymentRequired", paymentRequired);
   payment.set("amountCents", amountCents);
   payment.set("status", paymentRequired ? "UNPAID" : "PAID");
-  payment.set("purpose", `BVHUB-EVT-${event.id}-PAY-${payment.id}`);
+  payment.set("purpose", paymentPurpose(event.id, user.getString("displayName")));
   payment.set("active", true);
   app.save(payment);
   return payment;
@@ -187,6 +201,7 @@ module.exports = {
   noStore,
   normalizeBic,
   normalizeIban,
+  paymentPurpose,
   pathValue,
   paymentDto,
   paymentForRegistration,
