@@ -153,7 +153,7 @@ async function sessionPage(browser: Browser, user: SeedUser, token: string, view
 }
 
 async function paymentByRegistration(registrationId: string) {
-  const result = await api<{ items: Array<{ id: string; status: string; active: boolean }> }>("GET", `/api/collections/payments/records?filter=${encodeURIComponent(`registration = "${registrationId}"`)}`, seed.rootToken)
+  const result = await api<{ items: Array<{ id: string; status: string; active: boolean; purpose: string }> }>("GET", `/api/collections/payments/records?filter=${encodeURIComponent(`registration = "${registrationId}"`)}`, seed.rootToken)
   return result.items[0]
 }
 
@@ -191,6 +191,7 @@ test.describe.serial("payments with isolated PocketBase", () => {
     const registration = await api<{ id: string }>("GET", `/api/bvhub/events/${seed.events.guest.id}/registration`, seed.tokens.guest)
     const createdPayment = await paymentByRegistration(registration.id)
     seed.guestPaymentId = createdPayment.id
+    expect(createdPayment.purpose).toBe(`EVT-${seed.events.guest.id}-PAY-${seed.users.guest.displayName}`)
 
     await page.goto("/dashboard")
     await page.getByRole("button", { name: /Payments$/ }).first().click()
@@ -200,10 +201,12 @@ test.describe.serial("payments with isolated PocketBase", () => {
     await paymentRow.getByRole("link", { name: `Payment details: ${seed.events.guest.title}` }).click()
     await expect(page).toHaveURL(`/payments/${createdPayment.id}`)
     await expect(page.getByTestId("epc-payment-qr").locator("svg")).toBeVisible()
+    await expect(page.getByTestId("epc-payment-qr")).toHaveAttribute("data-epc-payload", expect.stringContaining(createdPayment.purpose))
     await expect(page.locator("dd").getByText("€3.80", { exact: true })).toBeVisible()
     await expect(page.locator("dd").getByText("Badminton Verein Erlangen", { exact: true })).toBeVisible()
     await expect(page.locator("dd").getByText("DE89 3704 0044 0532 0130 00", { exact: true })).toBeVisible()
     await expect(page.getByTestId("payto-link")).toHaveAttribute("href", /^payto:\/\/iban\//)
+    expect(new URL(await page.getByTestId("payto-link").getAttribute("href") ?? "").searchParams.get("message")).toBe(createdPayment.purpose)
     const downloadPromise = page.waitForEvent("download")
     await page.getByTestId("download-payment-qr").click()
     const download = await downloadPromise
