@@ -5,6 +5,7 @@ import { useAuth, useAuthUser } from "../features/auth/AuthProvider";
 import { isAdminRole } from "../features/auth/policy";
 import { pb } from "../lib/pocketbase";
 import { useI18n } from "../i18n";
+import { publicRouteDecision } from "../routes/guardLogic";
 export default function ProtectedRoute({ admin = false }: { admin?: boolean }) {
   const { status } = useAuth();
   const { data: user } = useAuthUser();
@@ -34,6 +35,15 @@ export default function ProtectedRoute({ admin = false }: { admin?: boolean }) {
   if (status !== "authenticated") return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}${location.hash}` }} />;
   if (serverSession.isPending) return <div className="min-h-full flex items-center justify-center">{t("common.loading")}</div>;
   if (serverSession.isError) return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}${location.hash}` }} />;
-  if (admin && !isAdminRole(user?.role)) return <Navigate to="/dashboard" replace />;
+  if (admin && !isAdminRole(user?.role)) return <Navigate to="/home" replace />;
   return <Outlet />;
+}
+
+export function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
+  const { status } = useAuth();
+  const { t } = useI18n();
+  const decision = publicRouteDecision(status);
+  if (decision === "loading") return <div className="min-h-full flex items-center justify-center">{t("common.loading")}</div>;
+  if (decision === "home") return <Navigate to="/home" replace />;
+  return children;
 }

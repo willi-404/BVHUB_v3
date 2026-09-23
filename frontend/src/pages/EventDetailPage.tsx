@@ -26,7 +26,7 @@ function NavigationLinks() {
       </Link>
       <Link
         className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground"
-        to="/dashboard"
+        to="/home"
       >
         {t("events.backToDashboard")}
       </Link>

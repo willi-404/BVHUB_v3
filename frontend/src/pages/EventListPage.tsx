@@ -15,12 +15,12 @@ export default function EventListPage() {
     <div className="min-h-full bg-[var(--background)] px-4 py-6 lg:px-8">
       <div className="mx-auto max-w-5xl">
         <div className="mb-6">
-          <Link className="mb-4 inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground" to="/dashboard">
+          <Link className="mb-4 inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground" to="/home">
             {t("events.backToDashboard")}
           </Link>
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="page-title">{t("events.title")}</h1>
+              <h1 id="view-title-events" tabIndex={-1} className="page-title">{t("events.title")}</h1>
               <p className="mt-1 text-sm text-[var(--muted-foreground)]">
                 {t("events.listDescription")}
               </p>

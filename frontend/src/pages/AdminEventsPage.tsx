@@ -6,7 +6,7 @@ export default function AdminEventsPage() {
 
   return (
     <main className="h-dvh overflow-y-auto bg-background">
-      <AdminEventsView onBack={() => navigate("/dashboard")} />
+      <AdminEventsView onBack={() => navigate("/home")} />
     </main>
   )
 }

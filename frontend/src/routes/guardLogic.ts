@@ -12,11 +12,11 @@ export function canAccessRole(role: Role | undefined, allowed: readonly Role[]):
 }
 
 export function safeLoginRedirect(value: unknown): string {
-  if (typeof value !== "string" || !/^\/(?![\\/])(?!.*[\\\u0000-\u001f])/.test(value)) return "/dashboard";
+  if (typeof value !== "string" || !/^\/(?![\\/])(?!.*[\\\u0000-\u001f])/.test(value)) return "/home";
   return value;
 }
 
-export function publicRouteDecision(status: AuthStatus): "loading" | "login" | "dashboard" {
+export function publicRouteDecision(status: AuthStatus): "loading" | "login" | "home" {
   if (status === "loading") return "loading";
-  return status === "authenticated" ? "dashboard" : "login";
+  return status === "authenticated" ? "home" : "login";
 }

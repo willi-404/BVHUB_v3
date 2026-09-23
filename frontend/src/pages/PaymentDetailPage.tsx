@@ -38,7 +38,7 @@ export default function PaymentDetailPage() {
   }
 
   if (payment.isPending) return <main className="min-h-full px-4 py-6"><p>{t("common.loading")}</p></main>
-  if (payment.isError || !payment.data) return <main className="min-h-full px-4 py-6"><p role="alert" className="text-destructive">{t("payments.notFound")}</p><Link className="mt-4 inline-block text-sm text-primary underline" to="/dashboard">{t("common.back")}</Link></main>
+  if (payment.isError || !payment.data) return <main className="min-h-full px-4 py-6"><p role="alert" className="text-destructive">{t("payments.notFound")}</p><Link className="mt-4 inline-block text-sm text-primary underline" to="/payments">{t("common.back")}</Link></main>
   const data = payment.data
   const required = data.paymentRequired
   const paid = data.status === "PAID"
@@ -46,7 +46,7 @@ export default function PaymentDetailPage() {
   return (
     <main className="min-h-full bg-background px-4 py-6 lg:px-8">
       <div className="mx-auto flex max-w-2xl flex-col gap-4">
-        <Link className="text-sm text-primary underline" to="/dashboard">{t("payments.backToPayments")}</Link>
+        <Link className="text-sm text-primary underline" to="/payments">{t("payments.backToPayments")}</Link>
         <Card>
           <CardHeader className="p-5 pb-4 lg:p-6 lg:pb-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
