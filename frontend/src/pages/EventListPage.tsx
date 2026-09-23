@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Link } from "react-router-dom"
 import { Badge } from "../app/components/ui/badge"
 import { Card } from "../app/components/ui/card"
@@ -7,19 +8,27 @@ import { formatLocaleDateTime, useI18n, type MessageKey } from "../i18n"
 
 export default function EventListPage() {
   const { t, locale } = useI18n()
+  const [showAll, setShowAll] = useState(false)
   useEventRealtime()
-  const query = useEvents()
+  const query = useEvents(showAll)
   return (
     <div className="min-h-full bg-[var(--background)] px-4 py-6 lg:px-8">
       <div className="mx-auto max-w-5xl">
         <div className="mb-6">
-          <Link className="mb-4 inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground" to="/dashboard">
+          <Link className="mb-4 inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground" to="/home">
             {t("events.backToDashboard")}
           </Link>
-          <h1 className="page-title">{t("events.title")}</h1>
-          <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-            {t("events.listDescription")}
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 id="view-title-events" tabIndex={-1} className="page-title">{t("events.title")}</h1>
+              <p className="mt-1 text-sm text-[var(--muted-foreground)]">
+                {t("events.listDescription")}
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setShowAll((current) => !current)}>
+              {showAll ? t("events.showRecent") : t("events.showAll")}
+            </Button>
+          </div>
         </div>
         {query.isPending && (
           <p role="status" className="text-sm text-[var(--muted-foreground)]">
@@ -44,7 +53,7 @@ export default function EventListPage() {
         )}
         {query.isSuccess && query.data.length === 0 && (
           <p className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-6 text-sm text-[var(--muted-foreground)]">
-            {t("events.empty")}
+            {t(showAll ? "events.emptyAll" : "events.empty")}
           </p>
         )}
         <div className="grid gap-4 md:grid-cols-2">

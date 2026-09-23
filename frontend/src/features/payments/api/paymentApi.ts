@@ -17,8 +17,8 @@ export function getPayment(id: string): Promise<PaymentDetail> {
   return pb.send<PaymentDetail>(`/api/bvhub/me/payments/${encodeURIComponent(id)}`, { method: "GET" })
 }
 
-export async function getAdminPaymentSummary(): Promise<AdminPaymentSummary[]> {
-  const response = await pb.send<{ items: AdminPaymentSummary[] }>("/api/bvhub/admin/payment-summary", { method: "GET" })
+export async function getAdminPaymentSummary(showAll = false): Promise<AdminPaymentSummary[]> {
+  const response = await pb.send<{ items: AdminPaymentSummary[] }>(`/api/bvhub/admin/payment-summary${showAll ? "?showAll=true" : ""}`, { method: "GET" })
   return response.items
 }
 

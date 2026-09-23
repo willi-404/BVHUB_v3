@@ -25,16 +25,16 @@ describe("authentication foundation", () => {
   it("accepts only internal login redirect paths", () => {
     expect(safeLoginRedirect("/events")).toBe("/events");
     expect(safeLoginRedirect("/")).toBe("/");
-    expect(safeLoginRedirect("//evil.example")).toBe("/dashboard");
-    expect(safeLoginRedirect("https://evil.example/login")).toBe("/dashboard");
-    expect(safeLoginRedirect("/\\\\evil.example")).toBe("/dashboard");
-    expect(safeLoginRedirect(undefined)).toBe("/dashboard");
+    expect(safeLoginRedirect("//evil.example")).toBe("/home");
+    expect(safeLoginRedirect("https://evil.example/login")).toBe("/home");
+    expect(safeLoginRedirect("/\\\\evil.example")).toBe("/home");
+    expect(safeLoginRedirect(undefined)).toBe("/home");
   });
 
-  it("uses dashboard for authenticated public routes", () => {
+  it("uses home for authenticated public routes", () => {
     expect(publicRouteDecision("loading")).toBe("loading");
     expect(publicRouteDecision("unauthenticated")).toBe("login");
-    expect(publicRouteDecision("authenticated")).toBe("dashboard");
+    expect(publicRouteDecision("authenticated")).toBe("home");
   });
 
   it("clears invalid or deactivated sessions", () => {

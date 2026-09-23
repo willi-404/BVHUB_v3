@@ -15,7 +15,7 @@ vi.mock("react-router-dom", () => ({
   useLocation: () => ({ pathname: "/members", search: "", hash: "" }),
 }));
 
-import ProtectedRoute from "./ProtectedRoute";
+import ProtectedRoute, { PublicOnlyRoute } from "./ProtectedRoute";
 
 describe("ProtectedRoute", () => {
   beforeEach(() => { authState.status = "unauthenticated"; authState.role = undefined; });
@@ -32,10 +32,15 @@ describe("ProtectedRoute", () => {
   it("allows admin and super-admin roles on admin routes only", () => {
     authState.status = "authenticated";
     authState.role = "MEMBER";
-    expect(renderToStaticMarkup(<ProtectedRoute admin />)).toContain("NAV:/dashboard");
+    expect(renderToStaticMarkup(<ProtectedRoute admin />)).toContain("NAV:/home");
     authState.role = "ADMIN";
     expect(renderToStaticMarkup(<ProtectedRoute admin />)).toContain("OUTLET");
     authState.role = "SUPER_ADMIN";
     expect(renderToStaticMarkup(<ProtectedRoute admin />)).toContain("OUTLET");
+  });
+
+  it("redirects authenticated visitors away from public routes", () => {
+    authState.status = "authenticated";
+    expect(renderToStaticMarkup(<PublicOnlyRoute><span>PUBLIC</span></PublicOnlyRoute>)).toContain("NAV:/home");
   });
 });

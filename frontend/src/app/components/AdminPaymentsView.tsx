@@ -601,7 +601,8 @@ function EventPaymentCard({ summary }: { summary: AdminPaymentSummary }) {
 
 export function AdminPaymentsView({ onBack }: { onBack: () => void }) {
   const { t } = useI18n()
-  const summary = useAdminPaymentSummary()
+  const [showAll, setShowAll] = useState(false)
+  const summary = useAdminPaymentSummary(showAll)
   return (
     <main className="min-h-0 flex-1 overflow-y-auto mx-auto w-full max-w-6xl space-y-6 p-4 pb-24 sm:p-6">
       <div className="flex items-center gap-3">
@@ -624,13 +625,18 @@ export function AdminPaymentsView({ onBack }: { onBack: () => void }) {
       <PaymentSettingsForm />
 
       <section aria-labelledby="event-payments-title">
-        <div className="mb-3">
-          <h2 id="event-payments-title" className="font-semibold">
-            {t("admin.payments.eventsTitle")}
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {t("admin.payments.eventsDescription")}
-          </p>
+        <div className="mb-3 flex items-start justify-between gap-4">
+          <div>
+            <h2 id="event-payments-title" className="font-semibold">
+              {t("admin.payments.eventsTitle")}
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {t("admin.payments.eventsDescription")}
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setShowAll((current) => !current)}>
+            {showAll ? t("admin.payments.showRecent") : t("admin.payments.showAll")}
+          </Button>
         </div>
         {summary.isLoading && (
           <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
@@ -642,7 +648,7 @@ export function AdminPaymentsView({ onBack }: { onBack: () => void }) {
         )}
         {summary.data?.length === 0 && (
           <Card className="p-6 text-center text-sm text-muted-foreground">
-            {t("admin.payments.noPayments")}
+            {t(showAll ? "admin.payments.noPaymentsAll" : "admin.payments.noPayments")}
           </Card>
         )}
         <div className="grid gap-3">

@@ -183,6 +183,36 @@ async function expectNoHorizontalOverflow(page: Page) {
 }
 
 test.describe("responsive application shell", () => {
+  test("uses canonical member routes and closes the phone drawer after navigation", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    await mockSession(page)
+    await page.goto("/home")
+
+    for (const [label, path] of [["Event", "/events"], ["Payments", "/payments"], ["Profile", "/profile"]] as const) {
+      await page.getByRole("button", { name: "Open navigation menu" }).click()
+      const drawer = page.getByRole("dialog", { name: "Menu" })
+      await drawer.getByRole("button", { name: label, exact: true }).click()
+      await expect(page).toHaveURL(path)
+      await expect(drawer).toBeHidden()
+      await expect(page.locator("#mobile-navigation-drawer button[aria-current=page]")).toHaveText(label)
+    }
+  })
+
+  test("redirects legacy URLs and rejects non-administrator management deep links", async ({ page }) => {
+    await mockSession(page)
+    await page.goto("/dashboard")
+    await expect(page).toHaveURL("/home")
+
+    await page.goto("/admin/members")
+    await expect(page).toHaveURL("/home")
+
+    await mockSession(page, { role: "ADMIN" })
+    await page.goto("/members")
+    await expect(page).toHaveURL("/admin/members")
+    await page.goto("/admin")
+    await expect(page).toHaveURL("/admin/members")
+  })
+
   for (const width of [320, 375, 767]) {
     test(`${width}px uses the phone layout without horizontal overflow`, async ({ page }) => {
       await page.setViewportSize({ width, height: 844 })

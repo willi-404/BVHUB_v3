@@ -11,6 +11,7 @@ export const eventKeys = {
   lists: () => [...eventKeys.all, "list"] as const,
   list: (filters: Record<string, unknown>) =>
     [...eventKeys.lists(), filters] as const,
+  publicList: (showAll: boolean) => [...eventKeys.lists(), "public", { showAll }] as const,
   detail: (id: string) => [...eventKeys.all, "detail", id] as const,
   participants: (id: string) => [...eventKeys.all, "participants", id] as const,
 }
@@ -31,7 +32,8 @@ export const paymentKeys = {
   details: () => [...paymentKeys.all, "detail"] as const,
   detail: (id: string) => [...paymentKeys.details(), id] as const,
   admin: () => [...paymentKeys.all, "admin"] as const,
-  adminSummary: () => [...paymentKeys.admin(), "summary"] as const,
+  adminSummaries: () => [...paymentKeys.admin(), "summary"] as const,
+  adminSummary: (showAll = false) => [...paymentKeys.adminSummaries(), { showAll }] as const,
   adminEvent: (eventId: string) => [...paymentKeys.admin(), "event", eventId] as const,
   settings: () => [...paymentKeys.admin(), "settings"] as const,
 }

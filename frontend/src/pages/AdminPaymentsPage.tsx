@@ -7,7 +7,7 @@ export default function AdminPaymentsPage() {
   usePaymentRealtime()
   return (
     <div className="flex h-full min-h-screen flex-col overflow-hidden bg-background">
-      <AdminPaymentsView onBack={() => navigate("/dashboard")} />
+      <AdminPaymentsView onBack={() => navigate("/home")} />
     </div>
   )
 }

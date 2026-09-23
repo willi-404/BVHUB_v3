@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { BrowserRouter, Navigate, Route, Routes, useNavigate, Link } from "react-router-dom";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { Link, Outlet, useLocation, useNavigate, useOutletContext } from "react-router-dom";
 import { Badge } from "../app/components/ui/badge";
 import { Button } from "../app/components/ui/button";
 import { Card, CardContent } from "../app/components/ui/card";
@@ -8,19 +7,10 @@ import { Avatar } from "../app/components/ui/avatar";
 import { Progress } from "../app/components/ui/progress";
 import { Separator } from "../app/components/ui/separator";
 import { MemberCard } from "../app/components/MemberCard";
-import LoginView from "../app/components/LoginView";
-import RegisterView from "../app/components/RegisterView";
-import RegisterSuccessView from "../app/components/RegisterSuccessView";
-import VerifyEmailView from "../app/components/VerifyEmailView";
-import AdminMembersView from "../app/components/AdminMembersView";
-import AdminPaymentsView from "../app/components/AdminPaymentsView";
-import AdminEventManageView from "../app/components/AdminEventsView";
 import logoSrc from "../imports/logo1-high-resolution.png";
-import { AuthProvider, useAuth, useAuthUser } from "../features/auth/AuthProvider";
+import { useAuth, useAuthUser } from "../features/auth/AuthProvider";
 import { isAdminRole } from "../features/auth/policy";
-import { queryClient } from "../lib/queryClient";
 import { formatLocaleDate, formatLocaleDateTime, LanguageSwitcher, useI18n, type MessageKey } from "../i18n";
-import { AdminGuard, ProtectedRoute, PublicOnlyRoute } from "../routes/guards";
 import { useMyProfile, useUpdateMyProfile } from "../features/profile/hooks/useProfile";
 import { profileErrorStatus } from "../features/profile/api/profileApi";
 import { profilePatchFromDto } from "../features/profile/profilePatch";
@@ -32,6 +22,8 @@ import DashboardStatisticsPanel from "../features/dashboard/components/Dashboard
 import MemberQr from "../features/memberCard/components/MemberQr";
 import PaymentsView from "../features/payments/components/PaymentsView";
 import { useMyPayments, usePaymentRealtime } from "../features/payments/hooks/usePayments";
+import { primaryNavigation, primaryTabForPath, routes } from "../routes/paths";
+import EventListPage from "./EventListPage";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -75,6 +67,20 @@ const icons = {
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
 type NavTab = PrimaryNavTab;
+
+export type MemberAppContext = {
+  events: Event[];
+  liveEvents: EventRecord[];
+  toggleRegistration: (id: number) => void;
+  openMemberCard: () => void;
+  openProfileEditor: () => void;
+  profile: ProfileDto | null;
+  profileLoading: boolean;
+  profileError: boolean;
+  refetchProfile: () => unknown;
+  logout: () => void;
+  canAccessAdmin: boolean;
+};
 
 interface Event {
   id: number;
@@ -524,80 +530,14 @@ function DashboardView({ events, liveEvents, onToggle, onOpenCard, profile }: { 
   );
 }
 
-function EventsView({ events, loading, error }: { events: EventRecord[]; loading: boolean; error: boolean }) {
-  const { t } = useI18n();
-  return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h1 id="view-title-events" tabIndex={-1} className="page-title text-[var(--foreground)]">{t("events.title")}</h1>
-        <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{t("events.subtitle")}</p>
-      </div>
-      {loading && <p className="text-sm text-[var(--muted-foreground)]">{t("common.loading")}</p>}
-      {error && <p role="alert" className="text-sm text-red-700">{t("events.loadError")}</p>}
-      {!loading && !error && <LiveEventCards events={events} />}
-    </div>
-  );
-}
-
 function LiveEventCards({ events }: { events: EventRecord[] }) {
   const { t, locale } = useI18n();
   if (!events.length) return <p className="text-sm text-[var(--muted-foreground)]">{t("events.empty")}</p>;
   return <div className="flex max-h-[min(62vh,44rem)] flex-col gap-3 overflow-y-auto pr-1">{events.map((event) => <Card key={event.id} className="p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="break-words font-bold text-[var(--foreground)]">{event.title}</h3><p className="mt-1 break-words text-xs text-[var(--muted-foreground)]">{event.venue.name}</p></div><Badge variant={event.status === "CANCELLED" || event.status === "COMPLETED" ? "destructive" : "success"}>{t(`events.status.${event.status}` as MessageKey)}</Badge></div><div className="mt-3 grid gap-1 text-xs text-[var(--muted-foreground)] md:grid-cols-2"><span>{formatLocaleDateTime(event.start, locale)} - {formatLocaleDateTime(event.end, locale)}</span><span>{t("events.capacity")}: {event.registeredCount}/{event.capacity} ({event.spotsLeft} {t("events.spotsLeftLabel")})</span></div><Link className="mt-3 inline-flex text-xs font-semibold text-[var(--primary)] underline" to={`/events/${encodeURIComponent(event.id)}`}>{t("events.details")}</Link></Card>)}</div>;
 }
 
-function AdminDrawer({ onClose, onAdminMembers, onAdminPayments, onAdminEvents, onAdminScanner }: { onClose: () => void; onAdminMembers: () => void; onAdminPayments: () => void; onAdminEvents: () => void; onAdminScanner: () => void }) {
-  const { t } = useI18n();
-  return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-[90] bg-black/40 backdrop-blur-sm lg:hidden"
-        onClick={onClose}
-      />
-      {/* Sheet */}
-      <div className="fixed bottom-0 left-0 right-0 z-[91] bg-[var(--card)] rounded-t-2xl border-t border-[var(--border)] pb-8 lg:hidden"
-        style={{ boxShadow: "0 -8px 40px rgba(0,0,0,0.15)" }}
-      >
-        {/* Handle */}
-        <div className="flex justify-center pt-3 pb-2">
-          <div className="w-10 h-1 rounded-full bg-[var(--border)]" />
-        </div>
-
-        {/* Header */}
-        <div className="flex items-center gap-2 px-5 pb-3 pt-1 border-b border-[var(--border)]">
-          <div className="h-7 w-7 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700">
-            <Icon d={icons.shieldAdmin} size={14} />
-          </div>
-          <span className="text-sm font-bold text-[var(--foreground)]">{t("admin.area")}</span>
-          <button onClick={onClose} aria-label={t("common.close")} className="ml-auto text-[var(--muted-foreground)] hover:text-[var(--foreground)] h-8 w-8 flex items-center justify-center rounded-full hover:bg-[var(--muted)]">
-            <Icon d={icons.x} size={16} />
-          </button>
-        </div>
-
-        {/* Admin buttons */}
-        <div className="px-4 pt-3 flex flex-col gap-2">
-          {ADMIN_ITEMS.map((item) => (
-            <button
-              key={item.label}
-              onClick={() => { onClose(); if (item.label === "Members") onAdminMembers(); else if (item.label === "Payments") onAdminPayments(); else if (item.label === "Event Manage") onAdminEvents(); else onAdminScanner(); }}
-              className="flex items-center gap-3 px-4 py-3.5 rounded-lg bg-amber-50 border border-amber-100 text-amber-800 font-medium text-sm hover:bg-amber-100 active:scale-[0.98] transition-all w-full"
-            >
-              <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700 shrink-0">
-                <Icon d={item.icon} size={17} />
-              </div>
-              {t(item.label === "Members" ? "admin.members.title" : item.label === "Payments" ? "admin.payments.title" : item.label === "Event Manage" ? "admin.events.title" : "admin.scanMemberCard")}
-              <Icon d={icons.chevronRight} size={14} className="ml-auto text-amber-500" />
-            </button>
-          ))}
-        </div>
-      </div>
-    </>
-  );
-}
-
-function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, onAdminPayments, onAdminEvents, onAdminScanner, canAccessAdmin }: { profile: ProfileDto | null; onEditProfile: () => void; onLogout: () => void; onAdminMembers: () => void; onAdminPayments: () => void; onAdminEvents: () => void; onAdminScanner: () => void; canAccessAdmin: boolean }) {
+function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, canAccessAdmin }: { profile: ProfileDto | null; onEditProfile: () => void; onLogout: () => void; onAdminMembers: () => void; canAccessAdmin: boolean }) {
   const { t, locale } = useI18n();
-  const [adminOpen, setAdminOpen] = useState(false);
 
   if (!profile) return <div className="flex flex-col gap-4"><Card><CardContent className="p-5"><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p className="text-sm text-[var(--muted-foreground)] mt-2">{t("profile.incompleteDetails")}</p><Button className="mt-4" onClick={onEditProfile}>{t("profile.edit")}</Button></CardContent></Card><Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 gap-2" onClick={onLogout}><Icon d={icons.logout} size={15} /> {t("auth.signOut")}</Button></div>;
   const initials = `${profile.user.firstName[0] || ""}${profile.user.lastName[0] || ""}`.toUpperCase() || "?";
@@ -633,11 +573,11 @@ function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, onAdmin
         </CardContent>
       </Card>
 
-      {/* Enter Admin View — mobile only */}
+      {/* The admin entry is a regular route so it can be bookmarked and guarded. */}
       {canAccessAdmin && (
         <Button
-          className="lg:hidden gap-2 bg-amber-500 hover:bg-amber-600 text-white"
-          onClick={() => setAdminOpen(true)}
+          className="gap-2 bg-amber-500 hover:bg-amber-600 text-white"
+          onClick={onAdminMembers}
         >
           <Icon d={icons.shieldAdmin} size={15} />
           {t("admin.enterView")}
@@ -647,8 +587,6 @@ function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, onAdmin
       <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 gap-2" onClick={onLogout}>
         <Icon d={icons.logout} size={15} /> {t("auth.signOut")}
       </Button>
-
-      {adminOpen && <AdminDrawer onClose={() => setAdminOpen(false)} onAdminMembers={() => { setAdminOpen(false); onAdminMembers(); }} onAdminPayments={() => { setAdminOpen(false); onAdminPayments(); }} onAdminEvents={() => { setAdminOpen(false); onAdminEvents(); }} onAdminScanner={() => { setAdminOpen(false); onAdminScanner(); }} />}
     </div>
   );
 }
@@ -688,6 +626,7 @@ function BottomNav({
           <button
             key={item.key}
             onClick={() => onChange(item.key)}
+            aria-current={isActive ? "page" : undefined}
             className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors relative ${isActive ? "text-[var(--primary)]" : "text-[var(--muted-foreground)]"}`}
           >
             <div className="relative">
@@ -970,6 +909,7 @@ function Sidebar({
             <button
               key={item.key}
               onClick={() => onChange(item.key)}
+              aria-current={isActive ? "page" : undefined}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 w-full ${isActive ? "bg-[var(--secondary)] text-[var(--primary)]" : "text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"}`}
             >
               <div className="relative">
@@ -1019,8 +959,9 @@ function Sidebar({
 
 // ─── AppShell (dashboard without login gate, used by FramePreview) ────────────
 
-export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: NavTab; onLogout?: () => void }) {
+export function AppShell({ initialTab = "dashboard", onLogout, routeContent = false }: { initialTab?: NavTab; onLogout?: () => void; routeContent?: boolean }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { logout: authLogout } = useAuth();
   const { data: user } = useAuthUser();
   const { t } = useI18n();
@@ -1030,16 +971,16 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
   const myPayments = useMyPayments();
   const { data: profile, isLoading: profileLoading, isError: profileError, refetch: refetchProfile } = useMyProfile();
   const canAccessAdmin = isAdminRole(user?.role);
-  const [tab, setTab] = useState<NavTab>(initialTab);
   const [events, setEvents] = useState<Event[]>(EVENTS);
   const [cardOpen, setCardOpen] = useState(false);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
-  const [adminView, setAdminView] = useState<"members" | "payments" | "events" | null>(null);
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const mobileNavigationTrigger = useRef<HTMLButtonElement>(null);
   const mainRef = useRef<HTMLElement>(null);
+  const pendingNavigationFocus = useRef<NavTab | null>(null);
 
   const unpaidCount = myPayments.data?.filter((payment) => payment.status === "UNPAID").length ?? 0;
+  const tab = primaryTabForPath(location.pathname) ?? initialTab;
 
   function toggleRegistration(id: number) {
     setEvents((prev) =>
@@ -1055,40 +996,59 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
   };
 
   const logout = onLogout ?? authLogout;
+  const outletContext: MemberAppContext = {
+    events,
+    liveEvents: liveEvents.data ?? [],
+    toggleRegistration,
+    openMemberCard: () => setCardOpen(true),
+    openProfileEditor: () => setEditProfileOpen(true),
+    profile: profile ?? null,
+    profileLoading,
+    profileError,
+    refetchProfile,
+    logout,
+    canAccessAdmin,
+  };
 
-  function selectFromMobileNavigation(nextTab: NavTab) {
-    setTab(nextTab);
+  function selectNavigation(nextTab: NavTab) {
+    pendingNavigationFocus.current = nextTab;
+    navigate(primaryNavigation[nextTab]);
     setMobileNavigationOpen(false);
+  }
+
+  useEffect(() => {
+    if (pendingNavigationFocus.current !== tab) return;
+    pendingNavigationFocus.current = null;
     window.requestAnimationFrame(() => {
-      const target = document.getElementById(`app-view-${nextTab}`);
-      const heading = document.getElementById(`view-title-${nextTab}`);
+      const target = document.getElementById(`app-view-${tab}`);
+      const heading = document.getElementById(`view-title-${tab}`);
       (heading ?? target)?.focus({ preventScroll: true });
       target?.scrollIntoView({
         block: "start",
         behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
       });
     });
-  }
+  }, [tab]);
 
   function renderView() {
     switch (tab) {
       case "dashboard":
         return <DashboardView events={events} liveEvents={liveEvents.data ?? []} onToggle={toggleRegistration} onOpenCard={() => setCardOpen(true)} profile={profile || null} />;
       case "events":
-        return <EventsView events={liveEvents.data ?? []} loading={liveEvents.isPending} error={liveEvents.isError} />;
+        return <EventListPage />;
       case "payments":
         return <PaymentsView />;
       case "profile":
         if (profileLoading) return <div><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p className="mt-2 text-sm text-[var(--muted-foreground)]">{t("profile.loading")}</p></div>;
         if (profileError) return <Card><CardContent className="p-5"><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p role="alert" className="mt-2 text-sm text-red-600">{t("profile.loadError")}</p><Button className="mt-4" onClick={() => void refetchProfile()}>{t("common.retry")}</Button></CardContent></Card>;
-        return <ProfileView profile={profile || null} onEditProfile={() => setEditProfileOpen(true)} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} onAdminScanner={() => navigate("/admin/member-card-scanner")} canAccessAdmin={canAccessAdmin} />;
+        return <ProfileView profile={profile || null} onEditProfile={() => setEditProfileOpen(true)} onLogout={logout} onAdminMembers={() => navigate(routes.adminMembers)} canAccessAdmin={canAccessAdmin} />;
     }
   }
 
   return (
     <div className="relative h-full bg-[var(--background)]" style={{ fontFamily: "var(--font-sans)" }}>
       <div className="app-shell-background flex h-full" data-drawer-open={mobileNavigationOpen} inert={mobileNavigationOpen ? true : undefined}>
-        <Sidebar active={tab} onChange={setTab} unpaidCount={unpaidCount} onLogout={logout} onAdminMembers={() => setAdminView("members")} onAdminPayments={() => setAdminView("payments")} onAdminEvents={() => setAdminView("events")} onAdminScanner={() => navigate("/admin/member-card-scanner")} canAccessAdmin={canAccessAdmin} profile={profile || null} />
+        <Sidebar active={tab} onChange={selectNavigation} unpaidCount={unpaidCount} onLogout={logout} onAdminMembers={() => navigate(routes.adminMembers)} onAdminPayments={() => navigate(routes.adminPayments)} onAdminEvents={() => navigate(routes.adminEvents)} onAdminScanner={() => navigate(routes.adminMemberCardScanner)} canAccessAdmin={canAccessAdmin} profile={profile || null} />
 
         <main ref={mainRef} id="app-main-content" className="min-w-0 w-full max-w-full flex-1 overflow-x-hidden overflow-y-auto">
         <div className="hidden lg:flex items-center justify-between px-8 py-5 border-b border-[var(--border)] bg-[var(--card)] sticky top-0 z-10">
@@ -1126,45 +1086,29 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
         </div>
         <div className="min-w-0 w-full max-w-2xl px-4 py-5 pb-24 lg:max-w-none lg:px-8 lg:py-7 lg:pb-8">
           <section id={`app-view-${tab}`} tabIndex={-1} aria-label={tabLabel[tab]} className="min-w-0 scroll-mt-20">
-            {renderView()}
+            {routeContent ? <Outlet context={outletContext} /> : renderView()}
           </section>
         </div>
         </main>
 
-        <BottomNav active={tab} onChange={setTab} unpaidCount={unpaidCount} />
+        <BottomNav active={tab} onChange={selectNavigation} unpaidCount={unpaidCount} />
 
         {cardOpen && <MemberCardOverlay onClose={() => setCardOpen(false)} />}
         {editProfileOpen && <EditProfileOverlay onClose={() => setEditProfileOpen(false)} />}
 
-      {/* Admin overlays */}
-      {canAccessAdmin && adminView === "members" && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "var(--background)", display: "flex", flexDirection: "column" }}>
-          <AdminMembersView onBack={() => setAdminView(null)} />
-        </div>
-      )}
-      {canAccessAdmin && adminView === "payments" && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "var(--background)", display: "flex", flexDirection: "column" }}>
-          <AdminPaymentsView onBack={() => setAdminView(null)} />
-        </div>
-      )}
-        {canAccessAdmin && adminView === "events" && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "var(--background)", display: "flex", flexDirection: "column" }}>
-          <AdminEventManageView onBack={() => setAdminView(null)} />
-        </div>
-      )}
       </div>
 
       <MobileNavigationDrawer
         open={mobileNavigationOpen}
         onOpenChange={setMobileNavigationOpen}
         active={tab}
-        onSelect={selectFromMobileNavigation}
+        onSelect={selectNavigation}
         unpaidCount={unpaidCount}
         canAccessAdmin={canAccessAdmin}
-        onAdminMembers={() => setAdminView("members")}
-        onAdminPayments={() => setAdminView("payments")}
-        onAdminEvents={() => setAdminView("events")}
-        onAdminScanner={() => navigate("/admin/member-card-scanner")}
+        onAdminMembers={() => navigate(routes.adminMembers)}
+        onAdminPayments={() => navigate(routes.adminPayments)}
+        onAdminEvents={() => navigate(routes.adminEvents)}
+        onAdminScanner={() => navigate(routes.adminMemberCardScanner)}
         onLogout={logout}
         triggerRef={mobileNavigationTrigger}
       />
@@ -1172,50 +1116,17 @@ export function AppShell({ initialTab = "dashboard", onLogout }: { initialTab?: 
   );
 }
 
-function AdminRoutePage({ kind }: { kind: "members" | "payments" | "events" }) {
+export function HomePageContent() {
+  const { events, liveEvents, toggleRegistration, openMemberCard, profile } = useOutletContext<MemberAppContext>();
+  return <DashboardView events={events} liveEvents={liveEvents} onToggle={toggleRegistration} onOpenCard={openMemberCard} profile={profile} />;
+}
+
+export function ProfilePageContent() {
+  const { profile, profileLoading, profileError, refetchProfile, logout, canAccessAdmin, openProfileEditor } = useOutletContext<MemberAppContext>();
+  const { t } = useI18n();
   const navigate = useNavigate();
-  const onBack = () => navigate("/");
 
-  return (
-    <div className="flex min-h-screen flex-col overflow-hidden bg-[var(--background)]">
-      {kind === "members" && <AdminMembersView onBack={onBack} />}
-      {kind === "payments" && <AdminPaymentsView onBack={onBack} />}
-      {kind === "events" && <AdminEventManageView onBack={onBack} />}
-    </div>
-  );
-}
-
-function AppRoutes() {
-  return (
-    <Routes>
-      <Route path="/login" element={<PublicOnlyRoute><LoginView /></PublicOnlyRoute>} />
-      <Route path="/register" element={<PublicOnlyRoute><RegisterView /></PublicOnlyRoute>} />
-      <Route path="/register/success" element={<PublicOnlyRoute><RegisterSuccessView /></PublicOnlyRoute>} />
-      <Route path="/verify-email" element={<PublicOnlyRoute><VerifyEmailView /></PublicOnlyRoute>} />
-      <Route element={<ProtectedRoute />}>
-        <Route index element={<AppShell />} />
-        <Route path="events" element={<AppShell initialTab="events" />} />
-        <Route path="payments" element={<AppShell initialTab="payments" />} />
-        <Route path="profile" element={<AppShell initialTab="profile" />} />
-        <Route element={<AdminGuard />}>
-          <Route path="admin/members" element={<AdminRoutePage kind="members" />} />
-          <Route path="admin/payments" element={<AdminRoutePage kind="payments" />} />
-          <Route path="admin/events" element={<AdminRoutePage kind="events" />} />
-        </Route>
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
-}
-
-export default function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </AuthProvider>
-    </QueryClientProvider>
-  );
+  if (profileLoading) return <div><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p className="mt-2 text-sm text-[var(--muted-foreground)]">{t("profile.loading")}</p></div>;
+  if (profileError) return <Card><CardContent className="p-5"><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p role="alert" className="mt-2 text-sm text-red-600">{t("profile.loadError")}</p><Button className="mt-4" onClick={() => void refetchProfile()}>{t("common.retry")}</Button></CardContent></Card>;
+  return <ProfileView profile={profile} onEditProfile={openProfileEditor} onLogout={logout} onAdminMembers={() => navigate(routes.adminMembers)} canAccessAdmin={canAccessAdmin} />;
 }

@@ -655,6 +655,22 @@ const publishedEvent = expectStatus(await request("PATCH", `/api/bvhub/admin/eve
 assert.equal(publishedEvent.published, true);
 const dashboardAfterPublish = expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: memberLoginToken }), 200, "dashboard after event publish");
 assert.equal(dashboardAfterPublish.current.publishedEventsThisMonth, dashboardBeforePublish.current.publishedEventsThisMonth + 1, "first publication in the Berlin month is counted");
+const activityEvents = await Promise.all([
+  ["WU-05 Activity Members", "2099-08-01T16:00:00.000Z", "MEMBERS_ONLY"],
+  ["WU-05 Activity Open", "2099-09-01T16:00:00.000Z", "OPEN_TO_ALL"],
+  ["WU-05 Activity Cancelled", "2099-10-01T16:00:00.000Z", "CANCELLED"],
+  ["WU-05 Activity Completed", "2099-11-01T16:00:00.000Z", "COMPLETED"],
+].map(async ([title, start, status]) => expectStatus(await request("POST", "/api/bvhub/admin/events", {
+  token: adminLogin.token,
+  body: { ...eventPayload, title, start, end: new Date(Date.parse(start) + 2 * 60 * 60 * 1000).toISOString(), abmeldefrist: new Date(Date.parse(start) - 60 * 60 * 1000).toISOString(), published: true, status },
+}), 201, `create ${title}`)));
+const defaultActivityList = expectStatus(await request("GET", "/api/bvhub/events", { token: memberLoginToken }), 200, "member reads default activity list");
+assert.ok(defaultActivityList.items.every((item) => ["MEMBERS_ONLY", "OPEN_TO_ALL"].includes(item.status)), "default activity list hides cancelled and completed events");
+assert.deepEqual(defaultActivityList.items.map((item) => item.start), [...defaultActivityList.items].map((item) => item.start).sort().reverse(), "default activity list is newest first");
+const allActivityList = expectStatus(await request("GET", "/api/bvhub/events?showAll=true", { token: memberLoginToken }), 200, "member reads complete activity list");
+assert.ok(allActivityList.items.some((item) => item.id === activityEvents[2].id && item.status === "CANCELLED"), "complete activity list includes cancelled events");
+assert.ok(allActivityList.items.some((item) => item.id === activityEvents[3].id && item.status === "COMPLETED"), "complete activity list includes completed events");
+assert.deepEqual(allActivityList.items.map((item) => item.start), [...allActivityList.items].map((item) => item.start).sort().reverse(), "complete activity list is newest first");
 const adminAddMailBefore = smtpMessages.length;
 const paymentPurposeNames = {
   guest: expectStatus(await request("GET", `/api/collections/users/records/${guest.id}`, { token: rootToken }), 200, "read guest payment display name").displayName,
@@ -742,11 +758,44 @@ assert.equal(reactivatedPayment.status, "PAID", "reactivation does not reset pai
 assert.equal(reactivatedPayment.amountCents, 380, "reactivation does not update amount snapshot");
 const paymentSummary = expectStatus(await request("GET", "/api/bvhub/admin/payment-summary", { token: adminLogin.token }), 200, "admin reads compact payment summary");
 assert.ok(paymentSummary.items.some((item) => item.eventId === validEvent.id && item.totalPayments >= 2));
+
+const oldPaymentEvent = expectStatus(await request("POST", "/api/bvhub/admin/events", {
+  token: adminLogin.token,
+  body: { ...eventPayload, title: "WU-05 Old Payment Event", start: "2020-01-01T16:00:00.000Z", end: "2020-01-01T18:00:00.000Z", abmeldefrist: "2019-12-
+  31T16:00:00.000Z", published: true, status: "COMPLETED" },
+}), 201, "create old event with payment history");
+const oldRegistration = expectStatus(await request("POST", "/api/collections/event_registrations/records", {
+  token: rootToken,
+  body: { event: oldPaymentEvent.id, user: guest.id, status: "REGISTERED", registeredAt: "2019-12-01T12:00:00.000Z", checkoutRegion: "ER", termsVersion:
+  "PAYMENT-SUMMARY-OLD-EVENT", termsAcceptedAt: "2019-12-01T12:00:00.000Z" },
+}), 200, "create old event registration");
+const oldPaymentId = "oldpayment00001";
+expectStatus(await request("POST", "/api/collections/payments/records", {
+  token: rootToken,
+  body: { id: oldPaymentId, registration: oldRegistration.id, event: oldPaymentEvent.id, user: guest.id, roleSnapshot: "GUEST", paymentRequired: true,
+  amountCents: 380, status: "UNPAID", purpose: `BVHUB-EVT-${oldPaymentEvent.id}-PAY-${oldPaymentId}`, active: true },
+}), 200, "create old event payment");
+
 const duplicatePurposePayment = expectStatus(await request("PATCH", `/api/collections/payments/records/${secondGuestPayment.id}`, {
   token: rootToken,
   body: { purpose: adminGuestPayment.purpose },
 }), 200, "duplicate payment purpose is accepted");
 assert.equal(duplicatePurposePayment.purpose, adminGuestPayment.purpose);
+
+const recentPaymentSummary = expectStatus(await request("GET", "/api/bvhub/admin/payment-summary", { token: adminLogin.token }), 200, "read recent payment
+summary");
+assert.ok(recentPaymentSummary.items.some((item) => item.eventId === validEvent.id), "recent payment summary keeps future events");
+assert.equal(recentPaymentSummary.items.some((item) => item.eventId === oldPaymentEvent.id), false, "recent payment summary hides events older than 30
+days");
+assert.deepEqual(recentPaymentSummary.items.map((item) => item.start), [...recentPaymentSummary.items].map((item) => item.start).sort().reverse(), "recent
+payment summary is newest first");
+
+const allPaymentSummary = expectStatus(await request("GET", "/api/bvhub/admin/payment-summary?showAll=true", { token: adminLogin.token }), 200, "read
+complete payment summary");
+assert.ok(allPaymentSummary.items.some((item) => item.eventId === oldPaymentEvent.id), "complete payment summary includes old events");
+assert.deepEqual(allPaymentSummary.items.map((item) => item.start), [...allPaymentSummary.items].map((item) => item.start).sort().reverse(), "complete
+payment summary is newest first");
+
 const eventPaymentDetails = expectStatus(await request("GET", `/api/bvhub/admin/events/${validEvent.id}/payments`, { token: superLogin.token }), 200, "superadmin lazily loads event payments");
 assert.ok(eventPaymentDetails.items.some((payment) => payment.id === adminGuestPayment.id));
 const publicEventList = expectStatus(await request("GET", "/api/bvhub/events", { token: memberLoginToken }), 200, "member reads published events");

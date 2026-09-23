@@ -1,6 +1,6 @@
 import LoginView from "../app/components/LoginView";
 import { useLocation, useNavigate } from "react-router-dom";
-import { PublicOnlyRoute } from "../routes/guards";
+import { PublicOnlyRoute } from "../components/ProtectedRoute";
 import { safeLoginRedirect } from "../routes/guardLogic";
 import BuildVersionNotice from "../features/version/BuildVersionNotice";
 

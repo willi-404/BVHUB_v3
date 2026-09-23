@@ -4,14 +4,17 @@ import LoginPage from "../pages/LoginPage";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { useI18n } from "../i18n";
 import MemberVerifyPage from "../pages/MemberVerifyPage";
+import { routes } from "../routes/paths";
 const DashboardPage = lazy(() => import("../pages/DashboardPage"));
 const MembersPage = lazy(() => import("../pages/MembersPage"));
-const EventsPage = lazy(() => import("../pages/EventsPage"));
+const MemberAppLayout = lazy(() => import("../pages/MemberAppLayout"));
+const EventListPage = lazy(() => import("../pages/EventListPage"));
+const PaymentsPage = lazy(() => import("../pages/PaymentsPage"));
+const ProfilePage = lazy(() => import("../pages/ProfilePage"));
 const EventDetailPage = lazy(() => import("../pages/EventDetailPage"));
 const EventCheckoutPage = lazy(() => import("../pages/EventCheckoutPage"));
 const AdminEventDetailPage = lazy(() => import("../pages/AdminEventDetailPage"));
-const AdminEventsPage = lazy(() => import("../app/components/AdminEventsView"));
-const AdminPage = lazy(() => import("../pages/AdminPage"));
+const AdminEventsPage = lazy(() => import("../pages/AdminEventsPage"));
 const MemberCardScannerPage = lazy(() => import("../pages/MemberCardScannerPage"));
 const PaymentDetailPage = lazy(() => import("../pages/PaymentDetailPage"));
 const AdminPaymentsPage = lazy(() => import("../pages/AdminPaymentsPage"));
@@ -27,16 +30,23 @@ export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
   { path: "/member/verify", element: <MemberVerifyPage /> },
   { element: <ProtectedRoute />, children: [
-    { path: "/dashboard", element: load(<DashboardPage />) },
-    { path: "/events", element: load(<EventsPage />) },
+    { element: load(<MemberAppLayout />), children: [
+      { path: routes.home, element: load(<DashboardPage />) },
+      { path: routes.events, element: load(<EventListPage />) },
+      { path: routes.payments, element: load(<PaymentsPage />) },
+      { path: routes.profile, element: load(<ProfilePage />) },
+    ] },
     { path: "/events/:eventId", element: load(<EventDetailPage />) },
     { path: "/events/:eventId/checkout", element: load(<EventCheckoutPage />) },
     { path: "/payments/:paymentId", element: load(<PaymentDetailPage />) },
     { element: <ProtectedRoute admin />, children: [{ path: "/admin/events/new", element: load(<AdminEventsPage />) }, { path: "/admin/events/:eventId", element: load(<AdminEventDetailPage />) }] },
-    { element: <ProtectedRoute admin />, children: [{ path: "/members", element: load(<MembersPage />) }, { path: "/admin", element: load(<AdminPage />) }, { path: "/admin/events", element: load(<AdminEventsPage />) }, { path: "/admin/venues", element: load(<AdminEventsPage />) }, { path: "/admin/payments", element: load(<AdminPaymentsPage />) }, { path: "/admin/member-card-scanner", element: load(<MemberCardScannerPage />) }] },
+    { element: <ProtectedRoute admin />, children: [{ path: routes.adminMembers, element: load(<MembersPage />) }, { path: routes.adminEvents, element: load(<AdminEventsPage />) }, { path: routes.adminPayments, element: load(<AdminPaymentsPage />) }, { path: routes.adminMemberCardScanner, element: load(<MemberCardScannerPage />) }] },
+    { path: "/dashboard", element: <Navigate to={routes.home} replace /> },
+    { path: "/members", element: <Navigate to={routes.adminMembers} replace /> },
+    { path: "/admin", element: <Navigate to={routes.adminMembers} replace /> },
   ] },
   { path: "/register", element: load(<RegisterPage />) },
   { path: "/register/success", element: load(<RegisterSuccessPage />) },
   { path: "/verify-email", element: load(<VerifyEmailPage />) },
-  { path: "*", element: <Navigate to="/dashboard" replace /> },
+  { path: "*", element: <Navigate to={routes.home} replace /> },
 ]);

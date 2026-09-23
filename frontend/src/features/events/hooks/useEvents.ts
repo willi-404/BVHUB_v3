@@ -4,10 +4,10 @@ import { pb } from "../../../lib/pocketbase"
 import { dashboardKeys, eventKeys, venueKeys } from "../../../lib/queryKeys"
 import * as api from "../api/eventsApi"
 import type { EventInput } from "../types"
-export function useEvents() {
+export function useEvents(showAll = false) {
   return useQuery({
-    queryKey: eventKeys.lists(),
-    queryFn: api.getEvents,
+    queryKey: eventKeys.publicList(showAll),
+    queryFn: () => api.getEvents(showAll),
     refetchOnMount: "always",
   })
 }

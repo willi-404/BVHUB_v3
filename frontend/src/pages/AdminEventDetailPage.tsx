@@ -86,7 +86,7 @@ export default function AdminEventDetailPage() {
         <p role="alert" className="text-sm text-red-700">
           {t("events.notFound")}
         </p>
-        <Link className="mt-4 inline-block underline" to="/dashboard">
+        <Link className="mt-4 inline-block underline" to="/admin/events">
           {t("common.back")}
         </Link>
       </div>
@@ -106,7 +106,7 @@ export default function AdminEventDetailPage() {
           abmeldefrist: berlinDateTimeInputToIso(form.abmeldefrist),
         },
       })
-      navigate("/dashboard")
+      navigate("/admin/events")
     } catch (error) {
       setFormError(error instanceof RangeError ? "errors.invalid_request" : mapPBError(error))
     }
@@ -119,7 +119,7 @@ export default function AdminEventDetailPage() {
       <div className="mx-auto max-w-3xl">
         <Link
           className="text-sm text-[var(--primary)] underline"
-          to="/dashboard"
+          to="/admin/events"
         >
           {t("common.back")}
         </Link>
@@ -307,7 +307,7 @@ export default function AdminEventDetailPage() {
                 disabled={actionPending}
                 type="button"
                 variant="outline"
-                onClick={() => navigate("/dashboard")}
+                onClick={() => navigate("/admin/events")}
               >
                 {t("common.back")}
               </Button>

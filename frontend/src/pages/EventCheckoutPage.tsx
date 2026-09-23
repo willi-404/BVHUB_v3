@@ -111,7 +111,7 @@ function Navigation({
       >
         {t("events.backToList")}
       </Link>
-      <Link className="underline" to="/dashboard">
+      <Link className="underline" to="/home">
         {t("events.backToDashboard")}
       </Link>
     </div>
