@@ -28,9 +28,13 @@ export default function BuildVersionNotice() {
 
   return (
     <>
-      <span data-testid="build-version" className="fixed bottom-3 right-3 z-10 text-[10px] text-white/55">
-        v{APP_VERSION}
-      </span>
+      <p className="mt-1 text-center text-[10px] text-[var(--muted-foreground)]">
+        <span data-testid="build-version">v{APP_VERSION}</span>
+        <span aria-hidden="true"> · </span>
+        <a href="https://github.com/willi-404/BVHUB_v3/releases" target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:underline">
+          {t("version.releases")}
+        </a>
+      </p>
       {latestVersion && (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/45 p-4" role="presentation">
           <section ref={dialogRef} aria-describedby="build-update-description" aria-labelledby="build-update-title" aria-modal="true" role="dialog" tabIndex={-1} className="w-full max-w-sm rounded-lg bg-background p-5 shadow-xl">

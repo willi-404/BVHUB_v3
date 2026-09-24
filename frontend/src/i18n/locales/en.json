@@ -69,6 +69,7 @@
   "version.updateDescription": "Version {version} is ready. Refresh to use the latest version.",
   "version.later": "Later",
   "version.refresh": "Refresh",
+  "version.releases": "View releases",
   "common.loading": "Loading…",
   "common.retry": "Try again",
   "common.save": "Save",

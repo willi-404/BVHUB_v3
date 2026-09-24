@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
 import logoSrc from "../../imports/logo1-high-resolution.png";
 import { useAuth } from "../../features/auth/AuthProvider";
@@ -10,6 +11,7 @@ import { LanguageSwitcher, useI18n } from "../../i18n";
 interface LoginViewProps {
   onLogin?: () => void;
   sessionExpired?: boolean;
+  footerContent?: ReactNode;
 }
 
 function Icon({ d, size = 18 }: { d: string; size?: number }) {
@@ -28,7 +30,7 @@ const icons = {
   arrowRight: "M5 12h14M12 5l7 7-7 7",
 };
 
-export default function LoginView({ onLogin, sessionExpired = false }: LoginViewProps) {
+export default function LoginView({ onLogin, sessionExpired = false, footerContent }: LoginViewProps) {
   const { getAccountStatus, requestOtp, verifyOtp, loginWithPassword } = useAuth();
   const { t } = useI18n();
   const [mode, setMode] = useState<"otp" | "password">("otp");
@@ -118,32 +120,34 @@ export default function LoginView({ onLogin, sessionExpired = false }: LoginView
 
   return (
     <div
-      className="min-h-full flex flex-col items-center justify-center px-4 py-12"
+      className="min-h-full px-4 py-4 md:px-8 md:py-8"
       style={{
-        background: "linear-gradient(160deg, #0a1f10 0%, #0f2d1a 40%, #14532d 80%, #1a6b38 100%)",
+        background: "#f4f7f5",
         fontFamily: "var(--font-sans)",
       }}
     >
-      <div className="w-full max-w-sm relative">
-        <div className="flex justify-end mb-3 text-white">
+      <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col">
+        <div className="flex justify-end text-[var(--foreground)]">
           <LanguageSwitcher />
         </div>
-        <div className="flex flex-col items-center mb-8">
-          <div className="h-20 w-20 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center mb-4 overflow-hidden p-1.5 backdrop-blur-sm">
-            <img src={logoSrc} alt={t("brand.logoAlt")} className="h-full w-full object-contain" />
-          </div>
-          <h1 className="page-title text-center tracking-tight text-white">{t("brand.name")}</h1>
-          <p className="text-white/50 text-xs mt-1">{t("brand.portal")}</p>
-        </div>
-
-        <div className="rounded-lg border border-white/10 shadow-2xl" style={{ background: "rgba(255,255,255,0.97)" }}>
-          <div className="p-6">
-            <div className="mb-5">
-              <h2 className="text-lg font-bold text-[var(--foreground)]">{mode === "otp" ? t("auth.otpTitle") : t("auth.adminLogin")}</h2>
-              <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{mode === "otp" ? t("auth.otpDescription") : t("auth.adminDescription")}</p>
+        <main className="grid flex-1 items-center gap-8 py-8 md:grid-cols-2 md:gap-12 lg:gap-20">
+          <section className="flex min-h-72 flex-col justify-center rounded-xl bg-[#0f2d1a] p-8 text-white shadow-sm md:min-h-[31rem] md:p-12">
+            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-white/10 p-1.5">
+              <img src={logoSrc} alt={t("brand.logoAlt")} className="h-full w-full object-contain" />
             </div>
+            <h1 className="page-title mt-6 max-w-sm tracking-tight">{t("brand.name")}</h1>
+            <p className="mt-2 text-sm text-white/65">{t("brand.portal")}</p>
+          </section>
 
-            <form onSubmit={mode === "otp" ? handleOtpSubmit : handlePasswordSubmit} className="flex flex-col gap-4">
+          <div className="w-full max-w-md justify-self-center md:justify-self-start">
+            <Card className="shadow-lg">
+              <CardHeader>
+                <CardTitle className="text-lg">{mode === "otp" ? t("auth.otpTitle") : t("auth.adminLogin")}</CardTitle>
+                <CardDescription>{mode === "otp" ? t("auth.otpDescription") : t("auth.adminDescription")}</CardDescription>
+              </CardHeader>
+              <CardContent>
+
+                <form onSubmit={mode === "otp" ? handleOtpSubmit : handlePasswordSubmit} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="login-identity" className="text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">{mode === "otp" ? t("auth.email") : t("auth.identity")}</label>
                 <div className="relative">
@@ -199,18 +203,21 @@ export default function LoginView({ onLogin, sessionExpired = false }: LoginView
               <Button type="submit" size="lg" className="w-full mt-1 gap-2" disabled={loading}>
                 {loading ? <><span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />{t("auth.signIn")} …</> : <>{mode === "otp" ? (otpId ? t("auth.verifyCode") : t("auth.sendCode")) : t("auth.passwordLogin")}<Icon d={icons.arrowRight} size={16} /></>}
               </Button>
-            </form>
+                </form>
 
-            <div className="h-px w-full bg-[var(--border)] mt-5" />
-            <button type="button" onClick={() => switchMode(mode === "otp" ? "password" : "otp")} className="w-full text-center text-xs text-[var(--primary)] font-semibold mt-4 hover:underline">
-              {mode === "otp" ? t("auth.switchPassword") : t("auth.switchOtp")}
-            </button>
-            {mode === "otp" && otpId && <button type="button" onClick={() => { setOtpId(null); setOtp(""); setNotice(""); setError(""); }} className="w-full text-center text-xs text-[var(--muted-foreground)] mt-3 hover:text-[var(--foreground)]">{t("auth.retry")}</button>}
-            <p className="text-center text-xs text-[var(--muted-foreground)] mt-4">{t("auth.noAccount")} <Link to="/register" className="text-[var(--primary)] font-semibold hover:underline">{t("auth.register")}</Link></p>
+                <div className="mt-5 h-px w-full bg-[var(--border)]" />
+                <button type="button" onClick={() => switchMode(mode === "otp" ? "password" : "otp")} className="mt-4 w-full text-center text-xs font-semibold text-[var(--primary)] hover:underline">
+                  {mode === "otp" ? t("auth.switchPassword") : t("auth.switchOtp")}
+                </button>
+                {mode === "otp" && otpId && <button type="button" onClick={() => { setOtpId(null); setOtp(""); setNotice(""); setError(""); }} className="mt-3 w-full text-center text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]">{t("auth.retry")}</button>}
+                <p className="mt-4 text-center text-xs text-[var(--muted-foreground)]">{t("auth.noAccount")} <Link to="/register" className="font-semibold text-[var(--primary)] hover:underline">{t("auth.register")}</Link></p>
+              </CardContent>
+            </Card>
+
+            <p className="mt-6 text-center text-[10px] text-[var(--muted-foreground)]">{t("brand.footer")}</p>
+            {footerContent}
           </div>
-        </div>
-
-        <p className="text-center text-white/25 text-[10px] mt-6">{t("brand.footer")}</p>
+        </main>
       </div>
     </div>
   );

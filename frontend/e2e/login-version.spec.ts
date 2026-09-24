@@ -17,13 +17,16 @@ test("login shows the build version and refreshes for a newer GitHub release", a
   await page.goto("/login")
 
   await expect(page.getByTestId("build-version")).toHaveText(`v${packageVersion}`)
+  await expect(page.getByRole("link", { name: "View releases" })).toHaveAttribute("href", "https://github.com/willi-404/BVHUB_v3/releases")
+  await expect(page.getByRole("link", { name: "View releases" })).toHaveAttribute("target", "_blank")
+  await expect(page.getByRole("link", { name: "View releases" })).toHaveAttribute("rel", "noopener noreferrer")
   await expect(page.getByRole("dialog")).toBeVisible()
   const navigation = page.waitForEvent("framenavigated")
   await page.getByRole("button", { name: "Refresh" }).click()
   await navigation
 })
 
-test("login ignores an equal release and keeps the version visible on mobile", async ({ page }) => {
+test("login ignores an equal release and keeps the inline version visible on mobile", async ({ page }) => {
   await page.route(latestReleaseUrl, (route) =>
     route.fulfill({ json: { tag_name: `v${packageVersion}` } }),
   )
@@ -31,6 +34,9 @@ test("login ignores an equal release and keeps the version visible on mobile", a
   await page.goto("/login")
   await expect(page.getByTestId("build-version")).toBeVisible()
   await expect(page.getByRole("dialog")).toHaveCount(0)
+  const footer = page.getByText("Badminton Verein Erlangen · Member portal", { exact: true })
+  const version = page.getByTestId("build-version")
+  expect((await version.boundingBox())?.y ?? 0).toBeGreaterThan((await footer.boundingBox())?.y ?? 0)
 
   await page.setViewportSize({ width: 375, height: 844 })
   const versionBox = await page.getByTestId("build-version").boundingBox()

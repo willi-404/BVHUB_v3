@@ -10,5 +10,5 @@ export default function LoginPage() {
   const state = location.state as { from?: unknown } | null;
   const target = safeLoginRedirect(state?.from);
   const sessionExpired = typeof window !== "undefined" && window.sessionStorage.getItem("bvhub.sessionExpired") === "1";
-  return <PublicOnlyRoute><LoginView sessionExpired={sessionExpired} onLogin={() => navigate(target, { replace: true })} /><BuildVersionNotice /></PublicOnlyRoute>;
+  return <PublicOnlyRoute><LoginView sessionExpired={sessionExpired} onLogin={() => navigate(target, { replace: true })} footerContent={<BuildVersionNotice />} /></PublicOnlyRoute>;
 }
