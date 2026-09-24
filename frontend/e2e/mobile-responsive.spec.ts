@@ -243,12 +243,12 @@ test.describe("responsive application shell", () => {
     })
   }
 
-  test("768px restores tablet tabs and 1024px restores the desktop sidebar", async ({ page }) => {
+  test("768px keeps the drawer layout and 1024px restores the desktop sidebar", async ({ page }) => {
     await mockSession(page)
     await page.setViewportSize({ width: 768, height: 900 })
     await page.goto("/dashboard")
     await expect(page.getByRole("button", { name: "Open navigation menu" })).toBeHidden()
-    await expect(page.locator("nav.fixed.bottom-0")).toBeVisible()
+    await expect(page.locator("nav.fixed.bottom-0")).toBeHidden()
     await expect(page.locator("aside")).toBeHidden()
 
     await page.setViewportSize({ width: 1024, height: 900 })

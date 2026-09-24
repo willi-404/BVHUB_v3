@@ -9,7 +9,6 @@ import {
   subscribeToPaymentRealtime,
 } from "./hooks/usePayments"
 import {
-  buildPaytoUri,
   createEpcPayload,
   downloadEpcPng,
   formatEuroInput,
@@ -89,13 +88,6 @@ describe("payment money and transfer adapters", () => {
     expect(() => parseEuroCents("3,799")).toThrow(RangeError)
   })
 
-  it("builds an encoded RFC 8905 payto URI", () => {
-    const uri = buildPaytoUri(payment)
-    expect(uri).toBe(
-      "payto://iban/DE89370400440532013000?amount=EUR%3A3.80&receiver-name=Empf%C3%A4nger%20%26%20Verein&message=BVHUB-EVT-ruuxuhvvg68vuoz-PAY-k8x4m2p9abc123d",
-    )
-  })
-
   it("maps cents exactly and places the full BVHUB purpose in EPC line 11", () => {
     const data = paymentToEpcData(payment)
     expect(data.amount).toBe(3.8)
@@ -119,12 +111,6 @@ describe("payment money and transfer adapters", () => {
           iban: "DE000",
           configured: true,
         },
-      }),
-    ).toThrow(RangeError)
-    expect(() =>
-      buildPaytoUri({
-        ...payment,
-        paymentSettings: { ...payment.paymentSettings, configured: false },
       }),
     ).toThrow(RangeError)
   })

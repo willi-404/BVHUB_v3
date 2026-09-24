@@ -92,20 +92,6 @@ export function formatEuroInput(amountCents: number): string {
   return `${Math.floor(amountCents / 100)},${String(amountCents % 100).padStart(2, "0")}`
 }
 
-export function buildPaytoUri(payment: PaymentDetail): string {
-  const settings = payment.paymentSettings
-  if (!payment.paymentRequired || !settings.configured)
-    throw new RangeError("Payment details unavailable")
-  const query = [
-    ["amount", `EUR:${(payment.amountCents / 100).toFixed(2)}`],
-    ["receiver-name", settings.recipientName],
-    ["message", payment.purpose],
-  ]
-    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
-    .join("&")
-  return `payto://iban/${encodeURIComponent(settings.iban.replace(/\s/g, ""))}?${query}`
-}
-
 export function paymentToEpcData(payment: PaymentDetail): PaymentData {
   const settings = payment.paymentSettings
   if (!payment.paymentRequired || !settings.configured)

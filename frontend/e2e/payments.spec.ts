@@ -182,7 +182,7 @@ test.describe.serial("payments with isolated PocketBase", () => {
     if (dataDir.startsWith(join(tmpdir(), "bvhub-payment-e2e-"))) rmSync(dataDir, { recursive: true, force: true })
   })
 
-  test("guest registers and receives local EPC QR and payto details", async ({ browser }) => {
+  test("guest registers and receives local EPC QR and payment details", async ({ browser }) => {
     const { context, page } = await sessionPage(browser, seed.users.guest, seed.tokens.guest)
     await page.goto(`/events/${seed.events.guest.id}`)
     await page.getByRole("link", { name: "Register", exact: true }).click()
@@ -205,8 +205,7 @@ test.describe.serial("payments with isolated PocketBase", () => {
     await expect(page.locator("dd").getByText("€3.80", { exact: true })).toBeVisible()
     await expect(page.locator("dd").getByText("Badminton Verein Erlangen", { exact: true })).toBeVisible()
     await expect(page.locator("dd").getByText("DE89 3704 0044 0532 0130 00", { exact: true })).toBeVisible()
-    await expect(page.getByTestId("payto-link")).toHaveAttribute("href", /^payto:\/\/iban\//)
-    expect(new URL(await page.getByTestId("payto-link").getAttribute("href") ?? "").searchParams.get("message")).toBe(createdPayment.purpose)
+    await expect(page.locator('a[target="_blank"][rel="noopener noreferrer"]')).toHaveCount(0)
     const downloadPromise = page.waitForEvent("download")
     await page.getByTestId("download-payment-qr").click()
     const download = await downloadPromise
@@ -231,7 +230,6 @@ test.describe.serial("payments with isolated PocketBase", () => {
     await expect(page.locator("dd").getByText("€0.00", { exact: true })).toBeVisible()
     await expect(page.getByTestId("epc-payment-qr")).toHaveCount(0)
     await expect(page.getByTestId("download-payment-qr")).toHaveCount(0)
-    await expect(page.getByTestId("payto-link")).toHaveCount(0)
     await context.close()
   })
 

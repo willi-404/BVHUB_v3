@@ -24,6 +24,7 @@ import PaymentsView from "../features/payments/components/PaymentsView";
 import { useMyPayments, usePaymentRealtime } from "../features/payments/hooks/usePayments";
 import { primaryNavigation, primaryTabForPath, routes } from "../routes/paths";
 import EventListPage from "./EventListPage";
+import { useNews } from "../features/news/hooks/useNews";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -62,6 +63,7 @@ const icons = {
   pencil: "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z",
   x: "M18 6 6 18M6 6l12 12",
   menu: "M4 6h16M4 12h16M4 18h16",
+  newspaper: "M4 4h16v16H4zM8 8h8M8 12h8M8 16h5",
 };
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
@@ -144,23 +146,6 @@ const EVENTS: Event[] = [
     isRegistered: true,
     level: "All",
   },
-];
-
-const NEWS = [
-  {
-    id: 1,
-    title: "New training schedule for autumn season",
-    excerpt: "Starting October 1st, Tuesday sessions move to 6:30 PM. Thursdays remain unchanged.",
-    date: "Aug 28, 2026",
-    tag: "Announcement",
-    tagColor: "success" as const,
-  },
-];
-
-const ACTIVITIES = [
-  { id: 1, text: "You registered for Tuesday Evening Training", time: "2h ago", icon: "check" as const },
-  { id: 2, text: "Monthly membership renewed automatically", time: "Aug 28", icon: "shield" as const },
-  { id: 3, text: "New tournament posted: Club Singles Championship", time: "Aug 27", icon: "trophy" as const },
 ];
 
 const typeColors: Record<Event["type"], string> = {
@@ -361,29 +346,34 @@ function QuickActions() {
 
 function NewsSection() {
   const { t, locale } = useI18n();
+  const query = useNews(locale === "zh-CN" ? "zh" : "de");
+  const item = query.data?.[0];
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-semibold text-[var(--foreground)]">{t("dashboard.news")}</h2>
-        <button className="text-xs text-[var(--primary)] font-medium flex items-center gap-0.5">
+        <Link to={routes.news} className="text-xs text-[var(--primary)] font-medium flex items-center gap-0.5">
           {t("common.seeAll")} <Icon d={icons.chevronRight} size={12} />
-        </button>
+        </Link>
       </div>
-      {NEWS.slice(0, 1).map((item) => (
-        <Card key={item.id} className="overflow-hidden">
+      {query.isPending && <p className="text-sm text-[var(--muted-foreground)]">{t("common.loading")}</p>}
+      {query.isError && <p role="alert" className="text-sm text-red-600">{t("news.loadError")}</p>}
+      {!query.isPending && !query.isError && !item && <p className="text-sm text-[var(--muted-foreground)]">{t("news.empty")}</p>}
+      {item && (
+        <Card key={item.slug} className="overflow-hidden">
           <div className="p-4">
             <div className="flex items-center gap-2 mb-2">
-              <Badge variant={item.tagColor}>{t("demo.news.tag")}</Badge>
-              <span className="text-[10px] text-[var(--muted-foreground)]">{formatLocaleDate(item.date, locale)}</span>
+              <Badge variant="success">{t("news.label")}</Badge>
+              <span className="text-[10px] text-[var(--muted-foreground)]">{formatLocaleDate(item.publishedAt, locale)}</span>
             </div>
-            <h3 className="font-semibold text-sm text-[var(--foreground)] leading-snug mb-1">{t("demo.news.title")}</h3>
-            <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">{t("demo.news.excerpt")}</p>
-            <button className="mt-2 text-xs text-[var(--primary)] font-medium flex items-center gap-0.5">
+            <h3 className="font-semibold text-sm text-[var(--foreground)] leading-snug mb-1">{item.title}</h3>
+            <p className="line-clamp-3 text-xs text-[var(--muted-foreground)] leading-relaxed">{item.excerpt}</p>
+            <a href={item.link} target="_blank" rel="noopener noreferrer" className="mt-2 text-xs text-[var(--primary)] font-medium flex items-center gap-0.5">
               {t("common.readMore")} <Icon d={icons.chevronRight} size={11} />
-            </button>
+            </a>
           </div>
         </Card>
-      ))}
+      )}
     </div>
   );
 }
@@ -442,31 +432,6 @@ function EventCard({ event, onToggle }: { event: Event; onToggle: (id: number) =
   );
 }
 
-function ActivityFeed() {
-  const { t } = useI18n();
-  const iconMap: Record<string, string> = { check: icons.check, shield: icons.shield, trophy: icons.trophy };
-  const activityText: Record<number, "demo.activity.registered" | "demo.activity.renewed" | "demo.activity.tournament"> = { 1: "demo.activity.registered", 2: "demo.activity.renewed", 3: "demo.activity.tournament" };
-  const activityTime: Record<number, "demo.activity.twoHours" | "demo.activity.aug28" | "demo.activity.aug27"> = { 1: "demo.activity.twoHours", 2: "demo.activity.aug28", 3: "demo.activity.aug27" };
-  return (
-    <div className="flex flex-col">
-      {ACTIVITIES.map((a, i) => (
-        <div key={a.id}>
-          <div className="flex items-start gap-3 py-3">
-            <div className="h-7 w-7 rounded-full bg-[var(--secondary)] flex items-center justify-center text-[var(--primary)] shrink-0 mt-0.5">
-              <Icon d={iconMap[a.icon]} size={13} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-[var(--foreground)] leading-snug">{t(activityText[a.id])}</p>
-              <p className="text-[10px] text-[var(--muted-foreground)] mt-0.5">{t(activityTime[a.id])}</p>
-            </div>
-          </div>
-          {i < ACTIVITIES.length - 1 && <Separator />}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // ─── Page views ────────────────────────────────────────────────────────────────
 
 function DashboardView({ events, liveEvents, onToggle, onOpenCard, profile }: { events: Event[]; liveEvents: EventRecord[]; onToggle: (id: number) => void; onOpenCard: () => void; profile: ProfileDto | null }) {
@@ -518,14 +483,6 @@ function DashboardView({ events, liveEvents, onToggle, onOpenCard, profile }: { 
         <LiveEventCards events={liveEvents.slice(0, 3)} />
       </div>
 
-      <div>
-        <h2 className="text-sm font-semibold text-[var(--foreground)] mb-1">{t("dashboard.recentActivity")}</h2>
-        <Card>
-          <CardContent className="pt-0 px-4 pb-2">
-            <ActivityFeed />
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }
@@ -598,6 +555,7 @@ const ADMIN_ITEMS = [
   { label: "Payments", icon: icons.creditCard },
   { label: "Event Manage", icon: icons.clipboardList },
   { label: "Scan Member Card", icon: icons.qrCode },
+  { label: "News", icon: icons.newspaper },
 ];
 
 const NAV_ITEMS: Array<{ key: NavTab; label: string; icon: string }> = [
@@ -606,44 +564,6 @@ const NAV_ITEMS: Array<{ key: NavTab; label: string; icon: string }> = [
   { key: "payments", label: "Payments", icon: icons.creditCard },
   { key: "profile", label: "Profile", icon: icons.user },
 ];
-
-function BottomNav({
-  active,
-  onChange,
-  unpaidCount,
-}: {
-  active: NavTab;
-  onChange: (t: NavTab) => void;
-  unpaidCount: number;
-}) {
-  const { t } = useI18n();
-  return (
-    <nav aria-label={t("navigation.primary")} className="fixed bottom-0 left-0 right-0 z-50 hidden border-t border-[var(--border)] bg-[var(--card)] md:flex lg:hidden">
-      {NAV_ITEMS.map((item) => {
-        const isActive = active === item.key;
-        const showDot = item.key === "payments" && unpaidCount > 0;
-        return (
-          <button
-            key={item.key}
-            onClick={() => onChange(item.key)}
-            aria-current={isActive ? "page" : undefined}
-            className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors relative ${isActive ? "text-[var(--primary)]" : "text-[var(--muted-foreground)]"}`}
-          >
-            <div className="relative">
-              <Icon d={item.icon} size={20} />
-              {showDot && (
-                <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-red-500 border-2 border-[var(--card)] text-[8px] text-white font-bold flex items-center justify-center">
-                  {unpaidCount}
-                </span>
-              )}
-            </div>
-            <span className="text-[10px] font-medium">{t(primaryNavMessageKey(item.key))}</span>
-          </button>
-        );
-      })}
-    </nav>
-  );
-}
 
 const FOCUSABLE_DRAWER_ELEMENTS = [
   "button:not([disabled])",
@@ -665,6 +585,7 @@ function MobileNavigationDrawer({
   onAdminPayments,
   onAdminEvents,
   onAdminScanner,
+  onAdminNews,
   onLogout,
   triggerRef,
 }: {
@@ -678,6 +599,7 @@ function MobileNavigationDrawer({
   onAdminPayments: () => void;
   onAdminEvents: () => void;
   onAdminScanner: () => void;
+  onAdminNews: () => void;
   onLogout: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
@@ -809,7 +731,7 @@ function MobileNavigationDrawer({
                 {t("admin.management")}
               </p>
               {ADMIN_ITEMS.map((item) => {
-                const action = item.label === "Members" ? onAdminMembers : item.label === "Payments" ? onAdminPayments : item.label === "Event Manage" ? onAdminEvents : onAdminScanner;
+                const action = item.label === "Members" ? onAdminMembers : item.label === "Payments" ? onAdminPayments : item.label === "Event Manage" ? onAdminEvents : item.label === "Scan Member Card" ? onAdminScanner : onAdminNews;
                 return (
                   <button
                     key={item.label}
@@ -819,7 +741,7 @@ function MobileNavigationDrawer({
                   >
                     <Icon d={item.icon} size={18} />
                     <span className="min-w-0 flex-1 break-words">
-                      {t(item.label === "Members" ? "admin.members.title" : item.label === "Payments" ? "admin.payments.title" : item.label === "Event Manage" ? "admin.events.title" : "admin.scanMemberCard")}
+                      {t(item.label === "Members" ? "admin.members.title" : item.label === "Payments" ? "admin.payments.title" : item.label === "Event Manage" ? "admin.events.title" : item.label === "Scan Member Card" ? "admin.scanMemberCard" : "admin.news.title")}
                     </span>
                   </button>
                 );
@@ -852,6 +774,7 @@ function Sidebar({
   onAdminPayments,
   onAdminEvents,
   onAdminScanner,
+  onAdminNews,
   canAccessAdmin,
   profile,
 }: {
@@ -863,6 +786,7 @@ function Sidebar({
   onAdminPayments: () => void;
   onAdminEvents: () => void;
   onAdminScanner: () => void;
+  onAdminNews: () => void;
   canAccessAdmin: boolean;
   profile: ProfileDto | null;
 }) {
@@ -937,11 +861,11 @@ function Sidebar({
         {ADMIN_ITEMS.map((item) => (
           <button
             key={item.label}
-            onClick={item.label === "Members" ? onAdminMembers : item.label === "Payments" ? onAdminPayments : item.label === "Event Manage" ? onAdminEvents : onAdminScanner}
+            onClick={item.label === "Members" ? onAdminMembers : item.label === "Payments" ? onAdminPayments : item.label === "Event Manage" ? onAdminEvents : item.label === "Scan Member Card" ? onAdminScanner : onAdminNews}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium w-full text-[var(--muted-foreground)] hover:bg-amber-50 hover:text-amber-700 transition-all duration-150"
           >
             <Icon d={item.icon} size={17} />
-            {t(item.label === "Members" ? "admin.members.title" : item.label === "Payments" ? "admin.payments.title" : item.label === "Event Manage" ? "admin.events.title" : "admin.scanMemberCard")}
+            {t(item.label === "Members" ? "admin.members.title" : item.label === "Payments" ? "admin.payments.title" : item.label === "Event Manage" ? "admin.events.title" : item.label === "Scan Member Card" ? "admin.scanMemberCard" : "admin.news.title")}
           </button>
         ))}
       </div>}
@@ -1048,7 +972,7 @@ export function AppShell({ initialTab = "dashboard", onLogout, routeContent = fa
   return (
     <div className="relative h-full bg-[var(--background)]" style={{ fontFamily: "var(--font-sans)" }}>
       <div className="app-shell-background flex h-full" data-drawer-open={mobileNavigationOpen} inert={mobileNavigationOpen ? true : undefined}>
-        <Sidebar active={tab} onChange={selectNavigation} unpaidCount={unpaidCount} onLogout={logout} onAdminMembers={() => navigate(routes.adminMembers)} onAdminPayments={() => navigate(routes.adminPayments)} onAdminEvents={() => navigate(routes.adminEvents)} onAdminScanner={() => navigate(routes.adminMemberCardScanner)} canAccessAdmin={canAccessAdmin} profile={profile || null} />
+        <Sidebar active={tab} onChange={selectNavigation} unpaidCount={unpaidCount} onLogout={logout} onAdminMembers={() => navigate(routes.adminMembers)} onAdminPayments={() => navigate(routes.adminPayments)} onAdminEvents={() => navigate(routes.adminEvents)} onAdminScanner={() => navigate(routes.adminMemberCardScanner)} onAdminNews={() => navigate(routes.adminNews)} canAccessAdmin={canAccessAdmin} profile={profile || null} />
 
         <main ref={mainRef} id="app-main-content" className="min-w-0 w-full max-w-full flex-1 overflow-x-hidden overflow-y-auto">
         <div className="hidden lg:flex items-center justify-between px-8 py-5 border-b border-[var(--border)] bg-[var(--card)] sticky top-0 z-10">
@@ -1084,14 +1008,12 @@ export function AppShell({ initialTab = "dashboard", onLogout, routeContent = fa
           <span className="text-sm font-semibold text-[var(--foreground)]">{tabLabel[tab]}</span>
           <LanguageSwitcher className="text-[var(--foreground)]" />
         </div>
-        <div className="min-w-0 w-full max-w-2xl px-4 py-5 pb-24 lg:max-w-none lg:px-8 lg:py-7 lg:pb-8">
+        <div className="min-w-0 w-full max-w-2xl px-4 py-5 lg:max-w-none lg:px-8 lg:py-7">
           <section id={`app-view-${tab}`} tabIndex={-1} aria-label={tabLabel[tab]} className="min-w-0 scroll-mt-20">
             {routeContent ? <Outlet context={outletContext} /> : renderView()}
           </section>
         </div>
         </main>
-
-        <BottomNav active={tab} onChange={selectNavigation} unpaidCount={unpaidCount} />
 
         {cardOpen && <MemberCardOverlay onClose={() => setCardOpen(false)} />}
         {editProfileOpen && <EditProfileOverlay onClose={() => setEditProfileOpen(false)} />}
@@ -1109,6 +1031,7 @@ export function AppShell({ initialTab = "dashboard", onLogout, routeContent = fa
         onAdminPayments={() => navigate(routes.adminPayments)}
         onAdminEvents={() => navigate(routes.adminEvents)}
         onAdminScanner={() => navigate(routes.adminMemberCardScanner)}
+        onAdminNews={() => navigate(routes.adminNews)}
         onLogout={logout}
         triggerRef={mobileNavigationTrigger}
       />
