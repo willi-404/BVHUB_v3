@@ -220,6 +220,7 @@
   "news.adminDuplicate": "Ein Artikel darf je Sprache nur einmal ausgewählt werden.",
   "news.adminSaveError": "Die Reihenfolge konnte nicht gespeichert werden.",
   "news.adminRefreshError": "Die Feeds konnten nicht aktualisiert werden.",
+  "news.adminRefreshed": "Feeds wurden aktualisiert.",
   "news.adminSaved": "Reihenfolge gespeichert.",
   "dashboard.upcomingEvents": "Kommende Events",
   "dashboard.recentActivity": "Letzte Aktivitäten",

@@ -18,5 +18,6 @@ assert.deepEqual(parseFeed(xml, "zh"), [{
   publishedAt: "2026-09-01",
   excerpt: "Short & clear",
 }])
+assert.deepEqual(parseFeed(xml.replace("https://bv-erlangen2025.de/zh/posts/sommer/", "https://bv-erlangen2025.de/zh/posts/sommer/?utm_source=test"), "zh")[0].link, "https://bv-erlangen2025.de/zh/posts/sommer/")
 assert.throws(() => parseFeed("<rss><channel /></rss>", "zh"))
 console.log("news parser self-check passed")

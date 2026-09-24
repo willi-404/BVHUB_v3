@@ -20,14 +20,16 @@ function xmlValue(xml, tag) {
 }
 
 function safeLink(value, locale) {
-  let parsed;
-  try { parsed = new URL(decodeXml(plainText(value))); } catch (_) { return ""; }
-  if (parsed.protocol !== "https:" || parsed.hostname !== HOST || !parsed.pathname.startsWith(`/${locale}/posts/`)) return "";
-  return parsed.toString();
+  const link = decodeXml(plainText(value)).trim();
+  const prefix = `https://${HOST}/${locale}/posts/`;
+  if (!link.startsWith(prefix) || /[\s"'<>]/.test(link.slice(prefix.length))) return "";
+  const path = link.slice(prefix.length).split(/[?#]/, 1)[0].replace(/^\/+|\/+$/g, "");
+  if (!path || path.split("/").some((part) => !part || part === "." || part === "..")) return "";
+  return `${prefix}${path}/`;
 }
 
 function slugFromLink(link) {
-  const parts = new URL(link).pathname.split("/").filter(Boolean);
+  const parts = link.split(/[?#]/, 1)[0].split("/").filter(Boolean);
   return parts[parts.length - 1] || "";
 }
 

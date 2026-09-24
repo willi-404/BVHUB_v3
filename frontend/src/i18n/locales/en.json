@@ -220,6 +220,7 @@
   "news.adminDuplicate": "A news article can only be selected once per language.",
   "news.adminSaveError": "News order could not be saved.",
   "news.adminRefreshError": "News feeds could not be refreshed.",
+  "news.adminRefreshed": "News feeds refreshed.",
   "news.adminSaved": "News order saved.",
   "dashboard.upcomingEvents": "Upcoming events",
   "dashboard.recentActivity": "Recent activity",

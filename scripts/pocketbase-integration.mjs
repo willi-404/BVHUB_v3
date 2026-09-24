@@ -483,6 +483,26 @@ const adminLogin = expectStatus(await request("POST", "/api/collections/users/au
   body: { identity: admin.email, password: "Synthetic-password-12!" },
 }), 200, "admin password login");
 
+expectStatus(await request("GET", "/api/bvhub/admin/news"), 401, "unauthenticated news management read");
+expectStatus(await request("POST", "/api/bvhub/admin/news/refresh", { token: guestLoginToken, body: {} }), 403, "guest cannot refresh news");
+const refreshedNews = expectStatus(await request("POST", "/api/bvhub/admin/news/refresh", { token: adminLogin.token, body: {} }), 200, "admin refreshes PaperMod news feeds");
+for (const locale of ["zh", "de"]) {
+  const feed = refreshedNews.locales.find((item) => item.locale === locale);
+  assert.ok(feed && feed.posts.length > 0, `${locale} PaperMod feed returns posts`);
+  assert.ok(feed.posts.every((post) => post.link.startsWith(`https://bv-erlangen2025.de/${locale}/posts/`)), `${locale} feed links stay on the approved posts path`);
+}
+const configuredNews = expectStatus(await request("GET", "/api/bvhub/news?locale=de", { token: memberLoginToken }), 200, "member reads configured German news");
+assert.equal(configuredNews.items.length, 0, "fresh feeds remain unselected until an admin saves slots");
+expectStatus(await request("GET", "/api/bvhub/news?locale=fr", { token: memberLoginToken }), 400, "news rejects unsupported locale");
+const selectedDe = refreshedNews.locales.find((item) => item.locale === "de").posts[0].slug;
+const selectedZh = refreshedNews.locales.find((item) => item.locale === "zh").posts[0].slug;
+expectStatus(await request("PUT", "/api/bvhub/admin/news", {
+  token: adminLogin.token,
+  body: { de: [{ position: 1, slug: selectedDe }, { position: 2, slug: "" }], zh: [{ position: 1, slug: selectedZh }, { position: 2, slug: "" }] },
+}), 200, "admin saves independent news slots");
+const selectedGermanNews = expectStatus(await request("GET", "/api/bvhub/news?locale=de", { token: memberLoginToken }), 200, "member reads selected German news");
+assert.equal(selectedGermanNews.items[0].slug, selectedDe, "German slot order is applied");
+
 expectStatus(await request("GET", "/api/bvhub/admin/payment-settings"), 401, "unauthenticated payment settings read");
 for (const [label, token] of [["guest", guestLoginToken], ["member", memberLoginToken]]) {
   expectStatus(await request("GET", "/api/bvhub/admin/payment-settings", { token }), 403, `${label} cannot read payment settings`);

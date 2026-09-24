@@ -220,6 +220,7 @@
   "news.adminDuplicate": "同一种语言不能重复选择同一篇新闻。",
   "news.adminSaveError": "新闻顺序保存失败。",
   "news.adminRefreshError": "新闻 feed 刷新失败。",
+  "news.adminRefreshed": "新闻 feed 已刷新。",
   "news.adminSaved": "新闻顺序已保存。",
   "dashboard.upcomingEvents": "即将举行的活动",
   "dashboard.recentActivity": "最近活动",
