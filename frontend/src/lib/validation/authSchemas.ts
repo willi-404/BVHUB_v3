@@ -25,7 +25,9 @@ export const RegisterPayload = z.object({
 
 export const OtpPayload = z.object({ email: z.string().email() });
 
-export const AccountStatusResponse = z.object({ exists: z.boolean() });
+export const AccountStatusResponse = z.object({
+  status: z.enum(["not_found", "pending_verification", "inactive", "active"]),
+});
 
 export type PocketBaseUserResponse = z.infer<typeof PocketBaseUserResponse>;
 export type PocketBaseAuthResponse = z.infer<typeof PocketBaseAuthResponse>;

@@ -1,16 +1,17 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { pb } from "../../lib/pocketbase";
-import { clearAuthSession, isRegisteredEmail, loginWithPassword, refreshSession, requestOtp, softLogout, verifyOtp } from "./authService";
+import { clearAuthSession, getAccountStatus, loginWithPassword, refreshSession, requestOtp, softLogout, verifyOtp } from "./authService";
 import { toAuthUser, type AuthUser } from "./policy";
 import { getTokenExpiry, resolveSessionDecision } from "./session";
+import type { AccountStatusResponse } from "../../lib/validation/authSchemas";
 
 export type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
 export interface AuthContextValue {
   status: AuthStatus;
   requestOtp: (email: string) => Promise<string>;
-  isRegisteredEmail: (email: string) => Promise<boolean>;
+  getAccountStatus: (email: string) => Promise<AccountStatusResponse["status"]>;
   verifyOtp: (otpId: string, otp: string) => Promise<AuthUser>;
   loginWithPassword: (identity: string, password: string) => Promise<AuthUser>;
   logout: () => void;
@@ -19,7 +20,7 @@ export interface AuthContextValue {
 const fallbackAuth: AuthContextValue = {
   status: "unauthenticated",
   requestOtp,
-  isRegisteredEmail,
+  getAccountStatus,
   verifyOtp,
   loginWithPassword,
   logout: () => pb.authStore.clear(),
@@ -96,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AuthContextValue>(() => ({
     status,
-    isRegisteredEmail,
+    getAccountStatus,
     requestOtp,
     verifyOtp,
     loginWithPassword,
