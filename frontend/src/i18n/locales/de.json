@@ -69,6 +69,7 @@
   "version.updateDescription": "Version {version} ist verfügbar. Aktualisiere die Seite, um die neueste Version zu verwenden.",
   "version.later": "Später",
   "version.refresh": "Aktualisieren",
+  "version.releases": "Releases ansehen",
   "common.loading": "Wird geladen …",
   "common.retry": "Erneut versuchen",
   "common.save": "Speichern",
