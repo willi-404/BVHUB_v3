@@ -17,6 +17,8 @@ const AdminEventDetailPage = lazy(() => import("../pages/AdminEventDetailPage"))
 const AdminEventsPage = lazy(() => import("../pages/AdminEventsPage"));
 const MemberCardScannerPage = lazy(() => import("../pages/MemberCardScannerPage"));
 const PaymentDetailPage = lazy(() => import("../pages/PaymentDetailPage"));
+const NewsPage = lazy(() => import("../pages/NewsPage"));
+const AdminNewsPage = lazy(() => import("../pages/AdminNewsPage"));
 const AdminPaymentsPage = lazy(() => import("../pages/AdminPaymentsPage"));
 const RegisterPage = lazy(() => import("../app/components/RegisterView"));
 const RegisterSuccessPage = lazy(() => import("../app/components/RegisterSuccessView"));
@@ -35,12 +37,13 @@ export const router = createBrowserRouter([
       { path: routes.events, element: load(<EventListPage />) },
       { path: routes.payments, element: load(<PaymentsPage />) },
       { path: routes.profile, element: load(<ProfilePage />) },
+      { path: routes.news, element: load(<NewsPage />) },
     ] },
     { path: "/events/:eventId", element: load(<EventDetailPage />) },
     { path: "/events/:eventId/checkout", element: load(<EventCheckoutPage />) },
     { path: "/payments/:paymentId", element: load(<PaymentDetailPage />) },
     { element: <ProtectedRoute admin />, children: [{ path: "/admin/events/new", element: load(<AdminEventsPage />) }, { path: "/admin/events/:eventId", element: load(<AdminEventDetailPage />) }] },
-    { element: <ProtectedRoute admin />, children: [{ path: routes.adminMembers, element: load(<MembersPage />) }, { path: routes.adminEvents, element: load(<AdminEventsPage />) }, { path: routes.adminPayments, element: load(<AdminPaymentsPage />) }, { path: routes.adminMemberCardScanner, element: load(<MemberCardScannerPage />) }] },
+    { element: <ProtectedRoute admin />, children: [{ path: routes.adminMembers, element: load(<MembersPage />) }, { path: routes.adminEvents, element: load(<AdminEventsPage />) }, { path: routes.adminPayments, element: load(<AdminPaymentsPage />) }, { path: routes.adminMemberCardScanner, element: load(<MemberCardScannerPage />) }, { path: routes.adminNews, element: load(<AdminNewsPage />) }] },
     { path: "/dashboard", element: <Navigate to={routes.home} replace /> },
     { path: "/members", element: <Navigate to={routes.adminMembers} replace /> },
     { path: "/admin", element: <Navigate to={routes.adminMembers} replace /> },

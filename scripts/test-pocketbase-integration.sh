@@ -38,7 +38,7 @@ legacy_migrations="$data_dir/legacy_migrations"
 mkdir -p "$legacy_migrations"
 for migration in "$pb_dir"/pb_migrations/*.js; do
   case "$(basename "$migration")" in
-    1790400000_add_event_guest_fee.js|1790400010_create_payments.js|1790400020_relax_payment_purpose.js) continue ;;
+    1790400000_add_event_guest_fee.js|1790400010_create_payments.js|1790400020_relax_payment_purpose.js|1790500000_normalize_user_emails.js) continue ;;
   esac
   cp "$migration" "$legacy_migrations/"
 done

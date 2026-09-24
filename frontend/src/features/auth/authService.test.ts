@@ -18,7 +18,7 @@ vi.mock("../../lib/pocketbase", () => ({
   },
 }))
 
-import { AuthServiceError, authErrorCodes, isRegisteredEmail, loginWithPassword, requestOtp, verifyOtp } from "./authService"
+import { AuthServiceError, authErrorCodes, getAccountStatus, loginWithPassword, requestOtp, verifyOtp } from "./authService"
 
 const pocketBaseBadRequest = () => new ClientResponseError({ status: 400, response: { message: "Failed to request OTP.", data: {} } })
 
@@ -47,19 +47,23 @@ describe("auth service error classification", () => {
     expect((error as AuthServiceError).message).toBe("errors.generic")
   })
 
-  it("returns the OTP id for a usable account", async () => {
+  it("normalizes an OTP email before requesting a code", async () => {
     collection.mockReturnValue({ requestOTP: requestOTP.mockResolvedValueOnce({ otpId: "otp-123" }) })
-    await expect(requestOtp("member@example.test")).resolves.toBe("otp-123")
+    await expect(requestOtp(" Member@Example.Test ")).resolves.toBe("otp-123")
+    expect(requestOTP).toHaveBeenCalledWith("member@example.test")
   })
 
-  it("checks registration status only for a valid email address", async () => {
-    send.mockResolvedValueOnce({ exists: false })
-    await expect(isRegisteredEmail("unknown@example.test")).resolves.toBe(false)
-    expect(send).toHaveBeenCalledWith("/api/bvhub/auth/account-status", { method: "POST", body: { email: "unknown@example.test" } })
+  it.each(["not_found", "pending_verification", "inactive", "active"] as const)("returns the typed %s account status", async (status) => {
+    send.mockResolvedValueOnce({ status })
 
-    const error = await isRegisteredEmail("not-an-email").catch((value: unknown) => value)
+    await expect(getAccountStatus(" Member@Example.Test ")).resolves.toBe(status)
+    expect(send).toHaveBeenCalledWith("/api/bvhub/auth/account-status", { method: "POST", body: { email: "member@example.test" } })
+  })
+
+  it("checks account status only for a valid email address", async () => {
+    const error = await getAccountStatus("not-an-email").catch((value: unknown) => value)
     expect(error).toMatchObject({ code: authErrorCodes.invalidEmail })
-    expect(send).toHaveBeenCalledTimes(1)
+    expect(send).not.toHaveBeenCalled()
   })
 
   it("does not classify an invalid OTP or admin password as an unavailable account", async () => {

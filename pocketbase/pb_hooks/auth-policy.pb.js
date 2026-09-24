@@ -11,6 +11,13 @@ onRecordAuthWithPasswordRequest((e) => {
 // Every OTP request has the same generic failure for unknown, inactive, or disallowed accounts.
 onRecordRequestOTPRequest((e) => {
   const otpRoles = ["GUEST", "MEMBER"];
+  if (!e.record) {
+    const body = e.requestInfo().body || {};
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    if (email) {
+      try { e.record = $app.findFirstRecordByData("users", "email", email); } catch (_) { /* preserve PocketBase's generic unknown-account response */ }
+    }
+  }
   const record = e.record;
   if (!record || record.getBool("active") !== true || record.getBool("verified") !== true || !otpRoles.includes(record.getString("role"))) throw new BadRequestError("Invalid credentials");
   e.next();

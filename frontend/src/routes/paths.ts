@@ -5,10 +5,12 @@ export const routes = {
   events: "/events",
   payments: "/payments",
   profile: "/profile",
+  news: "/news",
   adminMembers: "/admin/members",
   adminEvents: "/admin/events",
   adminPayments: "/admin/payments",
   adminMemberCardScanner: "/admin/member-card-scanner",
+  adminNews: "/admin/news",
 } as const;
 
 export const primaryNavigation: Readonly<Record<PrimaryNavTab, string>> = {

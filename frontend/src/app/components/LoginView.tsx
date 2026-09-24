@@ -29,7 +29,7 @@ const icons = {
 };
 
 export default function LoginView({ onLogin, sessionExpired = false }: LoginViewProps) {
-  const { isRegisteredEmail, requestOtp, verifyOtp, loginWithPassword } = useAuth();
+  const { getAccountStatus, requestOtp, verifyOtp, loginWithPassword } = useAuth();
   const { t } = useI18n();
   const [mode, setMode] = useState<"otp" | "password">("otp");
   const [email, setEmail] = useState("");
@@ -65,9 +65,17 @@ export default function LoginView({ onLogin, sessionExpired = false }: LoginView
     setLoading(true);
     try {
       if (!otpId) {
-        const isRegistered = await isRegisteredEmail(email);
-        if (!isRegistered) {
+        const accountStatus = await getAccountStatus(email);
+        if (accountStatus === "not_found") {
           setError(t("auth.accountNotFound"));
+          return;
+        }
+        if (accountStatus === "pending_verification") {
+          setError(t("auth.accountPendingVerification"));
+          return;
+        }
+        if (accountStatus === "inactive") {
+          setError(t("auth.accountInactive"));
           return;
         }
         const nextOtpId = await requestOtp(email);

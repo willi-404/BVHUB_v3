@@ -6,10 +6,15 @@ routerAdd("POST", "/api/bvhub/auth/account-status", (e) => {
   if (!email || email.length > 254 || !emailRe.test(email)) throw new BadRequestError("Ungültige E-Mail-Adresse");
 
   try {
-    $app.findFirstRecordByData("users", "email", email);
-    return e.json(200, { exists: true });
+    const user = $app.findFirstRecordByData("users", "email", email);
+    const status = user.getBool("verified") !== true
+      ? "pending_verification"
+      : user.getBool("active") !== true
+        ? "inactive"
+        : "active";
+    return e.json(200, { status });
   } catch (_) {
-    return e.json(200, { exists: false });
+    return e.json(200, { status: "not_found" });
   }
 }, $apis.requireGuestOnly());
 

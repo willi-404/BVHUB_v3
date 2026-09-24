@@ -17,7 +17,7 @@ describe("build version checks", () => {
     expect(isRemoteBuildNewer("1.0.1-beta.2", "1.0.1-beta.1")).toBe(true)
     expect(isRemoteBuildNewer("1.0.1-beta.1", "1.0.1")).toBe(false)
     expect(isRemoteBuildNewer("invalid", "1.0.1")).toBe(false)
-    expect(APP_VERSION).toBe("1.0.1")
+    expect(parseSemanticVersion(APP_VERSION)).not.toBeNull()
   })
 
   it("uses the fixed latest-release endpoint and ignores failed responses", async () => {

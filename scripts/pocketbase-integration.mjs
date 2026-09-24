@@ -93,6 +93,7 @@ const userBody = (email, role, password = "Synthetic-password-12!") => ({
   email, password, passwordConfirm: password, displayName: `Test ${role}`,
   firstName: "Synthetic", lastName: "Account", role, active: true, verified: true,
 });
+const legacyMixedCaseEmail = "Legacy.MixedCase@Example.Test";
 
 const auth = expectStatus(await request("POST", "/api/collections/_superusers/auth-with-password", {
   body: { identity: superuserEmail, password: superuserPassword },
@@ -111,6 +112,10 @@ if (process.env.PB_TEST_STAGE_LEGACY === "1") {
     token: rootToken,
     body: { ...userBody("legacy-member-payment@example.test", "MEMBER"), displayName: "Legacy Payment Member" },
   }), 200, "seed pre-payment member");
+  expectStatus(await request("POST", "/api/collections/users/records", {
+    token: rootToken,
+    body: { ...userBody(legacyMixedCaseEmail, "GUEST"), displayName: "Legacy Mixed Case Guest" },
+  }), 200, "seed mixed-case email before normalization migration");
   const legacyVenue = expectStatus(await request("POST", "/api/collections/venues/records", {
     token: rootToken,
     body: { name: "Legacy Payment Migration Venue", address: "Migrationstrasse 1", description: "", checkoutRegion: "ER", active: true },
@@ -133,6 +138,9 @@ if (process.env.PB_TEST_STAGE_LEGACY === "1") {
 
 const migratedEvents = expectStatus(await request("GET", `/api/collections/events/records?filter=${encodeURIComponent('title = "Legacy Payment Migration Event"')}`, { token: rootToken }), 200, "read migrated legacy event");
 assert.equal(migratedEvents.items.length, 1, "legacy migration event remains present");
+const normalizedLegacyEmail = expectStatus(await request("GET", `/api/collections/users/records?filter=${encodeURIComponent('displayName = "Legacy Mixed Case Guest"')}`, { token: rootToken }), 200, "read normalized legacy email");
+assert.equal(normalizedLegacyEmail.items.length, 1, "legacy mixed-case user remains present");
+assert.equal(normalizedLegacyEmail.items[0].email, legacyMixedCaseEmail.toLowerCase(), "migration lowercases existing email addresses");
 assert.equal(migratedEvents.items[0].guestFeeCents, 380, "old events are backfilled to 380 cents");
 const migratedRegistration = expectStatus(await request("GET", `/api/collections/event_registrations/records?filter=${encodeURIComponent('termsVersion = "LEGACY-PAYMENT-MIGRATION"')}`, { token: rootToken }), 200, "read migrated registration").items[0];
 const migratedPayment = await paymentsForRegistration(migratedRegistration.id, rootToken);
@@ -259,9 +267,9 @@ const registeredUsers = expectStatus(await request(
 assert.equal(registeredUsers.items.length, 1, "registration creates one user");
 const registeredUser = registeredUsers.items[0];
 const registeredEmailStatus = expectStatus(await request("POST", "/api/bvhub/auth/account-status", { body: { email: registrationEmail } }), 200, "registered email status");
-assert.equal(registeredEmailStatus.exists, true, "registered email is reported as existing");
+assert.equal(registeredEmailStatus.status, "pending_verification", "registered email awaits verification");
 const unknownEmailStatus = expectStatus(await request("POST", "/api/bvhub/auth/account-status", { body: { email: "unknown@example.test" } }), 200, "unknown email status");
-assert.equal(unknownEmailStatus.exists, false, "unknown email is reported as not existing");
+assert.equal(unknownEmailStatus.status, "not_found", "unknown email is reported as missing");
 expectStatus(await request("POST", "/api/bvhub/auth/account-status", { body: { email: "not-an-email" } }), 400, "invalid email status request");
 expectStatus(await request("POST", "/api/bvhub/auth/account-status", { body: { email: registrationEmail, role: "ADMIN" } }), 400, "account status rejects extra fields");
 assert.equal(registeredUser.displayName, registrationDisplayName, "registration stores one public name");
@@ -368,6 +376,13 @@ const inactiveGuest = expectStatus(await request("POST", "/api/collections/users
 expectStatus(await request("PATCH", `/api/collections/users/records/${inactiveGuest.id}`, { token: rootToken, body: { active: false } }), 200, "deactivate guest");
 const unverifiedGuest = expectStatus(await request("POST", "/api/collections/users/records", { token: rootToken, body: { ...userBody("unverified-guest@example.test", "GUEST"), displayName: "Unverified Guest", verified: false } }), 200, "create unverified test user");
 
+const activeEmailStatus = expectStatus(await request("POST", "/api/bvhub/auth/account-status", { body: { email: " MEMBER@EXAMPLE.TEST " } }), 200, "active email status");
+assert.equal(activeEmailStatus.status, "active", "active email status is normalized and usable");
+const inactiveEmailStatus = expectStatus(await request("POST", "/api/bvhub/auth/account-status", { body: { email: inactiveGuest.email } }), 200, "inactive email status");
+assert.equal(inactiveEmailStatus.status, "inactive", "verified inactive account is reported as inactive");
+const unverifiedEmailStatus = expectStatus(await request("POST", "/api/bvhub/auth/account-status", { body: { email: unverifiedGuest.email } }), 200, "unverified email status");
+assert.equal(unverifiedEmailStatus.status, "pending_verification", "unverified account is not reported as inactive");
+
 for (const account of [inactiveGuest, unverifiedGuest]) {
   const result = await request("POST", "/api/collections/users/request-otp", { body: { email: account.email } });
   assert.equal(result.status, 400, "inactive or unverified OTP request is rejected");
@@ -379,7 +394,8 @@ let memberLoginToken = "";
 let guestLoginToken = "";
 for (const account of [member, guest]) {
   const before = smtpMessages.length;
-  const otp = expectStatus(await request("POST", "/api/collections/users/request-otp", { body: { email: account.email } }), 200, `request OTP for ${account.role}`);
+  const otpEmail = account === member ? account.email.toUpperCase() : account.email;
+  const otp = expectStatus(await request("POST", "/api/collections/users/request-otp", { body: { email: otpEmail } }), 200, `request OTP for ${account.role}`);
   assert.equal(typeof otp.otpId, "string");
   const message = await waitForMail(before);
   const code = otpCode(message);
@@ -466,6 +482,26 @@ const superLogin = expectStatus(await request("POST", "/api/collections/users/au
 const adminLogin = expectStatus(await request("POST", "/api/collections/users/auth-with-password", {
   body: { identity: admin.email, password: "Synthetic-password-12!" },
 }), 200, "admin password login");
+
+expectStatus(await request("GET", "/api/bvhub/admin/news"), 401, "unauthenticated news management read");
+expectStatus(await request("POST", "/api/bvhub/admin/news/refresh", { token: guestLoginToken, body: {} }), 403, "guest cannot refresh news");
+const refreshedNews = expectStatus(await request("POST", "/api/bvhub/admin/news/refresh", { token: adminLogin.token, body: {} }), 200, "admin refreshes PaperMod news feeds");
+for (const locale of ["zh", "de"]) {
+  const feed = refreshedNews.locales.find((item) => item.locale === locale);
+  assert.ok(feed && feed.posts.length > 0, `${locale} PaperMod feed returns posts`);
+  assert.ok(feed.posts.every((post) => post.link.startsWith(`https://bv-erlangen2025.de/${locale}/posts/`)), `${locale} feed links stay on the approved posts path`);
+}
+const configuredNews = expectStatus(await request("GET", "/api/bvhub/news?locale=de", { token: memberLoginToken }), 200, "member reads configured German news");
+assert.equal(configuredNews.items.length, 0, "fresh feeds remain unselected until an admin saves slots");
+expectStatus(await request("GET", "/api/bvhub/news?locale=fr", { token: memberLoginToken }), 400, "news rejects unsupported locale");
+const selectedDe = refreshedNews.locales.find((item) => item.locale === "de").posts[0].slug;
+const selectedZh = refreshedNews.locales.find((item) => item.locale === "zh").posts[0].slug;
+expectStatus(await request("PUT", "/api/bvhub/admin/news", {
+  token: adminLogin.token,
+  body: { de: [{ position: 1, slug: selectedDe }, { position: 2, slug: "" }], zh: [{ position: 1, slug: selectedZh }, { position: 2, slug: "" }] },
+}), 200, "admin saves independent news slots");
+const selectedGermanNews = expectStatus(await request("GET", "/api/bvhub/news?locale=de", { token: memberLoginToken }), 200, "member reads selected German news");
+assert.equal(selectedGermanNews.items[0].slug, selectedDe, "German slot order is applied");
 
 expectStatus(await request("GET", "/api/bvhub/admin/payment-settings"), 401, "unauthenticated payment settings read");
 for (const [label, token] of [["guest", guestLoginToken], ["member", memberLoginToken]]) {
@@ -761,8 +797,7 @@ assert.ok(paymentSummary.items.some((item) => item.eventId === validEvent.id && 
 
 const oldPaymentEvent = expectStatus(await request("POST", "/api/bvhub/admin/events", {
   token: adminLogin.token,
-  body: { ...eventPayload, title: "WU-05 Old Payment Event", start: "2020-01-01T16:00:00.000Z", end: "2020-01-01T18:00:00.000Z", abmeldefrist: "2019-12-
-  31T16:00:00.000Z", published: true, status: "COMPLETED" },
+  body: { ...eventPayload, title: "WU-05 Old Payment Event", start: "2020-01-01T16:00:00.000Z", end: "2020-01-01T18:00:00.000Z", abmeldefrist: "2019-12-31T16:00:00.000Z", published: true, status: "COMPLETED" },
 }), 201, "create old event with payment history");
 const oldRegistration = expectStatus(await request("POST", "/api/collections/event_registrations/records", {
   token: rootToken,
@@ -782,19 +817,14 @@ const duplicatePurposePayment = expectStatus(await request("PATCH", `/api/collec
 }), 200, "duplicate payment purpose is accepted");
 assert.equal(duplicatePurposePayment.purpose, adminGuestPayment.purpose);
 
-const recentPaymentSummary = expectStatus(await request("GET", "/api/bvhub/admin/payment-summary", { token: adminLogin.token }), 200, "read recent payment
-summary");
+const recentPaymentSummary = expectStatus(await request("GET", "/api/bvhub/admin/payment-summary", { token: adminLogin.token }), 200, "read recent payment summary");
 assert.ok(recentPaymentSummary.items.some((item) => item.eventId === validEvent.id), "recent payment summary keeps future events");
-assert.equal(recentPaymentSummary.items.some((item) => item.eventId === oldPaymentEvent.id), false, "recent payment summary hides events older than 30
-days");
-assert.deepEqual(recentPaymentSummary.items.map((item) => item.start), [...recentPaymentSummary.items].map((item) => item.start).sort().reverse(), "recent
-payment summary is newest first");
+assert.equal(recentPaymentSummary.items.some((item) => item.eventId === oldPaymentEvent.id), false, "recent payment summary hides events older than 30 days");
+assert.deepEqual(recentPaymentSummary.items.map((item) => item.start), [...recentPaymentSummary.items].map((item) => item.start).sort().reverse(), "recent payment summary is newest first");
 
-const allPaymentSummary = expectStatus(await request("GET", "/api/bvhub/admin/payment-summary?showAll=true", { token: adminLogin.token }), 200, "read
-complete payment summary");
+const allPaymentSummary = expectStatus(await request("GET", "/api/bvhub/admin/payment-summary?showAll=true", { token: adminLogin.token }), 200, "read complete payment summary");
 assert.ok(allPaymentSummary.items.some((item) => item.eventId === oldPaymentEvent.id), "complete payment summary includes old events");
-assert.deepEqual(allPaymentSummary.items.map((item) => item.start), [...allPaymentSummary.items].map((item) => item.start).sort().reverse(), "complete
-payment summary is newest first");
+assert.deepEqual(allPaymentSummary.items.map((item) => item.start), [...allPaymentSummary.items].map((item) => item.start).sort().reverse(), "complete payment summary is newest first");
 
 const eventPaymentDetails = expectStatus(await request("GET", `/api/bvhub/admin/events/${validEvent.id}/payments`, { token: superLogin.token }), 200, "superadmin lazily loads event payments");
 assert.ok(eventPaymentDetails.items.some((payment) => payment.id === adminGuestPayment.id));
