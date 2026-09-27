@@ -25,6 +25,8 @@ import { useMyPayments, usePaymentRealtime } from "../features/payments/hooks/us
 import { primaryNavigation, primaryTabForPath, routes } from "../routes/paths";
 import EventListPage from "./EventListPage";
 import { useNews } from "../features/news/hooks/useNews";
+import AnnouncementCenter, { NotificationButton } from "../features/announcements/components/AnnouncementCenter";
+import { useAnnouncements } from "../features/announcements/hooks/useAnnouncements";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -82,6 +84,8 @@ export type MemberAppContext = {
   refetchProfile: () => unknown;
   logout: () => void;
   canAccessAdmin: boolean;
+  openNotifications: () => void;
+  unreadNotificationCount: number;
 };
 
 interface Event {
@@ -434,7 +438,7 @@ function EventCard({ event, onToggle }: { event: Event; onToggle: (id: number) =
 
 // ─── Page views ────────────────────────────────────────────────────────────────
 
-function DashboardView({ events, liveEvents, onToggle, onOpenCard, profile }: { events: Event[]; liveEvents: EventRecord[]; onToggle: (id: number) => void; onOpenCard: () => void; profile: ProfileDto | null }) {
+function DashboardView({ events, liveEvents, onToggle, onOpenCard, profile, onOpenNotifications, unreadNotificationCount }: { events: Event[]; liveEvents: EventRecord[]; onToggle: (id: number) => void; onOpenCard: () => void; profile: ProfileDto | null; onOpenNotifications: () => void; unreadNotificationCount: number }) {
   const { t } = useI18n();
   const displayName = profile?.user.displayName || t("profile.title");
   const memberId = profile?.user.id || "-";
@@ -448,10 +452,7 @@ function DashboardView({ events, liveEvents, onToggle, onOpenCard, profile }: { 
           <h1 id="view-title-dashboard" tabIndex={-1} className="page-title text-[var(--foreground)]">{displayName}</h1>
         </div>
         <div className="flex items-center gap-2">
-          <button aria-label={t("common.notifications")} className="relative flex h-11 w-11 items-center justify-center rounded-full text-[var(--muted-foreground)] transition-colors hover:bg-[var(--muted)]">
-            <Icon d={icons.bell} size={18} />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 border-2 border-[var(--background)]" />
-          </button>
+          <NotificationButton onClick={onOpenNotifications} count={unreadNotificationCount} />
           <Avatar fallback={displayName.slice(0, 2).toUpperCase()} size="md" />
         </div>
       </div>
@@ -493,7 +494,7 @@ function LiveEventCards({ events }: { events: EventRecord[] }) {
   return <div className="flex max-h-[min(62vh,44rem)] flex-col gap-3 overflow-y-auto pr-1">{events.map((event) => <Card key={event.id} className="p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="break-words font-bold text-[var(--foreground)]">{event.title}</h3><p className="mt-1 break-words text-xs text-[var(--muted-foreground)]">{event.venue.name}</p></div><Badge variant={event.status === "CANCELLED" || event.status === "COMPLETED" ? "destructive" : "success"}>{t(`events.status.${event.status}` as MessageKey)}</Badge></div><div className="mt-3 grid gap-1 text-xs text-[var(--muted-foreground)] md:grid-cols-2"><span>{formatLocaleDateTime(event.start, locale)} - {formatLocaleDateTime(event.end, locale)}</span><span>{t("events.capacity")}: {event.registeredCount}/{event.capacity} ({event.spotsLeft} {t("events.spotsLeftLabel")})</span></div><Link className="mt-3 inline-flex text-xs font-semibold text-[var(--primary)] underline" to={`/events/${encodeURIComponent(event.id)}`}>{t("events.details")}</Link></Card>)}</div>;
 }
 
-function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, canAccessAdmin }: { profile: ProfileDto | null; onEditProfile: () => void; onLogout: () => void; onAdminMembers: () => void; canAccessAdmin: boolean }) {
+function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, canAccessAdmin, onOpenNotifications, unreadNotificationCount }: { profile: ProfileDto | null; onEditProfile: () => void; onLogout: () => void; onAdminMembers: () => void; canAccessAdmin: boolean; onOpenNotifications: () => void; unreadNotificationCount: number }) {
   const { t, locale } = useI18n();
 
   if (!profile) return <div className="flex flex-col gap-4"><Card><CardContent className="p-5"><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p className="text-sm text-[var(--muted-foreground)] mt-2">{t("profile.incompleteDetails")}</p><Button className="mt-4" onClick={onEditProfile}>{t("profile.edit")}</Button></CardContent></Card><Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 gap-2" onClick={onLogout}><Icon d={icons.logout} size={15} /> {t("auth.signOut")}</Button></div>;
@@ -516,12 +517,13 @@ function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, canAcce
         <CardContent className="p-0">
           {[
             { label: t("profile.edit"), icon: icons.pencil, action: onEditProfile },
-            { label: t("common.notifications"), icon: icons.bell, action: () => {} },
+            { label: t("common.notifications"), icon: icons.bell, action: onOpenNotifications },
           ].map((item, i, arr) => (
             <div key={item.label}>
               <button onClick={item.action} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--muted)] text-left transition-colors">
                 <span className="text-[var(--muted-foreground)]"><Icon d={item.icon} size={16} /></span>
                 <span className="flex-1 text-sm font-medium">{item.label}</span>
+                {item.label === t("common.notifications") && unreadNotificationCount > 0 && <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">{unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}</span>}
                 <span className="text-[var(--muted-foreground)]"><Icon d={icons.chevronRight} size={14} /></span>
               </button>
               {i < arr.length - 1 && <Separator />}
@@ -777,6 +779,8 @@ function Sidebar({
   onAdminNews,
   canAccessAdmin,
   profile,
+  onOpenNotifications,
+  unreadNotificationCount,
 }: {
   active: NavTab;
   onChange: (t: NavTab) => void;
@@ -789,6 +793,8 @@ function Sidebar({
   onAdminNews: () => void;
   canAccessAdmin: boolean;
   profile: ProfileDto | null;
+  onOpenNotifications: () => void;
+  unreadNotificationCount: number;
 }) {
   const { t } = useI18n();
   const displayName = profile?.user.displayName || t("profile.title");
@@ -818,9 +824,7 @@ function Sidebar({
             <p className="text-[10px] text-[var(--muted-foreground)]">{role}</p>
             <div className="text-[10px] text-[var(--muted-foreground)]/75 leading-tight">{groups.length ? groups.map((group) => <p key={group} className="truncate">{group}</p>) : <p>-</p>}</div>
           </div>
-          <button aria-label={t("common.notifications")} className="ml-auto text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
-            <Icon d={icons.bell} size={16} />
-          </button>
+          <NotificationButton onClick={onOpenNotifications} count={unreadNotificationCount} className="ml-auto h-8 w-8" />
         </div>
       </div>
 
@@ -888,17 +892,20 @@ export function AppShell({ initialTab = "dashboard", onLogout, routeContent = fa
   const location = useLocation();
   const { logout: authLogout } = useAuth();
   const { data: user } = useAuthUser();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const liveEvents = useEvents();
   useEventRealtime();
   usePaymentRealtime();
   const myPayments = useMyPayments();
+  const announcementLocale = locale === "zh-CN" ? "zh" : "de";
+  const announcements = useAnnouncements(announcementLocale);
   const { data: profile, isLoading: profileLoading, isError: profileError, refetch: refetchProfile } = useMyProfile();
   const canAccessAdmin = isAdminRole(user?.role);
   const [events, setEvents] = useState<Event[]>(EVENTS);
   const [cardOpen, setCardOpen] = useState(false);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const mobileNavigationTrigger = useRef<HTMLButtonElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const pendingNavigationFocus = useRef<NavTab | null>(null);
@@ -932,6 +939,8 @@ export function AppShell({ initialTab = "dashboard", onLogout, routeContent = fa
     refetchProfile,
     logout,
     canAccessAdmin,
+    openNotifications: () => setNotificationsOpen(true),
+    unreadNotificationCount: announcements.data?.unreadCount ?? 0,
   };
 
   function selectNavigation(nextTab: NavTab) {
@@ -957,7 +966,7 @@ export function AppShell({ initialTab = "dashboard", onLogout, routeContent = fa
   function renderView() {
     switch (tab) {
       case "dashboard":
-        return <DashboardView events={events} liveEvents={liveEvents.data ?? []} onToggle={toggleRegistration} onOpenCard={() => setCardOpen(true)} profile={profile || null} />;
+        return <DashboardView events={events} liveEvents={liveEvents.data ?? []} onToggle={toggleRegistration} onOpenCard={() => setCardOpen(true)} profile={profile || null} onOpenNotifications={() => setNotificationsOpen(true)} unreadNotificationCount={announcements.data?.unreadCount ?? 0} />;
       case "events":
         return <EventListPage />;
       case "payments":
@@ -965,24 +974,21 @@ export function AppShell({ initialTab = "dashboard", onLogout, routeContent = fa
       case "profile":
         if (profileLoading) return <div><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p className="mt-2 text-sm text-[var(--muted-foreground)]">{t("profile.loading")}</p></div>;
         if (profileError) return <Card><CardContent className="p-5"><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p role="alert" className="mt-2 text-sm text-red-600">{t("profile.loadError")}</p><Button className="mt-4" onClick={() => void refetchProfile()}>{t("common.retry")}</Button></CardContent></Card>;
-        return <ProfileView profile={profile || null} onEditProfile={() => setEditProfileOpen(true)} onLogout={logout} onAdminMembers={() => navigate(routes.adminMembers)} canAccessAdmin={canAccessAdmin} />;
+        return <ProfileView profile={profile || null} onEditProfile={() => setEditProfileOpen(true)} onLogout={logout} onAdminMembers={() => navigate(routes.adminMembers)} canAccessAdmin={canAccessAdmin} onOpenNotifications={() => setNotificationsOpen(true)} unreadNotificationCount={announcements.data?.unreadCount ?? 0} />;
     }
   }
 
   return (
     <div className="relative h-full bg-[var(--background)]" style={{ fontFamily: "var(--font-sans)" }}>
       <div className="app-shell-background flex h-full" data-drawer-open={mobileNavigationOpen} inert={mobileNavigationOpen ? true : undefined}>
-        <Sidebar active={tab} onChange={selectNavigation} unpaidCount={unpaidCount} onLogout={logout} onAdminMembers={() => navigate(routes.adminMembers)} onAdminPayments={() => navigate(routes.adminPayments)} onAdminEvents={() => navigate(routes.adminEvents)} onAdminScanner={() => navigate(routes.adminMemberCardScanner)} onAdminNews={() => navigate(routes.adminNews)} canAccessAdmin={canAccessAdmin} profile={profile || null} />
+        <Sidebar active={tab} onChange={selectNavigation} unpaidCount={unpaidCount} onLogout={logout} onAdminMembers={() => navigate(routes.adminMembers)} onAdminPayments={() => navigate(routes.adminPayments)} onAdminEvents={() => navigate(routes.adminEvents)} onAdminScanner={() => navigate(routes.adminMemberCardScanner)} onAdminNews={() => navigate(routes.adminNews)} canAccessAdmin={canAccessAdmin} profile={profile || null} onOpenNotifications={() => setNotificationsOpen(true)} unreadNotificationCount={announcements.data?.unreadCount ?? 0} />
 
         <main ref={mainRef} id="app-main-content" className="min-w-0 w-full max-w-full flex-1 overflow-x-hidden overflow-y-auto">
         <div className="hidden lg:flex items-center justify-between px-8 py-5 border-b border-[var(--border)] bg-[var(--card)] sticky top-0 z-10">
           <span className="text-base font-semibold text-[var(--foreground)]">{tabLabel[tab]}</span>
           <div className="flex items-center gap-3">
             <LanguageSwitcher className="text-[var(--foreground)]" />
-            <button aria-label={t("common.notifications")} className="relative h-10 w-10 rounded-full flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
-              <Icon d={icons.bell} size={18} />
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 border-2 border-[var(--card)]" />
-            </button>
+            <NotificationButton onClick={() => setNotificationsOpen(true)} count={announcements.data?.unreadCount ?? 0} />
             <Avatar fallback={(profile?.user.displayName || "?").slice(0, 2).toUpperCase()} size="md" />
           </div>
         </div>
@@ -1017,6 +1023,7 @@ export function AppShell({ initialTab = "dashboard", onLogout, routeContent = fa
 
         {cardOpen && <MemberCardOverlay onClose={() => setCardOpen(false)} />}
         {editProfileOpen && <EditProfileOverlay onClose={() => setEditProfileOpen(false)} />}
+        <AnnouncementCenter open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
 
       </div>
 
@@ -1040,16 +1047,16 @@ export function AppShell({ initialTab = "dashboard", onLogout, routeContent = fa
 }
 
 export function HomePageContent() {
-  const { events, liveEvents, toggleRegistration, openMemberCard, profile } = useOutletContext<MemberAppContext>();
-  return <DashboardView events={events} liveEvents={liveEvents} onToggle={toggleRegistration} onOpenCard={openMemberCard} profile={profile} />;
+  const { events, liveEvents, toggleRegistration, openMemberCard, profile, openNotifications, unreadNotificationCount } = useOutletContext<MemberAppContext>();
+  return <DashboardView events={events} liveEvents={liveEvents} onToggle={toggleRegistration} onOpenCard={openMemberCard} profile={profile} onOpenNotifications={openNotifications} unreadNotificationCount={unreadNotificationCount} />;
 }
 
 export function ProfilePageContent() {
-  const { profile, profileLoading, profileError, refetchProfile, logout, canAccessAdmin, openProfileEditor } = useOutletContext<MemberAppContext>();
+  const { profile, profileLoading, profileError, refetchProfile, logout, canAccessAdmin, openProfileEditor, openNotifications, unreadNotificationCount } = useOutletContext<MemberAppContext>();
   const { t } = useI18n();
   const navigate = useNavigate();
 
   if (profileLoading) return <div><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p className="mt-2 text-sm text-[var(--muted-foreground)]">{t("profile.loading")}</p></div>;
   if (profileError) return <Card><CardContent className="p-5"><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p role="alert" className="mt-2 text-sm text-red-600">{t("profile.loadError")}</p><Button className="mt-4" onClick={() => void refetchProfile()}>{t("common.retry")}</Button></CardContent></Card>;
-  return <ProfileView profile={profile} onEditProfile={openProfileEditor} onLogout={logout} onAdminMembers={() => navigate(routes.adminMembers)} canAccessAdmin={canAccessAdmin} />;
+  return <ProfileView profile={profile} onEditProfile={openProfileEditor} onLogout={logout} onAdminMembers={() => navigate(routes.adminMembers)} canAccessAdmin={canAccessAdmin} onOpenNotifications={openNotifications} unreadNotificationCount={unreadNotificationCount} />;
 }
