@@ -70,6 +70,19 @@ export default function AnnouncementCenter({
     }
   }, [unread])
 
+  useEffect(() => {
+    if (!open && !autoId) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault()
+        setAutoId(null)
+        onClose()
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [autoId, onClose, open])
+
   const selected = autoId
     ? (unread.find((item) => item.id === autoId) ?? unread[0])
     : undefined
