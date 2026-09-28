@@ -8,12 +8,15 @@ port="${PB_TEST_PORT:-18101}"
 [[ "$port" =~ ^[0-9]+$ ]] || { printf 'PB_TEST_PORT must be numeric\n' >&2; exit 1; }
 [[ "$port" != "8090" ]] || { printf 'The legacy PocketBase port is not valid for integration tests\n' >&2; exit 1; }
 command -v curl >/dev/null || { printf 'Missing required command: curl\n' >&2; exit 1; }
+command -v node >/dev/null || { printf 'Missing required command: node\n' >&2; exit 1; }
 [[ -x "$binary" ]] || "$repo_root/scripts/setup-pocketbase.sh"
 
 data_dir="$(mktemp -d "${TMPDIR:-/tmp}/bvhub-pocketbase-test.XXXXXX")"
 server_pid=""
+feed_pid=""
 cleanup() {
   if [[ -n "$server_pid" ]] && kill -0 "$server_pid" 2>/dev/null; then kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true; fi
+  if [[ -n "$feed_pid" ]] && kill -0 "$feed_pid" 2>/dev/null; then kill "$feed_pid" 2>/dev/null || true; wait "$feed_pid" 2>/dev/null || true; fi
   rm -rf "$data_dir"
 }
 trap cleanup EXIT INT TERM
@@ -21,6 +24,17 @@ trap cleanup EXIT INT TERM
 test_email="integration-superuser-$(date +%s)@example.test"
 test_password='Integration-Test-Password-12!'
 health_url="http://127.0.0.1:$port/api/health"
+feed_port=$((port + 1))
+feed_zh_url="http://127.0.0.1:$feed_port/zh/posts/index.xml"
+feed_de_url="http://127.0.0.1:$feed_port/de/posts/index.xml"
+[[ "$feed_port" -le 65535 ]] || { printf 'PB_TEST_PORT is too high for the news fixture port\n' >&2; exit 1; }
+node "$repo_root/scripts/news-feed-fixture.mjs" "$feed_port" >"$data_dir/news-feed-server.log" 2>&1 &
+feed_pid=$!
+for _ in $(seq 1 60); do curl --fail --silent "$feed_zh_url" >/dev/null 2>&1 && curl --fail --silent "$feed_de_url" >/dev/null 2>&1 && break; sleep 0.25; done
+curl --fail --silent "$feed_zh_url" >/dev/null
+curl --fail --silent "$feed_de_url" >/dev/null
+export BVHUB_NEWS_FEED_ZH_URL="$feed_zh_url"
+export BVHUB_NEWS_FEED_DE_URL="$feed_de_url"
 start_server() {
   local log_path="$1"
   local migrations_path="${2:-$pb_dir/pb_migrations}"

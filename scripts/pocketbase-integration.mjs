@@ -496,6 +496,8 @@ const refreshedNews = expectStatus(await request("POST", "/api/bvhub/admin/news/
 for (const locale of ["zh", "de"]) {
   const feed = refreshedNews.locales.find((item) => item.locale === locale);
   assert.ok(feed && feed.posts.length > 0, `${locale} PaperMod feed returns posts`);
+  assert.equal(feed.posts[0].slug, "integration-news", `${locale} refresh uses the local RSS fixture`);
+  assert.equal(feed.posts[0].title, locale === "zh" ? "Integration Chinese News" : "Integration German News", `${locale} fixture content is parsed`);
   assert.ok(feed.posts.every((post) => post.link.startsWith(`https://bv-erlangen2025.de/${locale}/posts/`)), `${locale} feed links stay on the approved posts path`);
 }
 const configuredNews = expectStatus(await request("GET", "/api/bvhub/news?locale=de", { token: memberLoginToken }), 200, "member reads configured German news");
