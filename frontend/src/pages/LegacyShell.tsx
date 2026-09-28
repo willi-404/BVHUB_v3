@@ -187,43 +187,30 @@ function MemberCardOverlay({ onClose }: { onClose: () => void }) {
   const group = profile?.groups.map((item) => item.name) ?? ["-"];
   const activeSince = profile?.user.created ? profile.user.created.slice(0, 10) : "-";
   return (
-    <div
-      className="fixed inset-0 z-[100] flex flex-col overflow-y-auto"
-      style={{ background: "linear-gradient(160deg, #0f2d1a 0%, #14532d 45%, #1a6b38 100%)" }}
-    >
+    <div className="fixed inset-0 z-[100] flex flex-col overflow-y-auto bg-background text-foreground">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-5 pt-12 pb-2 shrink-0">
+      <div className="flex shrink-0 items-center justify-between px-5 pb-2 pt-12">
         <button
           onClick={onClose}
           aria-label={t("common.close")}
-          className="h-9 w-9 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+          className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Icon d={icons.chevronLeft} size={20} />
         </button>
-        <span className="text-white/60 text-sm font-medium">{t("profile.memberCard")}</span>
-        <div className="w-9" />
+        <span className="text-sm font-medium text-muted-foreground">{t("profile.memberCard")}</span>
+        <div className="size-9" />
       </div>
 
-      {/* Club logo */}
-      <div className="flex flex-col items-center pt-5 pb-6 shrink-0">
-        <div className="h-20 w-20 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center mb-3 backdrop-blur-sm overflow-hidden p-1">
-          <img src={logoSrc} alt={t("brand.logoAlt")} className="h-full w-full object-contain" />
-        </div>
-        <p className="text-white font-bold text-base leading-tight text-center">{t("brand.name")}</p>
-        <p className="text-white/50 text-xs mt-0.5">{t("brand.established")}</p>
-      </div>
-
-      {/* Card */}
-      <div className="flex justify-center px-6 shrink-0">
-        <div style={{ width: "100%", maxWidth: "380px" }}>
-          <MemberCard name={displayName} memberId={memberId} activeSince={activeSince} group={group} />
-        </div>
-      </div>
-
-      {/* QR Code */}
-      <div className="flex flex-col items-center mt-8 px-6 pb-12 shrink-0">
-        <MemberQr />
-        <p className="text-white/35 text-[10px] mt-4 text-center">{memberId}</p>
+      <div className="flex flex-1 items-start justify-center px-4 py-5 sm:items-center">
+        <MemberCard
+          name={displayName}
+          memberId={memberId}
+          activeSince={activeSince}
+          group={group}
+          role={profile?.user.role}
+          active={profile?.user.active}
+          qr={<MemberQr />}
+        />
       </div>
     </div>
   );
@@ -459,7 +446,7 @@ function DashboardView({ events, liveEvents, onToggle, onOpenCard, profile, onOp
 
       {/* Tappable card */}
       <button onClick={onOpenCard} className="text-left w-full active:scale-[0.98] transition-transform duration-150 cursor-pointer" aria-label={t("profile.openMemberCard")}>
-        <MemberCard name={displayName} memberId={memberId} activeSince={activeSince} group={group} />
+        <MemberCard name={displayName} memberId={memberId} activeSince={activeSince} group={group} role={profile?.user.role} active={profile?.user.active} />
         <p className="text-[10px] text-[var(--muted-foreground)] text-center mt-2 flex items-center justify-center gap-1">
           <Icon d={icons.qrCode} size={10} /> {t("profile.openMemberCardHint")}
         </p>
