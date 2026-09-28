@@ -1,233 +1,307 @@
-import logoSrc from "../../imports/logo1-high-resolution.png";
-import { useI18n } from "../../i18n";
-import { memberCardGroupLabels, resolveMemberCardGroup, type MemberCardGroup } from "./memberCardTheme";
+import { useEffect, useRef, useState, type ReactNode } from "react"
+import logoSrc from "../../imports/logo1-high-resolution.png"
+import { formatLocaleDate, useI18n } from "../../i18n"
+import type { Role } from "../../features/auth/policy"
+import { Avatar } from "./ui/avatar"
+import { Badge } from "./ui/badge"
+import { memberCardGroupLabels } from "./memberCardTheme"
 
 interface MemberCardProps {
-  name: string;
-  memberId: string;
-  activeSince: string;
-  group: string | readonly string[];
+  name: string
+  memberId: string
+  accountSince: string
+  group: string | readonly string[]
+  role?: Role
+  active?: boolean
+  qr?: ReactNode
 }
 
-type GroupConfig = {
-  label: string;
-  gradient: string;
-  shimmer: string;
-  chipBg: string;
-  chipText: string;
-  textPrimary: string;
-  textSecondary: string;
-  borderColor: string;
-  shine: string;
-  dot: string;
-};
+const roleKeys: Record<Role, "roles.guest" | "roles.member" | "roles.admin" | "roles.superAdmin"> =
+  {
+    GUEST: "roles.guest",
+    MEMBER: "roles.member",
+    ADMIN: "roles.admin",
+    SUPER_ADMIN: "roles.superAdmin",
+  }
 
-const GROUP: Record<MemberCardGroup, GroupConfig> = {
-  MemberER: {
-    label: "MemberER",
-    gradient: "linear-gradient(135deg, #14532d 0%, #15803d 55%, #22c55e 100%)",
-    shimmer: "rgba(255,255,255,0.07)",
-    chipBg: "rgba(255,255,255,0.18)",
-    chipText: "#d1fae5",
-    textPrimary: "#ffffff",
-    textSecondary: "rgba(255,255,255,0.65)",
-    borderColor: "rgba(134,239,172,0.25)",
-    shine: "rgba(187,247,208,0.12)",
-    dot: "#4ade80",
-  },
-  MemberNUE: {
-    label: "MemberNUE",
-    gradient: "linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 55%, #60a5fa 100%)",
-    shimmer: "rgba(255,255,255,0.07)",
-    chipBg: "rgba(255,255,255,0.18)",
-    chipText: "#dbeafe",
-    textPrimary: "#ffffff",
-    textSecondary: "rgba(255,255,255,0.65)",
-    borderColor: "rgba(147,197,253,0.25)",
-    shine: "rgba(191,219,254,0.12)",
-    dot: "#60a5fa",
-  },
-  guest: {
-    label: "Guest",
-    gradient: "linear-gradient(135deg, #78350f 0%, #b45309 55%, #d97706 100%)",
-    shimmer: "rgba(255,255,255,0.07)",
-    chipBg: "rgba(255,255,255,0.18)",
-    chipText: "#fef3c7",
-    textPrimary: "#ffffff",
-    textSecondary: "rgba(255,255,255,0.65)",
-    borderColor: "rgba(253,230,138,0.25)",
-    shine: "rgba(253,230,138,0.10)",
-    dot: "#fbbf24",
-  },
-};
-
-function ShuttlecockSVG({ opacity = 0.12 }: { opacity?: number }) {
-  return (
-    <svg
-      viewBox="0 0 80 80"
-      fill="none"
-      style={{ opacity }}
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <circle cx="40" cy="60" r="10" stroke="white" strokeWidth="2" fill="none" />
-      <line x1="40" y1="50" x2="20" y2="10" stroke="white" strokeWidth="1.5" />
-      <line x1="40" y1="50" x2="30" y2="8" stroke="white" strokeWidth="1.5" />
-      <line x1="40" y1="50" x2="40" y2="8" stroke="white" strokeWidth="1.5" />
-      <line x1="40" y1="50" x2="50" y2="8" stroke="white" strokeWidth="1.5" />
-      <line x1="40" y1="50" x2="60" y2="10" stroke="white" strokeWidth="1.5" />
-      <path d="M18 16 Q30 6 40 8 Q50 6 62 16" stroke="white" strokeWidth="1.5" fill="none" />
-      <path d="M22 28 Q31 20 40 22 Q49 20 58 28" stroke="white" strokeWidth="1.5" fill="none" />
-      <path d="M24 40 Q32 34 40 36 Q48 34 56 40" stroke="white" strokeWidth="1.5" fill="none" />
-    </svg>
-  );
+export interface MemberCardFlipProps {
+  name: string
+  memberId: string
+  created: string
+  group: string | readonly string[]
+  role?: Role
+  active?: boolean
+  qr: ReactNode
 }
 
-export function MemberCard({ name, memberId, activeSince, group }: MemberCardProps) {
-  const { t } = useI18n();
-  const cfg = GROUP[resolveMemberCardGroup(group)];
-  const groupLabels = memberCardGroupLabels(group);
+export function MemberCardFlip({
+  name,
+  memberId,
+  created,
+  group,
+  role,
+  active,
+  qr,
+}: MemberCardFlipProps) {
+  const { t, locale } = useI18n()
+  const [flipped, setFlipped] = useState(false)
+  const frontButton = useRef<HTMLButtonElement>(null)
+  const backButton = useRef<HTMLButtonElement>(null)
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase()
+  const roleLabel = role ? t(roleKeys[role]) : t("profile.role")
+  const groups = memberCardGroupLabels(group).map((label) =>
+    label === "Member ER"
+      ? t("groups.memberER")
+      : label === "Member NUE"
+        ? t("groups.memberNUE")
+        : t("groups.guest"),
+  )
+  const accountSince = created
+    ? formatLocaleDate(created.length <= 10 ? `${created}T12:00:00Z` : created, locale) || "-"
+    : "-"
+  const theme = role === "MEMBER" ? "member" : role === "GUEST" ? "guest" : "neutral"
+
+  useEffect(() => {
+    const button = flipped ? backButton.current : frontButton.current
+    if (!button) return
+    const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? 0
+      : 420
+    const timer = window.setTimeout(() => button.focus({ preventScroll: true }), delay)
+    return () => window.clearTimeout(timer)
+  }, [flipped])
 
   return (
-    <div
-      className="relative overflow-hidden select-none"
-      style={{
-        background: cfg.gradient,
-        borderRadius: "16px",
-        border: `1px solid ${cfg.borderColor}`,
-        width: "100%",
-        maxWidth: "360px",
-        aspectRatio: "1.586 / 1",
-        padding: "20px",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.12)",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
-      }}
+    <article
+      data-testid="member-card-flip"
+      data-flipped={flipped}
+      className={`member-card-flip member-card-flip--${theme} mx-auto w-full max-w-sm overflow-hidden rounded-2xl border text-card-foreground shadow-sm`}
     >
-      {/* Decorative orbs */}
       <div
-        style={{
-          position: "absolute",
-          top: "-40px",
-          right: "-40px",
-          width: "140px",
-          height: "140px",
-          borderRadius: "50%",
-          background: cfg.shine,
-          pointerEvents: "none",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          bottom: "-50px",
-          left: "-30px",
-          width: "120px",
-          height: "120px",
-          borderRadius: "50%",
-          background: cfg.shimmer,
-          pointerEvents: "none",
-        }}
-      />
-
-      {/* Shuttlecock watermark */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: "-4px",
-          right: "8px",
-          width: "88px",
-          height: "88px",
-          pointerEvents: "none",
-        }}
+        aria-hidden={flipped}
+        inert={flipped ? true : undefined}
+        className="member-card-face member-card-face--front"
       >
-        <ShuttlecockSVG opacity={0.14} />
+        <div className="member-card-face-inner p-5">
+          <header className="flex min-w-0 items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <img
+                src={logoSrc}
+                alt={t("brand.logoAlt")}
+                className="size-9 shrink-0 object-contain"
+              />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold uppercase tracking-[0.08em]">
+                  {t("memberCard.brandName")}
+                </p>
+                <p className="truncate text-[10px] text-muted-foreground">
+                  {t("memberCard.brandSubtitle")}
+                </p>
+              </div>
+            </div>
+            <Badge
+              variant={active === undefined ? "outline" : active ? "success" : "destructive"}
+              className="shrink-0"
+            >
+              {active === undefined
+                ? t("profile.status")
+                : active
+                  ? t("profile.active")
+                  : t("profile.inactive")}
+            </Badge>
+          </header>
+
+          <section className="flex flex-col items-center px-1 pt-8 text-center">
+            <Avatar
+              fallback={initials || "?"}
+              alt={name}
+              className="size-20 border-2 border-background shadow-sm ring-1 ring-border"
+            />
+            <h2 className="mt-3 max-w-full break-words text-xl font-semibold leading-tight">
+              {name}
+            </h2>
+            <Badge variant="outline" className="mt-2">
+              {roleLabel}
+            </Badge>
+            <p className="mt-2 max-w-full break-words text-xs font-medium text-muted-foreground">
+              {[roleLabel, ...groups].join(" · ")}
+            </p>
+          </section>
+
+          <dl className="mt-auto grid grid-cols-2 gap-4 border-t border-border pt-5">
+            <div className="min-w-0">
+              <dt className="text-[10px] font-medium text-muted-foreground">
+                {t("memberCard.memberId")}
+              </dt>
+              <dd className="mt-1 break-all font-mono text-xs font-semibold">
+                {memberId}
+              </dd>
+            </div>
+            <div className="min-w-0 text-right">
+              <dt className="text-[10px] font-medium text-muted-foreground">
+                {t("memberCard.accountSince")}
+              </dt>
+              <dd className="mt-1 break-words text-xs font-semibold">
+                {accountSince}
+              </dd>
+            </div>
+          </dl>
+
+          <button
+            ref={frontButton}
+            type="button"
+            data-slot="button"
+            onClick={() => setFlipped(true)}
+            className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            {t("memberCard.viewQr")}
+          </button>
+        </div>
       </div>
 
-      {/* Top row: club name + group chip */}
-      <div style={{ display: "flex", minWidth: 0, alignItems: "flex-start", justifyContent: "space-between", gap: "8px", position: "relative" }}>
-        <div style={{ display: "flex", minWidth: 0, alignItems: "center", gap: "8px" }}>
+      <div
+        aria-hidden={!flipped}
+        inert={!flipped ? true : undefined}
+        className="member-card-face member-card-face--back"
+      >
+        <div className="member-card-face-inner items-center p-5 text-center">
+          <header className="w-full text-left">
+            <p className="text-sm font-bold uppercase tracking-[0.08em]">
+              {t("memberCard.brandName")}
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              {t("memberCard.brandSubtitle")}
+            </p>
+          </header>
+          <div className="flex min-h-[17rem] flex-1 flex-col items-center justify-center gap-4 py-5">
+            {qr}
+            <p className="max-w-[15rem] text-xs font-medium text-muted-foreground">
+              {t("memberCard.scanInstruction")}
+            </p>
+          </div>
+          <p className="w-full border-t border-border pt-4 text-xs text-muted-foreground">
+            <span className="font-medium">{t("memberCard.memberId")}:</span>{" "}
+            <span className="font-mono font-semibold text-foreground">{memberId}</span>
+          </p>
+          <button
+            ref={backButton}
+            type="button"
+            data-slot="button"
+            onClick={() => setFlipped(false)}
+            className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            {t("memberCard.backToCard")}
+          </button>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+export function MemberCard({
+  name,
+  memberId,
+  accountSince,
+  group,
+  role,
+  active,
+  qr,
+}: MemberCardProps) {
+  const { t } = useI18n()
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase()
+  const groups = memberCardGroupLabels(group).map((label) =>
+    label === "Member ER"
+      ? t("groups.memberER")
+      : label === "Member NUE"
+        ? t("groups.memberNUE")
+        : t("groups.guest"),
+  )
+
+  return (
+    <article className="mx-auto w-full max-w-sm overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm">
+      <div className="h-1 bg-primary" />
+      <header className="flex min-w-0 items-center justify-between gap-3 px-5 pt-5">
+        <div className="flex min-w-0 items-center gap-2.5">
           <img
             src={logoSrc}
             alt={t("brand.logoAlt")}
-            style={{ width: "36px", height: "36px", objectFit: "contain", borderRadius: "6px", background: "rgba(255,255,255,0.12)", padding: "2px" }}
+            className="size-9 shrink-0 object-contain"
           />
-          <div style={{ minWidth: 0 }}>
-            <p style={{ fontSize: "10px", fontWeight: 600, color: cfg.textSecondary, letterSpacing: "0.04em", textTransform: "uppercase", margin: 0 }}>
+          <div className="min-w-0">
+            <p className="truncate text-xs font-semibold leading-tight">
               {t("brand.name")}
             </p>
-            <p style={{ fontSize: "11px", fontWeight: 700, color: cfg.textPrimary, margin: "1px 0 0", letterSpacing: "-0.01em", lineHeight: 1.2 }}>
+            <p className="truncate text-[10px] text-muted-foreground">
               {t("brand.legalSuffix")}
             </p>
           </div>
         </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "5px",
-            background: cfg.chipBg,
-            border: `1px solid ${cfg.borderColor}`,
-            borderRadius: "999px",
-            padding: "3px 10px 3px 6px",
-            backdropFilter: "blur(8px)",
-          }}
+        <Badge
+          variant="outline"
+          className={
+            active === undefined
+              ? "border-border text-muted-foreground"
+              : active
+                ? "border-emerald-600/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                : "border-destructive/25 bg-destructive/10 text-destructive"
+          }
         >
-          <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: cfg.dot, display: "inline-block", flexShrink: 0 }} />
-          <span style={{ fontSize: "11px", fontWeight: 600, color: cfg.chipText, lineHeight: 1.25, textAlign: "center", whiteSpace: "normal" }}>{groupLabels.map((label) => <span key={label} style={{ display: "block" }}>{label}</span>)}</span>
-        </div>
-      </div>
+          {active === undefined
+            ? t("profile.status")
+            : active
+              ? t("profile.active")
+              : t("profile.inactive")}
+        </Badge>
+      </header>
 
-      {/* Bottom rows: member info */}
-      <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: "10px" }}>
-        {/* Name */}
-        <div>
-          <p style={{ fontSize: "10px", fontWeight: 500, color: cfg.textSecondary, letterSpacing: "0.06em", textTransform: "uppercase", margin: 0 }}>
-            {t("memberCard.memberName")}
+      <section className="flex flex-col items-center px-5 pt-7 text-center">
+        <Avatar
+          fallback={initials || "?"}
+          alt={name}
+          className="size-20 border-2 border-background shadow-sm ring-1 ring-border"
+        />
+        <h2 className="mt-3 max-w-full break-words text-xl font-semibold leading-tight">
+          {name}
+        </h2>
+        <p className="mt-1 max-w-full break-words text-xs font-medium text-muted-foreground">
+          {[role ? t(roleKeys[role]) : null, ...groups]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+      </section>
+
+      {qr && <div className="flex justify-center px-4 pt-5">{qr}</div>}
+
+      <footer className="mt-5 grid grid-cols-2 gap-4 border-t border-border px-5 py-4">
+        <div className="min-w-0">
+          <p className="text-[10px] font-medium text-muted-foreground">
+            {t("memberCard.memberId")}
           </p>
-          <p style={{ fontSize: "16px", fontWeight: 700, color: cfg.textPrimary, margin: "2px 0 0", letterSpacing: "-0.01em", overflowWrap: "anywhere" }}>
-            {name}
+          <p className="mt-1 break-all font-mono text-xs font-semibold">
+            {memberId}
           </p>
         </div>
-
-        {/* Member ID + Active Since */}
-        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
-          <div style={{ minWidth: 0 }}>
-            <p style={{ fontSize: "10px", fontWeight: 500, color: cfg.textSecondary, letterSpacing: "0.06em", textTransform: "uppercase", margin: 0 }}>
-              {t("memberCard.memberId")}
-            </p>
-            <p style={{ fontSize: "13px", fontWeight: 600, color: cfg.textPrimary, margin: "2px 0 0", letterSpacing: "0.06em", fontFamily: "monospace", overflowWrap: "anywhere" }}>
-              {memberId}
-            </p>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <p style={{ fontSize: "10px", fontWeight: 500, color: cfg.textSecondary, letterSpacing: "0.06em", textTransform: "uppercase", margin: 0 }}>
-              {t("memberCard.activeSince")}
-            </p>
-            <p style={{ fontSize: "13px", fontWeight: 600, color: cfg.textPrimary, margin: "2px 0 0" }}>
-              {activeSince}
-            </p>
-          </div>
-        </div>
-
-        {/* Thin separator line */}
-        <div style={{ height: "1px", background: cfg.borderColor }} />
-
-        {/* Membership label */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <p style={{ fontSize: "10px", fontWeight: 500, color: cfg.textSecondary, margin: 0, letterSpacing: "0.04em" }}>
-            {t("memberCard.membership")} · {groupLabels.map((label) => label === "Member ER" ? t("groups.memberER") : label === "Member NUE" ? t("groups.memberNUE") : t("groups.guest")).join(", ")}
+        <div className="min-w-0 text-right">
+          <p className="text-[10px] font-medium text-muted-foreground">
+            {t("memberCard.accountSince")}
           </p>
-          <div style={{ display: "flex", gap: "3px" }}>
-            {[...Array(3)].map((_, i) => (
-              <div
-                key={i}
-                style={{ width: "20px", height: "12px", borderRadius: "3px", background: i < 2 ? cfg.chipBg : "transparent", border: `1px solid ${cfg.borderColor}` }}
-              />
-            ))}
-          </div>
+          <p className="mt-1 break-words text-xs font-semibold">
+            {accountSince}
+          </p>
         </div>
-      </div>
-    </div>
-  );
+      </footer>
+    </article>
+  )
 }
