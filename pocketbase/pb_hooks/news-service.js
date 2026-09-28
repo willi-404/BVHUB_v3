@@ -1,4 +1,11 @@
-const FEEDS = { zh: "https://bv-erlangen2025.de/zh/posts/index.xml", de: "https://bv-erlangen2025.de/de/posts/index.xml" };
+function environment(name) {
+  return typeof $os !== "undefined" && typeof $os.getenv === "function" ? String($os.getenv(name) || "") : "";
+}
+
+const FEEDS = {
+  zh: environment("BVHUB_NEWS_FEED_ZH_URL") || "https://bv-erlangen2025.de/zh/posts/index.xml",
+  de: environment("BVHUB_NEWS_FEED_DE_URL") || "https://bv-erlangen2025.de/de/posts/index.xml",
+};
 const LOCALES = ["zh", "de"];
 const HOST = "bv-erlangen2025.de";
 
@@ -59,9 +66,19 @@ function bodyText(body) {
 }
 
 function fetchFeed(locale) {
-  const response = $http.send({ url: FEEDS[locale], method: "GET", timeout: 20, headers: { Accept: "application/rss+xml, application/xml, text/xml" } });
-  if (!response || response.statusCode < 200 || response.statusCode >= 300) throw new Error(`News feed unavailable (${locale})`);
-  return parseFeed(response.raw || bodyText(response.body || []), locale);
+  const url = FEEDS[locale];
+  let response;
+  try {
+    response = $http.send({ url, method: "GET", timeout: 20, headers: { Accept: "application/rss+xml, application/xml, text/xml" } });
+  } catch (error) {
+    throw new Error(`News feed request failed (${locale}, ${url}): ${error}`);
+  }
+  if (!response || response.statusCode < 200 || response.statusCode >= 300) throw new Error(`News feed unavailable (${locale}, ${response ? response.statusCode : "no response"})`);
+  try {
+    return parseFeed(response.raw || bodyText(response.body || []), locale);
+  } catch (error) {
+    throw new Error(`News feed invalid (${locale}, ${url}): ${error}`);
+  }
 }
 
 function requireUser(e) {
