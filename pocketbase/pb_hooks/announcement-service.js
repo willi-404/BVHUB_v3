@@ -16,7 +16,11 @@ function requireAdmin(e) {
 function noStore(e) { e.response.header().set("Cache-Control", "no-store"); e.response.header().set("Pragma", "no-cache"); }
 
 function idOf(e) {
-  const id = String(e.pathParam("id") || "");
+  const direct = e.request && typeof e.request.pathValue === "function" ? e.request.pathValue("id") : "";
+  const path = String(e.request && e.request.url && e.request.url.path || "");
+  const parts = path.split("/").filter(Boolean);
+  const marker = parts.indexOf("announcements");
+  const id = String(direct || (marker >= 0 && parts[marker + 1]) || parts.at(-1) || "");
   if (!/^[a-zA-Z0-9]{10,30}$/.test(id)) throw new BadRequestError("Ungültige Ankündigungs-ID");
   return id;
 }
@@ -61,9 +65,14 @@ function localized(record, locale) {
 
 function userItems(app, userId, locale) {
   const readIds = new Set(app.findRecordsByFilter("announcement_reads", `user = '${userId}'`, "", 1000, 0).map((record) => record.getString("announcement")));
-  const activePositions = new Map(slots(app, locale).map((slot) => [slot.announcementId, slot.position]));
+  const currentSlots = slots(app, locale);
+  const activePositions = new Map(currentSlots.map((slot) => [slot.announcementId, slot.position]));
+  const currentIdsByPosition = new Map(currentSlots.map((slot) => [slot.position, slot.announcementId]));
+  const otherLocale = locale === "zh" ? "de" : "zh";
+  const hiddenIds = new Set(slots(app, otherLocale).flatMap((slot) => currentIdsByPosition.has(slot.position) && currentIdsByPosition.get(slot.position) !== slot.announcementId ? [slot.announcementId] : []));
   return app.findRecordsByFilter("announcements", "", "-updated", 1000, 0).flatMap((record) => {
     try {
+      if (hiddenIds.has(record.id)) return [];
       const copy = localized(record, locale);
       return copy.title && copy.content ? [{ id: record.id, position: activePositions.get(record.id) || 0, active: activePositions.has(record.id), ...copy, read: readIds.has(record.id), created: record.getString("created"), updated: record.getString("updated") }] : [];
     } catch (_) { return []; }
@@ -104,11 +113,16 @@ function saveSlots(app, body) {
 }
 
 function markRead(app, userId, announcementId) {
-  app.findRecordById("announcements", announcementId);
-  const existing = app.findRecordsByFilter("announcement_reads", `user = '${userId}' && announcement = '${announcementId}'`, "", 1, 0)[0];
-  if (existing) return existing;
-  const record = new Record(app.findCollectionByNameOrId("announcement_reads"));
-  record.set("user", userId); record.set("announcement", announcementId); app.save(record); return record;
+  const announcement = app.findRecordById("announcements", announcementId);
+  const relatedIds = new Set([announcement.id]);
+  const positions = new Set(app.findRecordsByFilter("announcement_slots", `announcement = '${announcement.id}'`, "", 20, 0).map((record) => record.getInt("position")));
+  positions.forEach((position) => app.findRecordsByFilter("announcement_slots", `position = ${position}`, "", 20, 0).forEach((record) => relatedIds.add(record.getString("announcement"))));
+  relatedIds.forEach((id) => {
+    const existing = app.findRecordsByFilter("announcement_reads", `user = '${userId}' && announcement = '${id}'`, "", 1, 0)[0];
+    if (existing) return;
+    const record = new Record(app.findCollectionByNameOrId("announcement_reads"));
+    record.set("user", userId); record.set("announcement", id); app.save(record);
+  });
 }
 
 module.exports = { requireUser, requireAdmin, noStore, idOf, parseAnnouncement, announcementDto, adminDto, userItems, localeFrom, saveSlots, markRead };

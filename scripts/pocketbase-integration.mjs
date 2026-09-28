@@ -6,6 +6,13 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const dashboardTime = require("../pocketbase/pb_hooks/dashboard-statistics-service.js");
 const paymentService = require("../pocketbase/pb_hooks/payment-service.js");
+const announcementService = require("../pocketbase/pb_hooks/announcement-service.js");
+
+assert.equal(
+  announcementService.idOf({ request: { pathValue: () => "ny30ikx3qywkcw7", url: { path: "/api/bvhub/me/announcements/ny30ikx3qywkcw7/read" } } }),
+  "ny30ikx3qywkcw7",
+  "announcement read routes resolve the PocketBase path value",
+);
 
 const purposeEventId = "abc123def456ghi";
 assert.equal(paymentService.paymentPurpose(purposeEventId, "\u0000 \t"), `EVT-${purposeEventId}-PAY-MEMBER`, "an empty normalized payment name has a stable fallback");

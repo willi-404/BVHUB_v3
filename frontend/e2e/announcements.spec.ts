@@ -106,6 +106,9 @@ test("shows an unread announcement, marks it read, and keeps it in notifications
   ).toBeVisible()
   await expect(page.getByText("Court update", { exact: true })).toBeVisible()
   await page.getByRole("button", { name: "Mark as read" }).click()
+  await expect(
+    page.locator('span[aria-label="1 unread notifications"]'),
+  ).toHaveCount(0)
   await expect(page.getByRole("dialog", { name: "Notifications" })).toHaveCount(
     0,
   )

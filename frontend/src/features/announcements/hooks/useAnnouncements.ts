@@ -2,7 +2,11 @@ import { useEffect } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { pb } from "../../../lib/pocketbase"
 import * as api from "../api/announcementApi"
-import type { AnnouncementDraft, AnnouncementLocale } from "../types"
+import type {
+  AnnouncementDraft,
+  AnnouncementLocale,
+  UserAnnouncementResponse,
+} from "../types"
 
 export const announcementKeys = {
   all: ["announcements"] as const,
@@ -24,23 +28,31 @@ export function useMarkAnnouncementRead(locale: AnnouncementLocale) {
   return useMutation({
     mutationFn: api.markAnnouncementRead,
     onSuccess: (_data, id) => {
-      client.setQueryData(
+      const current = client.getQueryData<UserAnnouncementResponse>(
         announcementKeys.user(locale),
-        (
-          current: Awaited<ReturnType<typeof api.getAnnouncements>> | undefined,
-        ) =>
-          current
-            ? {
-                ...current,
-                items: current.items.map((item) =>
-                  item.id === id ? { ...item, read: true } : item,
-                ),
-                unreadCount: current.items.filter(
-                  (item) => item.id !== id && !item.read,
-                ).length,
-              }
-            : current,
       )
+      const position = current?.items.find((item) => item.id === id)?.position
+      for (const targetLocale of ["zh", "de"] as const) {
+        client.setQueryData<UserAnnouncementResponse | undefined>(
+          announcementKeys.user(targetLocale),
+          (data) => {
+            if (!data) return data
+            const items = data.items.map((item) =>
+              item.id === id ||
+              (position !== undefined &&
+                position > 0 &&
+                item.position === position)
+                ? { ...item, read: true }
+                : item,
+            )
+            return {
+              ...data,
+              items,
+              unreadCount: items.filter((item) => !item.read).length,
+            }
+          },
+        )
+      }
     },
   })
 }
