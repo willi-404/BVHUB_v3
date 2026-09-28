@@ -155,16 +155,33 @@ test("member card renders a real SVG QR and verification route consumes its frag
     .filter({ has: page.getByTestId("member-card-qr") })
   await expect(card).toBeVisible()
   await expect(card.locator('[data-slot="avatar-fallback"]')).toHaveText("QM")
-  await expect(card.locator('[data-slot="badge"]')).toHaveText("Active")
+  await expect(card.locator('[data-slot="badge"]').first()).toHaveText("Active")
   await expect(card.locator("section p")).toContainText("Member · Member ER")
   await expect(
-    card.getByText("member-card-user", { exact: true }),
+    card.getByText("member-card-user", { exact: true }).first(),
   ).toBeVisible()
-  await expect(card.getByText("2026-01-01", { exact: true })).toBeVisible()
+  await expect(card.getByText(/2026/, { exact: false }).first()).toBeVisible()
   await expect(
     card.getByRole("img", { name: "Badminton Verein Erlangen logo" }),
   ).toBeVisible()
+  await expect(card.getByRole("button", { name: "View QR Code" })).toBeFocused()
+  const frontBox = await card.boundingBox()
+  await card.getByRole("button", { name: "View QR Code" }).click()
+  await expect(card.getByRole("button", { name: "Back to Card" })).toBeFocused()
+  await expect(card.locator(".member-card-face--front")).toHaveAttribute(
+    "aria-hidden",
+    "true",
+  )
+  await expect(card.locator(".member-card-face--back")).toHaveAttribute(
+    "aria-hidden",
+    "false",
+  )
   await expect(card.getByTestId("member-card-qr").locator("svg")).toBeVisible()
+  const backBox = await card.boundingBox()
+  expect(backBox?.width).toBe(frontBox?.width)
+  expect(backBox?.height).toBe(frontBox?.height)
+  await card.getByRole("button", { name: "Back to Card" }).click()
+  await expect(card.getByRole("button", { name: "View QR Code" })).toBeFocused()
   await expect(
     page
       .getByTestId("member-card-qr")
@@ -197,6 +214,7 @@ test("guest account renders its issued QR instead of the unavailable state", asy
   await mockMemberSession(page, guest, [])
   await page.goto("/dashboard")
   await page.getByRole("button", { name: "Open member card" }).click()
+  await page.getByRole("button", { name: "View QR Code" }).click()
   await expect(page.getByTestId("member-card-qr").locator("svg")).toBeVisible()
   await expect(
     page.getByText("QR code is unavailable.", { exact: true }),
@@ -223,7 +241,7 @@ test("member card handles a long name and inactive account on mobile", async ({
   await expect(
     card.getByRole("heading", { name: inactive.displayName }),
   ).toBeVisible()
-  await expect(card.locator('[data-slot="badge"]')).toHaveText("Inactive")
+  await expect(card.locator('[data-slot="badge"]').first()).toHaveText("Inactive")
   await expect(card.locator("section p")).toContainText("Admin · Guest")
   const dimensions = await page.evaluate(() => ({
     width: document.documentElement.clientWidth,

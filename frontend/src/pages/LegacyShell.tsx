@@ -6,7 +6,7 @@ import { Card, CardContent } from "../app/components/ui/card";
 import { Avatar } from "../app/components/ui/avatar";
 import { Progress } from "../app/components/ui/progress";
 import { Separator } from "../app/components/ui/separator";
-import { MemberCard } from "../app/components/MemberCard";
+import { MemberCard, MemberCardFlip } from "../app/components/MemberCard";
 import logoSrc from "../imports/logo1-high-resolution.png";
 import { useAuth, useAuthUser } from "../features/auth/AuthProvider";
 import { isAdminRole } from "../features/auth/policy";
@@ -185,7 +185,7 @@ function MemberCardOverlay({ onClose }: { onClose: () => void }) {
   const displayName = profile?.user.displayName || t("profile.title");
   const memberId = profile?.user.id || "-";
   const group = profile?.groups.map((item) => item.name) ?? ["-"];
-  const activeSince = profile?.user.created ? profile.user.created.slice(0, 10) : "-";
+  const created = profile?.user.created ?? "";
   return (
     <div className="fixed inset-0 z-[100] flex flex-col overflow-y-auto bg-background text-foreground">
       {/* Top bar */}
@@ -202,10 +202,10 @@ function MemberCardOverlay({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="flex flex-1 items-start justify-center px-4 py-5 sm:items-center">
-        <MemberCard
+        <MemberCardFlip
           name={displayName}
           memberId={memberId}
-          activeSince={activeSince}
+          created={created}
           group={group}
           role={profile?.user.role}
           active={profile?.user.active}
@@ -426,11 +426,11 @@ function EventCard({ event, onToggle }: { event: Event; onToggle: (id: number) =
 // ─── Page views ────────────────────────────────────────────────────────────────
 
 function DashboardView({ events, liveEvents, onToggle, onOpenCard, profile, onOpenNotifications, unreadNotificationCount }: { events: Event[]; liveEvents: EventRecord[]; onToggle: (id: number) => void; onOpenCard: () => void; profile: ProfileDto | null; onOpenNotifications: () => void; unreadNotificationCount: number }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const displayName = profile?.user.displayName || t("profile.title");
   const memberId = profile?.user.id || "-";
   const group = profile?.groups.map((item) => item.name) ?? ["-"];
-  const activeSince = profile?.user.created ? profile.user.created.slice(0, 10) : "-";
+  const accountSince = profile?.user.created ? formatLocaleDate(profile.user.created, locale) || "-" : "-";
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
@@ -446,7 +446,7 @@ function DashboardView({ events, liveEvents, onToggle, onOpenCard, profile, onOp
 
       {/* Tappable card */}
       <button onClick={onOpenCard} className="text-left w-full active:scale-[0.98] transition-transform duration-150 cursor-pointer" aria-label={t("profile.openMemberCard")}>
-        <MemberCard name={displayName} memberId={memberId} activeSince={activeSince} group={group} role={profile?.user.role} active={profile?.user.active} />
+        <MemberCard name={displayName} memberId={memberId} accountSince={accountSince} group={group} role={profile?.user.role} active={profile?.user.active} />
         <p className="text-[10px] text-[var(--muted-foreground)] text-center mt-2 flex items-center justify-center gap-1">
           <Icon d={icons.qrCode} size={10} /> {t("profile.openMemberCardHint")}
         </p>

@@ -227,6 +227,69 @@ canvas {
   padding-block-end: calc(var(--mobile-cta-height) + env(safe-area-inset-bottom));
 }
 
+.member-card-flip {
+  display: grid;
+  perspective: 1000px;
+}
+
+.member-card-face {
+  grid-area: 1 / 1;
+  display: flex;
+  min-height: 29rem;
+  min-width: 0;
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+  transition:
+    transform 400ms cubic-bezier(0.2, 0, 0, 1),
+    visibility 0s linear 400ms;
+}
+
+.member-card-face-inner {
+  display: flex;
+  min-height: 100%;
+  min-width: 0;
+  width: 100%;
+  flex-direction: column;
+}
+
+.member-card-face--front,
+.member-card-face--back {
+  border-radius: inherit;
+  background: var(--card);
+  border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+}
+
+.member-card-flip--member .member-card-face--front,
+.member-card-flip--member .member-card-face--back {
+  background: color-mix(in srgb, var(--card) 94%, var(--dashboard-member));
+  border-color: color-mix(in srgb, var(--dashboard-member) 28%, var(--border));
+}
+
+.member-card-flip--guest .member-card-face--front,
+.member-card-flip--guest .member-card-face--back {
+  background: color-mix(in srgb, var(--card) 94%, var(--muted));
+  border-color: color-mix(in srgb, var(--muted-foreground) 20%, var(--border));
+}
+
+.member-card-face--back {
+  transform: rotateY(180deg);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.member-card-flip[data-flipped="true"] .member-card-face--front {
+  transform: rotateY(-180deg);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.member-card-flip[data-flipped="true"] .member-card-face--back {
+  transform: rotateY(0deg);
+  visibility: visible;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
+
 @media (max-width: 47.999rem) {
   .event-detail-cta {
     margin-inline: -1rem;
@@ -287,6 +350,12 @@ canvas {
   .dashboard-stat-interactive:hover,
   .dashboard-stat-interactive:focus-visible {
     translate: none;
+  }
+
+  .member-card-face,
+  .member-card-flip[data-flipped="true"] .member-card-face--front,
+  .member-card-flip[data-flipped="true"] .member-card-face--back {
+    transition: none;
   }
 }
 
