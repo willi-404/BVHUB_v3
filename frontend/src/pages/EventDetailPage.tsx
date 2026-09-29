@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from "react-router-dom"
 import { Badge } from "../app/components/ui/badge"
 import { Card } from "../app/components/ui/card"
 import { Button } from "../app/components/ui/button"
+import UserAvatar from "../features/profile/components/UserAvatar"
 import { isAdminRole } from "../features/auth/policy"
 import { useAuthUser } from "../features/auth/AuthProvider"
 import {
@@ -265,7 +266,10 @@ export default function EventDetailPage() {
                 }
                 className="mt-2 flex min-w-0 flex-wrap justify-between gap-2 border-b border-[var(--border)] py-2 text-sm"
               >
-                <span className="min-w-0 break-words">{participant.displayName}</span>
+                <div className="flex min-w-0 items-center gap-2">
+                  <UserAvatar avatar={participant.avatar} fallback={participant.displayName.slice(0, 2).toUpperCase()} />
+                  <span className="min-w-0 break-words">{participant.displayName}</span>
+                </div>
                 {adminViewer && (
                   <span className="min-w-0 break-words">
                     {participant.firstName} {participant.lastName}

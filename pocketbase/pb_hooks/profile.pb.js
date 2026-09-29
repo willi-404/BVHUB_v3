@@ -59,3 +59,25 @@ routerAdd("PATCH", "/api/bvhub/me/profile", (e) => {
 
   return e.json(200, api.dto($app, updatedUser, updatedProfile));
 }, $apis.requireAuth("users"));
+
+routerAdd("PUT", "/api/bvhub/me/avatar", (e) => {
+  const api = require(`${__hooks}/profile-service.js`);
+  const currentUser = api.user(e);
+  const files = e.findUploadedFiles("avatar");
+  if (files.length !== 1 || !files[0]) throw new BadRequestError("Genau ein Bild erforderlich");
+  const avatar = api.findAvatar($app, currentUser.id) || new Record($app.findCollectionByNameOrId("user_avatars"));
+  avatar.set("user", currentUser.id);
+  avatar.set("image", files[0]);
+  $app.save(avatar);
+  e.response.header().set("Cache-Control", "no-store");
+  return e.json(200, api.dto($app, currentUser, api.findProfile($app, currentUser.id)));
+}, $apis.requireAuth("users"));
+
+routerAdd("DELETE", "/api/bvhub/me/avatar", (e) => {
+  const api = require(`${__hooks}/profile-service.js`);
+  const currentUser = api.user(e);
+  const avatar = api.findAvatar($app, currentUser.id);
+  if (avatar) $app.delete(avatar);
+  e.response.header().set("Cache-Control", "no-store");
+  return e.json(200, api.dto($app, currentUser, api.findProfile($app, currentUser.id)));
+}, $apis.requireAuth("users"));

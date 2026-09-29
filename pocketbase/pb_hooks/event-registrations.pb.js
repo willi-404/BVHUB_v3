@@ -76,6 +76,7 @@ routerAdd("DELETE", "/api/bvhub/events/{id}/registrations/me", (e) => {
 
 routerAdd("GET", "/api/bvhub/events/{id}/participants", (e) => {
   const api = require(`${__hooks}/venue-event-service.js`);
+  const profile = require(`${__hooks}/profile-service.js`);
   const user = api.requireAuthenticatedReader(e);
   if (!user) throw new ForbiddenError("Zugriff nicht erlaubt");
   const event = api.event($app, api.idOf(e));
@@ -84,8 +85,10 @@ routerAdd("GET", "/api/bvhub/events/{id}/participants", (e) => {
   const records = $app.findRecordsByFilter("event_registrations", `event = '${event.id}' && status = 'REGISTERED'`, "registeredAt", 10000, 0);
   const items = records.map((registration) => {
     const target = api.userRecord($app, registration.getString("user"));
-    if (!isAdmin) return { displayName: target.getString("displayName") };
-    return { registrationId: registration.id, userId: target.id, displayName: target.getString("displayName"), firstName: target.getString("firstName"), lastName: target.getString("lastName"), registeredAt: registration.getString("registeredAt") };
+    // ponytail: one indexed avatar lookup per participant; batch when event lists become large.
+    const avatar = profile.avatarRef($app, target.id);
+    if (!isAdmin) return { displayName: target.getString("displayName"), avatar };
+    return { registrationId: registration.id, userId: target.id, displayName: target.getString("displayName"), firstName: target.getString("firstName"), lastName: target.getString("lastName"), registeredAt: registration.getString("registeredAt"), avatar };
   });
   e.response.header().set("Cache-Control", "no-store");
   e.response.header().set("Pragma", "no-cache");

@@ -1,5 +1,10 @@
 import type { Role } from "../../auth/policy";
 
+export interface AvatarRef {
+  id: string;
+  filename: string;
+}
+
 export interface ProfileUser {
   id: string;
   displayName: string;
@@ -9,6 +14,7 @@ export interface ProfileUser {
   role: Role;
   active: boolean;
   verified: boolean;
+  avatar?: AvatarRef | null;
   created: string;
   updated: string;
 }

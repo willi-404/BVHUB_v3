@@ -72,14 +72,14 @@ const superuserPassword = process.env.PB_TEST_SUPERUSER_PASSWORD;
 const serverLogPath = process.env.PB_TEST_SERVER_LOG;
 if (!baseUrl || !superuserEmail || !superuserPassword) throw new Error("Missing integration test configuration");
 
-async function request(method, path, { token, body } = {}) {
+async function request(method, path, { token, body, form } = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
     method,
     headers: {
       ...(token ? { Authorization: token } : {}),
       ...(body ? { "Content-Type": "application/json" } : {}),
     },
-    body: body ? JSON.stringify(body) : undefined,
+    body: form ?? (body ? JSON.stringify(body) : undefined),
   });
   const text = await response.text();
   let data = null;
@@ -447,6 +447,48 @@ const duplicateProfile = await request("PATCH", "/api/bvhub/me/profile", { token
 assert.equal(duplicateProfile.status, 409, "duplicate displayName returns conflict");
 const forbiddenFields = await request("PATCH", "/api/bvhub/me/profile", { token: memberLoginToken, body: { role: "ADMIN" } });
 assert.equal(forbiddenFields.status, 400, "privileged profile fields are rejected");
+assert.equal(ownProfile.user.avatar, null, "new profiles have no avatar");
+const avatarImage = fs.readFileSync(new URL("../frontend/public/favicon/android-chrome-512x512.png", import.meta.url));
+function avatarForm(bytes, type, name) {
+  const form = new FormData();
+  form.append("avatar", new Blob([bytes], { type }), name);
+  return form;
+}
+const firstAvatar = expectStatus(await request("PUT", "/api/bvhub/me/avatar", {
+  token: memberLoginToken, form: avatarForm(avatarImage, "image/png", "portrait.png"),
+}), 200, "member uploads avatar").user.avatar;
+const uploadedAvatar = expectStatus(await request("PUT", "/api/bvhub/me/avatar", {
+  token: memberLoginToken, form: avatarForm(avatarImage, "image/png", "replacement.png"),
+}), 200, "member replaces avatar").user.avatar;
+assert.equal(uploadedAvatar.id, firstAvatar.id, "replacement keeps one avatar record per user");
+assert.notEqual(uploadedAvatar.filename, firstAvatar.filename, "replacement stores a new file");
+assert.ok(uploadedAvatar.id && uploadedAvatar.filename, "profile returns a protected avatar reference");
+expectStatus(await request("PUT", "/api/bvhub/me/avatar", {
+  token: memberLoginToken, form: avatarForm(Buffer.from("<svg></svg>"), "image/svg+xml", "unsafe.svg"),
+}), 400, "SVG avatars are rejected");
+expectStatus(await request("PUT", "/api/bvhub/me/avatar", {
+  token: memberLoginToken, form: avatarForm(Buffer.from("<svg></svg>"), "image/png", "spoofed.png"),
+}), 400, "file validation rejects spoofed image content");
+expectStatus(await request("PUT", "/api/bvhub/me/avatar", {
+  token: memberLoginToken, form: avatarForm(Buffer.alloc(5 * 1024 * 1024 + 1), "image/png", "oversize.png"),
+}), 400, "avatars over 5 MB are rejected");
+assert.deepEqual(expectStatus(await request("GET", "/api/bvhub/me/profile", { token: memberLoginToken }), 200, "avatar survives invalid uploads").user.avatar, uploadedAvatar);
+assert.notEqual((await request("POST", "/api/collections/user_avatars/records", { token: memberLoginToken, body: { user: guest.id } })).status, 200, "members cannot create arbitrary avatar records");
+assert.notEqual((await request("PATCH", `/api/collections/user_avatars/records/${uploadedAvatar.id}`, { token: guestLoginToken, body: { user: guest.id } })).status, 200, "guests cannot reassign another member's avatar");
+const avatarFilePath = `/api/files/user_avatars/${uploadedAvatar.id}/${uploadedAvatar.filename}?thumb=64x64`;
+assert.notEqual((await fetch(`${baseUrl}${avatarFilePath}`)).status, 200, "protected avatar rejects anonymous reads");
+const avatarFileToken = expectStatus(await request("POST", "/api/files/token", { token: guestLoginToken }), 200, "guest obtains protected file token").token;
+const avatarThumb = await fetch(`${baseUrl}${avatarFilePath}&token=${encodeURIComponent(avatarFileToken)}`);
+assert.equal(avatarThumb.status, 200, "verified guest can view participant avatar");
+assert.match(avatarThumb.headers.get("content-type"), /^image\//, "avatar thumbnail is an image");
+const avatarThumbBytes = Buffer.from(await avatarThumb.arrayBuffer());
+assert.ok(avatarThumbBytes.byteLength < 1024 * 1024, "list thumbnail is below 1 MB");
+assert.equal(avatarThumbBytes.readUInt32BE(16), 64, "list thumbnail is 64 pixels wide");
+const cardThumb = await fetch(`${baseUrl}${avatarFilePath.replace("64x64", "160x160")}&token=${encodeURIComponent(avatarFileToken)}`);
+assert.equal(cardThumb.status, 200, "member card thumbnail is accessible");
+const cardThumbBytes = Buffer.from(await cardThumb.arrayBuffer());
+assert.ok(cardThumbBytes.byteLength < 1024 * 1024, "member card thumbnail is below 1 MB");
+assert.equal(cardThumbBytes.readUInt32BE(16), 160, "member card thumbnail is 160 pixels wide");
 const guestProfile = expectStatus(await request("PATCH", "/api/bvhub/me/profile", { token: guestLoginToken, body: { displayName: "Updated Guest" } }), 200, "guest updates own profile");
 assert.equal(guestProfile.user.displayName, "Updated Guest");
 const refreshedGuestProfile = expectStatus(await request("GET", "/api/bvhub/me/profile", { token: guestLoginToken }), 200, "guest reloads updated profile");
@@ -851,6 +893,12 @@ const wuRegistration = expectStatus(await request("POST", `/api/bvhub/events/${v
   token: memberLoginToken, body: { checkoutRegion: "ER", termsVersion: "ER-v1" },
 }), 201, "member registers for event");
 assert.equal(wuRegistration.status, "REGISTERED");
+const avatarParticipants = expectStatus(await request("GET", `/api/bvhub/events/${validEvent.id}/participants`, { token: guestLoginToken }), 200, "guest reads participant avatars");
+assert.deepEqual(avatarParticipants.items.find((item) => item.displayName === paymentPurposeNames.member)?.avatar, uploadedAvatar, "participant response includes the member avatar without exposing their user id");
+assert.equal(avatarParticipants.items.find((item) => item.displayName === paymentPurposeNames.member)?.userId, undefined);
+const removedAvatar = expectStatus(await request("DELETE", "/api/bvhub/me/avatar", { token: memberLoginToken }), 200, "member removes avatar");
+assert.equal(removedAvatar.user.avatar, null);
+assert.equal(expectStatus(await request("GET", `/api/bvhub/events/${validEvent.id}/participants`, { token: guestLoginToken }), 200, "participant avatar removed").items.find((item) => item.displayName === paymentPurposeNames.member)?.avatar, null);
 const memberPayments = await paymentsForRegistration(wuRegistration.id, rootToken);
 assert.equal(memberPayments.length, 1, "member registration creates one payment");
 const memberPayment = memberPayments[0];

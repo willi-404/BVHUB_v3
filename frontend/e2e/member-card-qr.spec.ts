@@ -40,6 +40,7 @@ async function mockMemberSession(
   ],
   profileRecord = record,
 ) {
+  let currentProfile: typeof user & { avatar?: { id: string; filename: string } | null } = profileRecord
   const sessionToken = authToken()
   await page.addInitScript(
     ({
@@ -64,8 +65,16 @@ async function mockMemberSession(
       return route.fulfill({ json: { token: sessionToken, record } })
     if (path === "/api/bvhub/me/profile")
       return route.fulfill({
-        json: { user: profileRecord, profile: null, groups },
+        json: { user: currentProfile, profile: null, groups },
       })
+    if (path === "/api/bvhub/me/avatar") {
+      currentProfile = { ...currentProfile, avatar: request.method() === "DELETE" ? null : { id: "avatar-1", filename: "portrait.png" } }
+      return route.fulfill({ json: { user: currentProfile, profile: null, groups } })
+    }
+    if (path === "/api/files/token")
+      return route.fulfill({ json: { token: "file-token" } })
+    if (path.startsWith("/api/files/user_avatars/"))
+      return route.fulfill({ path: new URL("../public/favicon/favicon-32x32.png", import.meta.url).pathname, contentType: "image/png" })
     if (path === "/api/bvhub/me/member-card-token")
       return route.fulfill({
         json: {
@@ -143,6 +152,29 @@ async function mockMemberSession(
     return route.fulfill({ json: { items: [] } })
   })
 }
+
+test("avatar upload updates the sidebar and member card, then removal restores initials", async ({ page }) => {
+  await mockMemberSession(page)
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto("/profile")
+  await page.getByRole("button", { name: "Edit profile" }).click()
+  const input = page.locator('input[type="file"]')
+  await input.setInputFiles({ name: "invalid.svg", mimeType: "image/svg+xml", buffer: Buffer.from("<svg/>") })
+  await expect(page.getByRole("alert")).toHaveText("Choose a JPG, PNG or WebP image.")
+  await input.setInputFiles({ name: "large.png", mimeType: "image/png", buffer: Buffer.alloc(5 * 1024 * 1024 + 1) })
+  await expect(page.getByRole("alert")).toHaveText("Choose an image up to 5 MB.")
+  await input.setInputFiles({ name: "portrait.png", mimeType: "image/png", buffer: Buffer.from([137, 80, 78, 71]) })
+  await expect(page.getByRole("status")).toHaveText("Photo updated.")
+  await page.goto("/home")
+  await expect(page.locator("aside [data-slot=avatar] img")).toBeVisible()
+  await page.getByRole("button", { name: "Open member card" }).click()
+  await expect(page.locator("[data-testid=member-card-flip] [data-slot=avatar] img")).toBeVisible()
+  await page.goto("/profile")
+  await page.getByRole("button", { name: "Edit profile" }).click()
+  await page.getByRole("button", { name: "Remove photo" }).click()
+  await expect(page.getByRole("status")).toHaveText("Photo removed.")
+  await expect(page.locator("aside [data-slot=avatar-fallback]")).toHaveText("QR")
+})
 
 test("member card renders a real SVG QR and verification route consumes its fragment", async ({
   page,

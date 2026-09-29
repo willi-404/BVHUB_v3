@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react"
 import logoSrc from "../../imports/logo1-high-resolution.png"
 import { formatLocaleDate, useI18n } from "../../i18n"
 import type { Role } from "../../features/auth/policy"
-import { Avatar } from "./ui/avatar"
+import UserAvatar from "../../features/profile/components/UserAvatar"
+import type { AvatarRef } from "../../features/profile/types"
 import { Badge } from "./ui/badge"
 import { memberCardGroupLabels } from "./memberCardTheme"
 
@@ -13,6 +14,7 @@ interface MemberCardProps {
   group: string | readonly string[]
   role?: Role
   active?: boolean
+  avatar?: AvatarRef | null
   qr?: ReactNode
 }
 
@@ -31,6 +33,7 @@ export interface MemberCardFlipProps {
   group: string | readonly string[]
   role?: Role
   active?: boolean
+  avatar?: AvatarRef | null
   qr: ReactNode
 }
 
@@ -41,6 +44,7 @@ export function MemberCardFlip({
   group,
   role,
   active,
+  avatar,
   qr,
 }: MemberCardFlipProps) {
   const { t, locale } = useI18n()
@@ -118,9 +122,11 @@ export function MemberCardFlip({
           </header>
 
           <section className="flex flex-col items-center px-1 pt-8 text-center">
-            <Avatar
+            <UserAvatar
+              avatar={avatar}
               fallback={initials || "?"}
               alt={name}
+              thumb="160x160"
               className="size-20 border-2 border-background shadow-sm ring-1 ring-border"
             />
             <h2 className="mt-3 max-w-full break-words text-xl font-semibold leading-tight">
@@ -211,6 +217,7 @@ export function MemberCard({
   group,
   role,
   active,
+  avatar,
   qr,
 }: MemberCardProps) {
   const { t } = useI18n()
@@ -267,9 +274,11 @@ export function MemberCard({
       </header>
 
       <section className="flex flex-col items-center px-5 pt-7 text-center">
-        <Avatar
+        <UserAvatar
+          avatar={avatar}
           fallback={initials || "?"}
           alt={name}
+          thumb="160x160"
           className="size-20 border-2 border-background shadow-sm ring-1 ring-border"
         />
         <h2 className="mt-3 max-w-full break-words text-xl font-semibold leading-tight">

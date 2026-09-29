@@ -1,3 +1,5 @@
+import type { AvatarRef } from "../../profile/types"
+
 export type EventStatus = "MEMBERS_ONLY" | "OPEN_TO_ALL" | "CANCELLED" | "COMPLETED"
 export interface Venue {
   id: string
@@ -36,6 +38,7 @@ export interface EventParticipant {
   registrationId?: string
   userId?: string
   displayName: string
+  avatar?: AvatarRef | null
   firstName?: string
   lastName?: string
   registeredAt?: string

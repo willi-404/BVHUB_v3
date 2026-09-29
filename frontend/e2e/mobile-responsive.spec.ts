@@ -50,10 +50,11 @@ function eventRecord(overrides: Record<string, unknown> = {}) {
 
 async function mockSession(
   page: Page,
-  options: { role?: Role; event?: ReturnType<typeof eventRecord> } = {},
+  options: { role?: Role; event?: ReturnType<typeof eventRecord>; avatar?: boolean } = {},
 ) {
   const role = options.role ?? "MEMBER"
   const token = authToken()
+  const avatar = options.avatar ? { id: "avatar-1", filename: "portrait.png" } : null
   const user = {
     id: "user-1",
     email: "responsive@example.test",
@@ -63,6 +64,7 @@ async function mockSession(
     role,
     active: true,
     verified: true,
+    avatar,
     created: "2026-01-01T00:00:00.000Z",
     updated: "2026-01-01T00:00:00.000Z",
   }
@@ -119,6 +121,14 @@ async function mockSession(
       })
       return
     }
+    if (path === "/api/files/token") {
+      await route.fulfill({ json: { token: "file-token" } })
+      return
+    }
+    if (path.startsWith("/api/files/user_avatars/")) {
+      await route.fulfill({ path: new URL("../public/favicon/favicon-32x32.png", import.meta.url).pathname, contentType: "image/png" })
+      return
+    }
     if (path === "/api/bvhub/events") {
       await route.fulfill({ json: { items: [event] } })
       return
@@ -153,6 +163,7 @@ async function mockSession(
               registrationId: "registration-1",
               userId: user.id,
               displayName: `Participant ${"longparticipant".repeat(20)}`,
+              avatar,
               firstName: user.firstName,
               lastName: user.lastName,
             },
@@ -183,6 +194,16 @@ async function expectNoHorizontalOverflow(page: Page) {
 }
 
 test.describe("responsive application shell", () => {
+  test("participant avatars load the small protected thumbnail on a phone", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    await mockSession(page, { avatar: true })
+    await page.goto("/events/responsive-event")
+    const participantAvatar = page.locator('img[src*="/api/files/user_avatars/"][src*="thumb=64x64"]')
+    await expect(participantAvatar).toBeVisible()
+    await expect(participantAvatar).toHaveAttribute("src", /token=file-token/)
+    await expectNoHorizontalOverflow(page)
+  })
+
   test("uses canonical member routes and closes the phone drawer after navigation", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 })
     await mockSession(page)

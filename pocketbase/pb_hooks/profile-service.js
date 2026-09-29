@@ -23,13 +23,20 @@ function validate(body) {
 
 function findProfile(app, userId) { try { return app.findFirstRecordByData("user_profiles", "user", userId); } catch (_) { return null; } }
 
+function findAvatar(app, userId) { try { return app.findFirstRecordByData("user_avatars", "user", userId); } catch (_) { return null; } }
+
+function avatarRef(app, userId) {
+  const avatar = findAvatar(app, userId);
+  return avatar ? { id: avatar.id, filename: avatar.getString("image") } : null;
+}
+
 function dto(app, user, profile) {
   const groups = [];
   app.findRecordsByFilter("user_groups", `user = '${user.id}'`, "", 500, 0).forEach((assignment) => {
     try { const group = app.findRecordById("groups", assignment.getString("group")); groups.push({ membershipId: assignment.id, id: group.id, name: group.getString("name"), active: group.getBool("active"), created: assignment.getString("created"), updated: assignment.getString("updated") }); } catch (_) { console.warn(`[bvhub profile] invalid group assignment ${assignment.id}`); }
   });
   return {
-    user: { id: user.id, displayName: user.getString("displayName"), firstName: user.getString("firstName"), lastName: user.getString("lastName"), email: user.getString("email"), role: user.getString("role"), active: user.getBool("active"), verified: user.getBool("verified"), created: user.getString("created"), updated: user.getString("updated") },
+    user: { id: user.id, displayName: user.getString("displayName"), firstName: user.getString("firstName"), lastName: user.getString("lastName"), email: user.getString("email"), role: user.getString("role"), active: user.getBool("active"), verified: user.getBool("verified"), avatar: avatarRef(app, user.id), created: user.getString("created"), updated: user.getString("updated") },
     profile: profile ? { street: profile.getString("street"), houseNumber: profile.getString("houseNumber"), postalCode: profile.getString("postalCode"), city: profile.getString("city"), birthDate: profile.getString("birthDate").slice(0, 10), phone: profile.getString("phone"), contactInfo: profile.getString("contactInfo"), created: profile.getString("created"), updated: profile.getString("updated") } : null,
     groups,
   };
@@ -42,4 +49,4 @@ function user(e) {
   return record;
 }
 
-module.exports = { validate, findProfile, dto, user };
+module.exports = { validate, findProfile, findAvatar, avatarRef, dto, user };

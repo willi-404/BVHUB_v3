@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Link, Outlet, useLocation, useNavigate, useOutletContext } from "react-router-dom";
+import { ImagePlus, Trash2 } from "lucide-react";
 import { Badge } from "../app/components/ui/badge";
 import { Button } from "../app/components/ui/button";
 import { Card, CardContent } from "../app/components/ui/card";
-import { Avatar } from "../app/components/ui/avatar";
+import UserAvatar from "../features/profile/components/UserAvatar";
 import { Progress } from "../app/components/ui/progress";
 import { Separator } from "../app/components/ui/separator";
 import { MemberCard, MemberCardFlip } from "../app/components/MemberCard";
@@ -11,7 +12,7 @@ import logoSrc from "../imports/logo1-high-resolution.png";
 import { useAuth, useAuthUser } from "../features/auth/AuthProvider";
 import { isAdminRole } from "../features/auth/policy";
 import { formatLocaleDate, formatLocaleDateTime, LanguageSwitcher, useI18n, type MessageKey } from "../i18n";
-import { useMyProfile, useUpdateMyProfile } from "../features/profile/hooks/useProfile";
+import { useMyProfile, useUpdateMyAvatar, useUpdateMyProfile } from "../features/profile/hooks/useProfile";
 import { profileErrorStatus } from "../features/profile/api/profileApi";
 import { profilePatchFromDto } from "../features/profile/profilePatch";
 import type { ProfileDto, ProfilePatch } from "../features/profile/types";
@@ -209,6 +210,7 @@ function MemberCardOverlay({ onClose }: { onClose: () => void }) {
           group={group}
           role={profile?.user.role}
           active={profile?.user.active}
+          avatar={profile?.user.avatar}
           qr={<MemberQr />}
         />
       </div>
@@ -222,10 +224,14 @@ function EditProfileOverlay({ onClose }: { onClose: () => void }) {
   const { t } = useI18n();
   const { data, isLoading } = useMyProfile();
   const mutation = useUpdateMyProfile();
+  const avatarMutation = useUpdateMyAvatar();
+  const avatarInput = useRef<HTMLInputElement>(null);
   const [values, setValues] = useState<ProfilePatch>({});
   const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
+  const [avatarStatus, setAvatarStatus] = useState("");
   useEffect(() => {
     if (!data || initialized) return;
     setValues(profilePatchFromDto(data));
@@ -233,7 +239,25 @@ function EditProfileOverlay({ onClose }: { onClose: () => void }) {
   }, [data, initialized]);
 
   function close() {
-    if (mutation.isPending || saved || Object.keys(values).length === 0 || window.confirm(t("profile.discardChanges"))) onClose();
+    if (mutation.isPending || avatarMutation.isPending) return;
+    if (saved || !data || JSON.stringify(values) === JSON.stringify(profilePatchFromDto(data)) || window.confirm(t("profile.discardChanges"))) onClose();
+  }
+  async function uploadAvatar(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setAvatarError("");
+    setAvatarStatus("");
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) { setAvatarError(t("profile.avatarInvalidType")); return; }
+    if (!file.size || file.size > 5 * 1024 * 1024) { setAvatarError(t("profile.avatarTooLarge")); return; }
+    try { await avatarMutation.mutateAsync(file); setAvatarStatus(t("profile.avatarSaved")); }
+    catch { setAvatarError(t("profile.avatarUploadFailed")); }
+  }
+  async function removeAvatar() {
+    setAvatarError("");
+    setAvatarStatus("");
+    try { await avatarMutation.mutateAsync(null); setAvatarStatus(t("profile.avatarRemoved")); }
+    catch { setAvatarError(t("profile.avatarUploadFailed")); }
   }
   async function save(event: React.FormEvent) {
     event.preventDefault();
@@ -261,7 +285,7 @@ function EditProfileOverlay({ onClose }: { onClose: () => void }) {
         <span className="text-sm font-semibold">{t("profile.edit")}</span>
         <button
           onClick={save}
-          disabled={mutation.isPending || isLoading || !initialized}
+          disabled={mutation.isPending || avatarMutation.isPending || isLoading || !initialized}
           className="text-sm font-semibold text-[var(--primary)] px-2 py-1 rounded hover:bg-[var(--secondary)] transition-colors"
         >
           {mutation.isPending ? t("common.saving") : saved ? t("common.saved") : t("common.save")}
@@ -273,6 +297,20 @@ function EditProfileOverlay({ onClose }: { onClose: () => void }) {
         {saved && <p role="status" className="text-sm text-green-700 bg-green-50 border border-green-200 rounded p-3">{t("profile.saved")}</p>}
         {!data && !isLoading && <p className="text-sm text-[var(--muted-foreground)]">{t("profile.incomplete")}</p>}
         {data && <>
+          <div className="flex flex-wrap items-center gap-4">
+            <UserAvatar avatar={data.user.avatar} fallback={data.user.displayName.slice(0, 2).toUpperCase()} thumb="160x160" className="size-16 text-lg" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">{t("profile.avatar")}</p>
+              <p className="text-xs text-muted-foreground">{t("profile.avatarHelp")}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <input ref={avatarInput} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={uploadAvatar} />
+                <Button type="button" variant="outline" disabled={avatarMutation.isPending} onClick={() => avatarInput.current?.click()}><ImagePlus size={16} />{avatarMutation.isPending ? t("profile.avatarUpdating") : data.user.avatar ? t("profile.avatarChange") : t("profile.avatarUpload")}</Button>
+                {data.user.avatar && <Button type="button" variant="outline" disabled={avatarMutation.isPending} onClick={removeAvatar}><Trash2 size={16} />{t("profile.avatarRemove")}</Button>}
+              </div>
+              {avatarError && <p role="alert" className="mt-2 text-sm text-red-600">{avatarError}</p>}
+              {avatarStatus && <p role="status" className="mt-2 text-sm text-green-700">{avatarStatus}</p>}
+            </div>
+          </div>
           <div className="flex flex-col gap-4">
             {field("displayName", t("profile.displayName"))}
             <div className="grid md:grid-cols-2 gap-4">{field("firstName", t("profile.firstName"))}{field("lastName", t("profile.lastName"))}</div>
@@ -440,13 +478,13 @@ function DashboardView({ events, liveEvents, onToggle, onOpenCard, profile, onOp
         </div>
         <div className="flex items-center gap-2">
           <NotificationButton onClick={onOpenNotifications} count={unreadNotificationCount} />
-          <Avatar fallback={displayName.slice(0, 2).toUpperCase()} size="md" />
+          <UserAvatar avatar={profile?.user.avatar} fallback={displayName.slice(0, 2).toUpperCase()} />
         </div>
       </div>
 
       {/* Tappable card */}
       <button onClick={onOpenCard} className="text-left w-full active:scale-[0.98] transition-transform duration-150 cursor-pointer" aria-label={t("profile.openMemberCard")}>
-        <MemberCard name={displayName} memberId={memberId} accountSince={accountSince} group={group} role={profile?.user.role} active={profile?.user.active} />
+        <MemberCard name={displayName} memberId={memberId} accountSince={accountSince} group={group} role={profile?.user.role} active={profile?.user.active} avatar={profile?.user.avatar} />
         <p className="text-[10px] text-[var(--muted-foreground)] text-center mt-2 flex items-center justify-center gap-1">
           <Icon d={icons.qrCode} size={10} /> {t("profile.openMemberCardHint")}
         </p>
@@ -492,7 +530,7 @@ function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, canAcce
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col items-center pt-4 pb-2">
-        <Avatar fallback={initials} size="lg" className="h-16 w-16 text-lg mb-3" />
+        <UserAvatar avatar={profile.user.avatar} fallback={initials} thumb="160x160" className="h-16 w-16 text-lg mb-3" />
         <h1 id="view-title-profile" tabIndex={-1} className="page-title max-w-full break-words text-center">{profile.user.displayName}</h1>
         <p className="max-w-full break-words text-center text-xs text-[var(--muted-foreground)]">{profile.user.email}</p>
         <Badge variant={profile.user.active ? "success" : "outline"} className="mt-2">{profile.user.role === "SUPER_ADMIN" ? t("roles.superAdmin") : profile.user.role === "ADMIN" ? t("roles.admin") : profile.user.role === "MEMBER" ? t("roles.member") : t("roles.guest")}</Badge>
@@ -805,7 +843,7 @@ function Sidebar({
       {/* User */}
       <div className="p-4 border-b border-[var(--border)]">
         <div className="flex items-center gap-3">
-          <Avatar fallback={displayName.slice(0, 2).toUpperCase()} size="md" />
+          <UserAvatar avatar={profile?.user.avatar} fallback={displayName.slice(0, 2).toUpperCase()} />
           <div className="min-w-0">
             <p className="text-sm font-semibold truncate">{displayName}</p>
             <p className="text-[10px] text-[var(--muted-foreground)]">{role}</p>
@@ -976,7 +1014,7 @@ export function AppShell({ initialTab = "dashboard", onLogout, routeContent = fa
           <div className="flex items-center gap-3">
             <LanguageSwitcher className="text-[var(--foreground)]" />
             <NotificationButton onClick={() => setNotificationsOpen(true)} count={announcements.data?.unreadCount ?? 0} />
-            <Avatar fallback={(profile?.user.displayName || "?").slice(0, 2).toUpperCase()} size="md" />
+            <UserAvatar avatar={profile?.user.avatar} fallback={(profile?.user.displayName || "?").slice(0, 2).toUpperCase()} />
           </div>
         </div>
 
