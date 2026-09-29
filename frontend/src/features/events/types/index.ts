@@ -42,6 +42,13 @@ export interface EventParticipant {
   firstName?: string
   lastName?: string
   registeredAt?: string
+  position?: number
+}
+export interface EventParticipants {
+  items: EventParticipant[]
+  totalItems: number
+  waitlist: EventParticipant[]
+  myWaitlistPosition: number | null
 }
 export interface EventInput {
   title: string

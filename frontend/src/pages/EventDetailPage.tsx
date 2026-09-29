@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from "react-router-dom"
 import { Badge } from "../app/components/ui/badge"
 import { Card } from "../app/components/ui/card"
 import { Button } from "../app/components/ui/button"
+import { Progress } from "../app/components/ui/progress"
 import UserAvatar from "../features/profile/components/UserAvatar"
 import { isAdminRole } from "../features/auth/policy"
 import { useAuthUser } from "../features/auth/AuthProvider"
@@ -184,6 +185,18 @@ export default function EventDetailPage() {
               <dd className="mt-1 text-sm">{event.capacity}</dd>
             </div>
           </dl>
+          <div className="mt-5">
+            <div className="mb-2 flex flex-wrap justify-between gap-2 text-sm">
+              <span>{t("events.participantCount", { registered: event.registeredCount, capacity: event.capacity })}</span>
+              <span>{t("events.spotsLeft", { count: event.spotsLeft })}</span>
+            </div>
+            <Progress
+              label={t("events.participantCount", { registered: event.registeredCount, capacity: event.capacity })}
+              value={event.registeredCount}
+              max={event.capacity}
+              color={event.spotsLeft <= 0 ? "hsl(0, 84%, 60%)" : event.spotsLeft <= 3 ? "hsl(38, 92%, 50%)" : "hsl(142, 71%, 45%)"}
+            />
+          </div>
           <div className="mt-6 rounded-lg bg-[var(--muted)] p-4 text-sm">
             <p>
               {event.status === "MEMBERS_ONLY"
@@ -275,6 +288,27 @@ export default function EventDetailPage() {
                     {participant.firstName} {participant.lastName}
                   </span>
                 )}
+              </div>
+            ))}
+          </section>
+          <section className="mt-8">
+            <div className="flex flex-wrap items-baseline justify-between gap-3">
+              <h2 className="text-lg font-bold">{t("events.waitlistTitle")}</h2>
+              <span className="text-sm text-[var(--muted-foreground)]">{participants.data?.waitlist.length ?? 0}</span>
+            </div>
+            {participants.data?.myWaitlistPosition && (
+              <p className="mt-2 text-sm font-medium">{t("events.yourWaitlistPosition", { position: participants.data.myWaitlistPosition })}</p>
+            )}
+            {participants.isSuccess && participants.data.waitlist.length === 0 && (
+              <p className="mt-3 text-sm text-[var(--muted-foreground)]">{t("events.noWaitlist")}</p>
+            )}
+            {participants.data?.waitlist.map((participant) => (
+              <div key={participant.registrationId ?? `${participant.displayName}-${participant.position}`} className="mt-2 flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] py-2 text-sm">
+                <div className="flex min-w-0 items-center gap-2">
+                  <UserAvatar avatar={participant.avatar} fallback={participant.displayName.slice(0, 2).toUpperCase()} />
+                  <span className="min-w-0 break-words">{participant.displayName}</span>
+                </div>
+                <span className="text-[var(--muted-foreground)]">{t("events.waitlistPosition", { position: participant.position ?? 0 })}</span>
               </div>
             ))}
           </section>
