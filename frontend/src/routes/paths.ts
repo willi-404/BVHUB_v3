@@ -5,6 +5,7 @@ export const routes = {
   events: "/events",
   payments: "/payments",
   profile: "/profile",
+  profileLog: "/profile/log",
   news: "/news",
   adminMembers: "/admin/members",
   adminEvents: "/admin/events",
@@ -21,6 +22,7 @@ export const primaryNavigation: Readonly<Record<PrimaryNavTab, string>> = {
 };
 
 export function primaryTabForPath(pathname: string): PrimaryNavTab | undefined {
+  if (pathname === routes.profileLog) return "profile";
   return (Object.entries(primaryNavigation) as Array<[PrimaryNavTab, string]>).find(
     ([, path]) => pathname === path,
   )?.[0];

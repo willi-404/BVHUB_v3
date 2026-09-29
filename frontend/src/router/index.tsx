@@ -11,6 +11,7 @@ const MemberAppLayout = lazy(() => import("../pages/MemberAppLayout"));
 const EventListPage = lazy(() => import("../pages/EventListPage"));
 const PaymentsPage = lazy(() => import("../pages/PaymentsPage"));
 const ProfilePage = lazy(() => import("../pages/ProfilePage"));
+const ProfileAuditLogPage = lazy(() => import("../pages/ProfileAuditLogPage"));
 const EventDetailPage = lazy(() => import("../pages/EventDetailPage"));
 const EventCheckoutPage = lazy(() => import("../pages/EventCheckoutPage"));
 const AdminEventDetailPage = lazy(() => import("../pages/AdminEventDetailPage"));
@@ -37,6 +38,7 @@ export const router = createBrowserRouter([
       { path: routes.events, element: load(<EventListPage />) },
       { path: routes.payments, element: load(<PaymentsPage />) },
       { path: routes.profile, element: load(<ProfilePage />) },
+      { path: routes.profileLog, element: load(<ProfileAuditLogPage />) },
       { path: routes.news, element: load(<NewsPage />) },
     ] },
     { path: "/events/:eventId", element: load(<EventDetailPage />) },

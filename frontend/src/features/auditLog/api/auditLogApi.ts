@@ -7,7 +7,7 @@ export interface AuditLogItem {
   eventType: string;
   actorUser: string;
   targetUser: string;
-  metadata: Record<string, unknown>;
+  metadata: Record<string, unknown> | null;
   created: string;
 }
 

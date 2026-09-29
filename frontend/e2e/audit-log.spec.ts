@@ -4,7 +4,10 @@ import { e2ePocketBaseApiRoute } from "./test-endpoints";
 const token = `${Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url")}.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })).toString("base64url")}.test-signature`;
 const member = { id: "member-00000001", email: "member@example.test", displayName: "Member User", firstName: "Member", lastName: "User", role: "MEMBER", active: true, verified: true, created: "2026-01-01T00:00:00.000Z", updated: "2026-01-01T00:00:00.000Z" };
 const admin = { ...member, id: "admin-000000001", email: "admin@example.test", displayName: "Admin User", firstName: "Admin", lastName: "User", role: "ADMIN" };
-const logItems = [{ id: "audit-event0001", eventType: "USER_PROFILE_UPDATED", actorUser: member.id, targetUser: member.id, metadata: { changes: { city: { old: "Erlangen", new: "Nürnberg" } } }, created: "2026-06-01T12:00:00.000Z" }];
+const logItems = [
+  { id: "audit-event0001", eventType: "USER_PROFILE_UPDATED", actorUser: member.id, targetUser: member.id, metadata: { changes: { city: { old: "Erlangen", new: "Nürnberg" } } }, created: "2026-06-01T12:00:00.000Z" },
+  { id: "audit-event0002", eventType: "EVENT_REGISTERED", actorUser: member.id, targetUser: member.id, metadata: null, created: "2026-05-01T12:00:00.000Z" },
+];
 
 async function mockSession(page: Page, user: typeof admin | typeof member) {
   await page.addInitScript(({ record, sessionToken }: { record: typeof admin | typeof member; sessionToken: string }) => {
@@ -30,17 +33,24 @@ async function mockSession(page: Page, user: typeof admin | typeof member) {
       }));
       return route.fulfill({ json: { items, page: 1, perPage: 50, totalItems: items.length, totalPages: 1 } });
     }
-    if (url.pathname.endsWith("/audit-log")) return route.fulfill({ json: { items: logItems, page: 1, perPage: 30, totalItems: 1, totalPages: 1 } });
+    if (url.pathname.endsWith("/audit-log")) return route.fulfill({ json: { items: logItems, page: 1, perPage: 30, totalItems: logItems.length, totalPages: 1 } });
     return route.fulfill({ json: { items: [] } });
   });
 }
 
 test("members open their own log and combine activity filters in place", async ({ page }) => {
   await mockSession(page, member);
-  await page.goto("/profile");
-  await page.getByRole("button", { name: "Audit log" }).click();
+  await page.goto("/profile/log");
   await expect(page.getByRole("heading", { name: "Audit log" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Registered for an event" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Profile" })).toHaveAttribute("aria-current", "page");
+  await page.reload();
   await expect(page.getByText(/Nürnberg/)).toBeVisible();
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(page).toHaveURL("/profile");
+  await page.getByRole("button", { name: "Audit log" }).click();
+  await expect(page).toHaveURL("/profile/log");
+  await expect(page.getByRole("heading", { name: "Audit log" })).toBeVisible();
   const firstResponse = page.waitForResponse((response) => response.url().includes("/api/bvhub/me/audit-log"));
   await page.getByRole("checkbox", { name: "Login" }).check();
   const response = await firstResponse;
@@ -63,7 +73,7 @@ test("a late pagination response does not overwrite a newly selected filter", as
       await new Promise<void>((resolve) => { releasePageTwo = resolve; });
       return route.fulfill({ json: { items: [{ ...logItems[0], id: "audit-event0002", eventType: "EVENT_REGISTERED" }], page: 2, perPage: 30, totalItems: 2, totalPages: 2 } });
     }
-    return route.fulfill({ json: { items: logItems, page: 1, perPage: 30, totalItems: 2, totalPages: 2 } });
+    return route.fulfill({ json: { items: [logItems[0]], page: 1, perPage: 30, totalItems: 2, totalPages: 2 } });
   });
 
   await page.goto("/profile");

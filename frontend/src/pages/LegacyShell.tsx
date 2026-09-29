@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Link, Outlet, useLocation, useNavigate, useOutletContext } from "react-router-dom";
-import { ArrowLeft, ClipboardList, ImagePlus, Trash2 } from "lucide-react";
+import { ClipboardList, ImagePlus, Trash2 } from "lucide-react";
 import { Badge } from "../app/components/ui/badge";
 import { Button } from "../app/components/ui/button";
 import { Card, CardContent } from "../app/components/ui/card";
@@ -28,7 +28,6 @@ import EventListPage from "./EventListPage";
 import { useNews } from "../features/news/hooks/useNews";
 import AnnouncementCenter, { NotificationButton } from "../features/announcements/components/AnnouncementCenter";
 import { useAnnouncements } from "../features/announcements/hooks/useAnnouncements";
-import { AuditLogPanel } from "../features/auditLog/components/AuditLogPanel";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -578,19 +577,6 @@ function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, canAcce
   );
 }
 
-function MyAuditLogOverlay({ onClose }: { onClose: () => void }) {
-  const { t } = useI18n();
-  return <div className="fixed inset-0 z-[100] flex flex-col bg-[var(--background)]">
-    <header className="flex items-center gap-3 border-b border-[var(--border)] bg-[var(--card)] px-4 py-4">
-      <Button variant="ghost" size="icon" onClick={onClose} aria-label={t("common.back")}><ArrowLeft size={18} /></Button>
-      <h1 className="text-base font-semibold">{t("audit.title")}</h1>
-    </header>
-    <main className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
-      <div className="mx-auto w-full max-w-3xl"><AuditLogPanel /></div>
-    </main>
-  </div>;
-}
-
 // ─── Navigation ────────────────────────────────────────────────────────────────
 
 const ADMIN_ITEMS = [
@@ -945,7 +931,6 @@ export function AppShell({ initialTab = "dashboard", onLogout, routeContent = fa
   const [events, setEvents] = useState<Event[]>(EVENTS);
   const [cardOpen, setCardOpen] = useState(false);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
-  const [auditLogOpen, setAuditLogOpen] = useState(false);
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const mobileNavigationTrigger = useRef<HTMLButtonElement>(null);
@@ -982,7 +967,7 @@ export function AppShell({ initialTab = "dashboard", onLogout, routeContent = fa
     logout,
     canAccessAdmin,
     openNotifications: () => setNotificationsOpen(true),
-    openAuditLog: () => setAuditLogOpen(true),
+    openAuditLog: () => navigate(routes.profileLog),
     unreadNotificationCount: announcements.data?.unreadCount ?? 0,
   };
 
@@ -1017,7 +1002,7 @@ export function AppShell({ initialTab = "dashboard", onLogout, routeContent = fa
       case "profile":
         if (profileLoading) return <div><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p className="mt-2 text-sm text-[var(--muted-foreground)]">{t("profile.loading")}</p></div>;
         if (profileError) return <Card><CardContent className="p-5"><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p role="alert" className="mt-2 text-sm text-red-600">{t("profile.loadError")}</p><Button className="mt-4" onClick={() => void refetchProfile()}>{t("common.retry")}</Button></CardContent></Card>;
-        return <ProfileView profile={profile || null} onEditProfile={() => setEditProfileOpen(true)} onLogout={logout} onAdminMembers={() => navigate(routes.adminMembers)} canAccessAdmin={canAccessAdmin} onOpenNotifications={() => setNotificationsOpen(true)} onOpenAuditLog={() => setAuditLogOpen(true)} unreadNotificationCount={announcements.data?.unreadCount ?? 0} />;
+        return <ProfileView profile={profile || null} onEditProfile={() => setEditProfileOpen(true)} onLogout={logout} onAdminMembers={() => navigate(routes.adminMembers)} canAccessAdmin={canAccessAdmin} onOpenNotifications={() => setNotificationsOpen(true)} onOpenAuditLog={() => navigate(routes.profileLog)} unreadNotificationCount={announcements.data?.unreadCount ?? 0} />;
     }
   }
 
@@ -1066,7 +1051,6 @@ export function AppShell({ initialTab = "dashboard", onLogout, routeContent = fa
 
         {cardOpen && <MemberCardOverlay onClose={() => setCardOpen(false)} />}
         {editProfileOpen && <EditProfileOverlay onClose={() => setEditProfileOpen(false)} />}
-        {auditLogOpen && <MyAuditLogOverlay onClose={() => setAuditLogOpen(false)} />}
         <AnnouncementCenter open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
 
       </div>

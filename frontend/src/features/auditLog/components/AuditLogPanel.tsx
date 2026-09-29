@@ -43,9 +43,14 @@ function stringValue(value: unknown): string {
   return String(value);
 }
 
+function metadataFor(item: AuditLogItem): Record<string, unknown> {
+  const metadata = item.metadata;
+  return metadata && typeof metadata === "object" && !Array.isArray(metadata) ? metadata : {};
+}
+
 function Changes({ item }: { item: AuditLogItem }) {
   const { t } = useI18n();
-  const changes = item.metadata.changes;
+  const changes = metadataFor(item).changes;
   if (!changes || typeof changes !== "object") return null;
   return <div className="mt-3 divide-y divide-[var(--border)] border-y border-[var(--border)]">{Object.entries(changes as Record<string, unknown>).map(([field, raw]) => {
     const values = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
@@ -64,7 +69,7 @@ function Detail({ label, value }: { label: string; value: unknown }) {
 
 function Metadata({ item }: { item: AuditLogItem }) {
   const { t } = useI18n();
-  const metadata = item.metadata;
+  const metadata = metadataFor(item);
   const roleChange = item.eventType === "USER_ROLE_CHANGED";
   const groupChange = item.eventType === "USER_GROUPS_CHANGED";
   const login = item.eventType === "USER_LOGIN" || item.eventType === "USER_LOGIN_FAILED";
