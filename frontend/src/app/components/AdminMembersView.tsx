@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { Download } from "lucide-react";
+import writeExcelFile from "write-excel-file/browser";
 import { Button } from "./ui/button";
-import { Separator } from "./ui/separator";
 import { Input } from "./ui/input";
 import { Member, Group, groupConfig, initials } from "./shared/MemberTypes";
 import { MemberDetailPopup } from "./shared/MemberDetailPopup";
+import { getAllMembers } from "../../features/members/api/getMembers";
 import { useMembers } from "../../features/members/hooks/useMembers";
 import { useI18n, type MessageKey } from "../../i18n";
 
@@ -32,6 +34,14 @@ const roleConfig = {
   ADMIN: { key: "roles.admin", color: "#7c3aed", bg: "#ede9fe" },
   SUPER_ADMIN: { key: "roles.superAdmin", color: "#be123c", bg: "#ffe4e6" },
 } as const;
+
+function matchesGroups(member: Member, groups: Group[]) {
+  return groups.length === 0 || groups.some((group) => {
+    if (group === "Admin") return member.role === "ADMIN";
+    const names = member.groups?.map((item) => item.name) ?? [];
+    return group === "MemberER" ? names.includes("Member ER") : group === "MemberNUE" ? names.includes("Member NUE") : names.includes("Guest");
+  });
+}
 
 // ─── Filter Sheet ─────────────────────────────────────────────────────────────
 
@@ -83,11 +93,41 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
   const [filterGroups, setFilterGroups] = useState<Group[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [selected, setSelected] = useState<Member | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(false);
 
-  const membersQuery = useMembers({ search, group: filterGroups[0], page: 1, perPage: 50 });
-  const filtered = membersQuery.data?.items ?? [];
-
+  const membersQuery = useMembers({ search, page: 1, perPage: 50 });
+  const filtered = (membersQuery.data?.items ?? []).filter((member) => matchesGroups(member, filterGroups));
   const hasFilter = filterGroups.length > 0;
+
+  async function exportMembers() {
+    setExporting(true);
+    setExportError(false);
+    try {
+      const members = (await getAllMembers(search)).filter((member) => matchesGroups(member, filterGroups));
+      const groupLabels: Record<string, MessageKey> = { "Member ER": "groups.memberER", "Member NUE": "groups.memberNUE", Guest: "groups.guest" };
+      const rows = [
+        ["admin.members.memberId", "admin.members.displayName", "profile.firstName", "profile.lastName", "auth.email", "profile.role", "profile.groups", "admin.members.memberSince"].map((key) => t(key as MessageKey)),
+        ...members.map((member) => [
+          member.id,
+          member.displayName || member.username,
+          member.vorname,
+          member.nachname,
+          member.email,
+          t(roleConfig[member.role ?? "GUEST"].key),
+          member.groups?.map((group) => groupLabels[group.name] ? t(groupLabels[group.name]) : group.name).join(", ") || "-",
+          member.memberSince,
+        ]),
+      ];
+      const now = new Date();
+      const stamp = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0"), String(now.getHours()).padStart(2, "0"), String(now.getMinutes()).padStart(2, "0"), String(now.getSeconds()).padStart(2, "0")].join("");
+      await writeExcelFile(rows).toFile(`bvhub-members-${stamp}.xlsx`);
+    } catch {
+      setExportError(true);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflow: "hidden" }}>
@@ -99,17 +139,22 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
           </button>
           <div className="min-w-0 flex-1">
             <h1 className="page-title">{t("admin.members.title")}</h1>
-            <p className="text-[10px] text-[var(--muted-foreground)]">{t("admin.members.count", { count: membersQuery.data?.totalItems ?? 0 })}</p>
+            <p className="text-[10px] text-[var(--muted-foreground)]">{t("admin.members.count", { count: hasFilter ? filtered.length : membersQuery.data?.totalItems ?? 0 })}</p>
           </div>
-          <button onClick={() => setFilterOpen(true)} aria-label={t("common.filter")}
-            className={`relative h-9 w-9 rounded-full flex items-center justify-center transition-colors ${hasFilter ? "bg-[var(--primary)] text-white" : "hover:bg-[var(--muted)] text-[var(--muted-foreground)]"}`}>
-            <Icon d={ic.filter} size={16} />
-            {hasFilter && (
-              <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-[var(--card)]">
-                {filterGroups.length}
-              </span>
-            )}
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button type="button" variant="outline" size="sm" className="hidden lg:inline-flex" onClick={() => void exportMembers()} disabled={exporting} data-testid="export-members">
+              <Download size={15} aria-hidden="true" />{exporting ? t("admin.members.exporting") : t("admin.members.exportExcel")}
+            </Button>
+            <button onClick={() => setFilterOpen(true)} aria-label={t("common.filter")}
+              className={`relative h-9 w-9 rounded-full flex items-center justify-center transition-colors ${hasFilter ? "bg-[var(--primary)] text-white" : "hover:bg-[var(--muted)] text-[var(--muted-foreground)]"}`}>
+              <Icon d={ic.filter} size={16} />
+              {hasFilter && (
+                <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-[var(--card)]">
+                  {filterGroups.length}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
         <div className="px-4 pb-3">
           <div className="relative">
@@ -131,6 +176,7 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
               })}
             </div>
           )}
+          {exportError && <p role="alert" className="mt-2 text-xs text-red-600">{t("admin.members.exportError")}</p>}
         </div>
       </div>
 

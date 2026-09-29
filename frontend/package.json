@@ -28,6 +28,7 @@
     "react-router-dom": "7.18.3",
     "recharts": "3.8.0",
     "tailwind-merge": "^3.7.0",
+    "write-excel-file": "^4.1.1",
     "zod": "^3.25.76"
   },
   "devDependencies": {
