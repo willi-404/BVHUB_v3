@@ -44,6 +44,7 @@ routerAdd("POST", "/api/bvhub/events/{id}/registrations", (e) => {
     if (!current || previousStatus === "CANCELLED") {
       const position = status === "WAITING" ? registrations.waitingRegistrations(txApp, txEvent).findIndex((waiting) => waiting.id === record.id) + 1 : null;
       registrations.queueNotification(txApp, record, txUser, txEvent, txVenue, status === "WAITING" ? "EVENT_WAITING_LIST_JOINED" : "EVENT_REGISTRATION_CONFIRMED", now, position ? { position } : {}, notificationIds);
+      require(`${__hooks}/admin-service.js`).audit(txApp, txUser.id, txUser.id, "EVENT_REGISTERED", { eventId: txEvent.id, eventTitle: txEvent.getString("title"), status });
     }
   });
   registrations.deliverNotifications($app, notificationIds);
@@ -71,7 +72,9 @@ routerAdd("DELETE", "/api/bvhub/events/{id}/registrations/me", (e) => {
     const txUser = api.userRecord(txApp, user.id);
     const record = registrations.registrationFor(txApp, txEvent, txUser);
     const now = api.nowIso();
-    result = registrations.cancelRegistration(txApp, txEvent, txUser, record, now, notificationIds).record;
+    const cancelled = registrations.cancelRegistration(txApp, txEvent, txUser, record, now, notificationIds);
+    result = cancelled.record;
+    if (cancelled.previous) require(`${__hooks}/admin-service.js`).audit(txApp, txUser.id, txUser.id, "EVENT_CANCELLED", { eventId: txEvent.id, eventTitle: txEvent.getString("title"), previousStatus: cancelled.previous });
   });
   registrations.deliverNotifications($app, notificationIds);
   return e.json(200, result ? registrations.registrationDto(result) : { status: "CANCELLED" });
@@ -144,7 +147,7 @@ routerAdd("POST", "/api/bvhub/admin/events/{id}/participants", (e) => {
     txApp.save(registration); result = registration;
     payments.ensurePaymentForRegistration(txApp, registration, txTarget, txEvent);
     registrations.queueNotification(txApp, registration, txTarget, txEvent, txVenue, "EVENT_ADMIN_ADDED", now, {}, notificationIds);
-    const audit = new Record(txApp.findCollectionByNameOrId("audit_events")); audit.set("eventType", "PARTICIPANT_ADDED"); audit.set("actorUser", admin.id); audit.set("targetUser", target.id); audit.set("metadata", JSON.stringify({ eventId: txEvent.id })); txApp.save(audit);
+    require(`${__hooks}/admin-service.js`).audit(txApp, admin.id, target.id, "PARTICIPANT_ADDED", { eventId: txEvent.id, eventTitle: txEvent.getString("title") });
   });
   registrations.deliverNotifications($app, notificationIds);
   return e.json(201, { registrationId: result.id, userId: target.id, status: result.getString("status") });
@@ -169,7 +172,7 @@ routerAdd("DELETE", "/api/bvhub/admin/events/{id}/participants/{userId}", (e) =>
     if (!current || current.getString("status") !== "REGISTERED") { result = current; return; }
     const now = api.nowIso();
     result = registrations.cancelRegistration(txApp, txEvent, txTarget, current, now, notificationIds, "EVENT_ADMIN_REMOVED").record;
-    const audit = new Record(txApp.findCollectionByNameOrId("audit_events")); audit.set("eventType", "PARTICIPANT_REMOVED"); audit.set("actorUser", admin.id); audit.set("targetUser", target.id); audit.set("metadata", JSON.stringify({ eventId: event.id })); txApp.save(audit);
+    require(`${__hooks}/admin-service.js`).audit(txApp, admin.id, target.id, "PARTICIPANT_REMOVED", { eventId: txEvent.id, eventTitle: txEvent.getString("title") });
   });
   registrations.deliverNotifications($app, notificationIds);
   return e.json(200, { status: result ? result.getString("status") : "CANCELLED" });

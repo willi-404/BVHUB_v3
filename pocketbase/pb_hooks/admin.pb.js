@@ -31,6 +31,7 @@ routerAdd("PUT", "/api/bvhub/admin/users/{id}/groups", (e) => {
   const ids = service.targetGroupIds($app, payload.groups);
 
   $app.runInTransaction((txApp) => {
+    const previousGroups = service.groupsFor(txApp, target.id).map((group) => group.name);
     txApp.findRecordsByFilter("user_groups", `user = '${target.id}'`, "", 100, 0).forEach((assignment) => txApp.delete(assignment));
     ids.forEach((groupId) => {
       const assignment = new Record(txApp.findCollectionByNameOrId("user_groups"));
@@ -38,7 +39,8 @@ routerAdd("PUT", "/api/bvhub/admin/users/{id}/groups", (e) => {
       assignment.set("group", groupId);
       txApp.save(assignment);
     });
-    service.audit(txApp, current.id, target.id, "USER_GROUPS_CHANGED");
+    const groups = service.groupsFor(txApp, target.id).map((group) => group.name);
+    service.audit(txApp, current.id, target.id, "USER_GROUPS_CHANGED", { previousGroups, groups });
   });
   return e.json(200, service.userDto($app, service.findUser($app, targetId)));
 }, $apis.requireAuth("users"));
@@ -63,7 +65,7 @@ routerAdd("PATCH", "/api/bvhub/admin/users/{id}/role", (e) => {
   const tokenKey = target.getString("tokenKey");
   $app.runInTransaction((txApp) => {
     txApp.db().newQuery("UPDATE users SET role = {:role}, tokenKey = {:tokenKey} WHERE id = {:id}").bind({ role: payload.role, tokenKey, id: targetId }).execute();
-    service.audit(txApp, current.id, targetId, "USER_ROLE_CHANGED");
+    service.audit(txApp, current.id, targetId, "USER_ROLE_CHANGED", { previousRole, role: payload.role });
   });
   return e.json(200, service.userDto($app, service.findUser($app, targetId)));
 }, $apis.requireAuth("users"));

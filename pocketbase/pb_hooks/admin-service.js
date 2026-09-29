@@ -97,9 +97,7 @@ function audit(app, actorId, targetId, eventType, metadata) {
   record.set("eventType", eventType);
   record.set("actorUser", actorId);
   record.set("targetUser", targetId);
-  if (metadata !== undefined) {
-    try { record.set("metadata", JSON.stringify(metadata)); } catch (_) {}
-  }
+  if (metadata !== undefined) record.set("metadata", JSON.stringify(metadata));
   app.save(record);
 }
 

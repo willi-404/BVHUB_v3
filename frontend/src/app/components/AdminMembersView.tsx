@@ -151,7 +151,7 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
                 <thead>
                   <tr className="border-b border-[var(--border)] bg-[var(--muted)]/50">
                     {["admin.members.avatar", "admin.members.memberId", "admin.members.displayName", "profile.firstName", "profile.lastName", "auth.email", "profile.role", "profile.groups", "admin.members.memberSince"].map((h) => (
-                      <th key={h} className="text-left text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wide px-4 py-3">{t(h as MessageKey)}</th>
+                      <th key={h} className="sticky top-0 z-10 bg-[var(--muted)] text-left text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wide px-4 py-3">{t(h as MessageKey)}</th>
                     ))}
                   </tr>
                 </thead>

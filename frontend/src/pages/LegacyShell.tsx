@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Link, Outlet, useLocation, useNavigate, useOutletContext } from "react-router-dom";
-import { ImagePlus, Trash2 } from "lucide-react";
+import { ArrowLeft, ClipboardList, ImagePlus, Trash2 } from "lucide-react";
 import { Badge } from "../app/components/ui/badge";
 import { Button } from "../app/components/ui/button";
 import { Card, CardContent } from "../app/components/ui/card";
@@ -28,6 +28,7 @@ import EventListPage from "./EventListPage";
 import { useNews } from "../features/news/hooks/useNews";
 import AnnouncementCenter, { NotificationButton } from "../features/announcements/components/AnnouncementCenter";
 import { useAnnouncements } from "../features/announcements/hooks/useAnnouncements";
+import { AuditLogPanel } from "../features/auditLog/components/AuditLogPanel";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -86,6 +87,7 @@ export type MemberAppContext = {
   logout: () => void;
   canAccessAdmin: boolean;
   openNotifications: () => void;
+  openAuditLog: () => void;
   unreadNotificationCount: number;
 };
 
@@ -519,10 +521,10 @@ function LiveEventCards({ events }: { events: EventRecord[] }) {
   return <div className="flex max-h-[min(62vh,44rem)] flex-col gap-3 overflow-y-auto pr-1">{events.map((event) => <Card key={event.id} className="p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="break-words font-bold text-[var(--foreground)]">{event.title}</h3><p className="mt-1 break-words text-xs text-[var(--muted-foreground)]">{event.venue.name}</p></div><Badge variant={event.status === "CANCELLED" || event.status === "COMPLETED" ? "destructive" : "success"}>{t(`events.status.${event.status}` as MessageKey)}</Badge></div><div className="mt-3 grid gap-1 text-xs text-[var(--muted-foreground)] md:grid-cols-2"><span>{formatLocaleDateTime(event.start, locale)} - {formatLocaleDateTime(event.end, locale)}</span><span>{t("events.capacity")}: {event.registeredCount}/{event.capacity} ({event.spotsLeft} {t("events.spotsLeftLabel")})</span></div><Progress label={t("events.participantCount", { registered: event.registeredCount, capacity: event.capacity })} value={event.registeredCount} max={event.capacity} color={event.spotsLeft <= 0 ? "hsl(0, 84%, 60%)" : event.spotsLeft <= 3 ? "hsl(38, 92%, 50%)" : "hsl(142, 71%, 45%)"} className="mt-3" /><Link className="mt-3 inline-flex text-xs font-semibold text-[var(--primary)] underline" to={`/events/${encodeURIComponent(event.id)}`}>{t("events.details")}</Link></Card>)}</div>;
 }
 
-function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, canAccessAdmin, onOpenNotifications, unreadNotificationCount }: { profile: ProfileDto | null; onEditProfile: () => void; onLogout: () => void; onAdminMembers: () => void; canAccessAdmin: boolean; onOpenNotifications: () => void; unreadNotificationCount: number }) {
+function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, canAccessAdmin, onOpenNotifications, onOpenAuditLog, unreadNotificationCount }: { profile: ProfileDto | null; onEditProfile: () => void; onLogout: () => void; onAdminMembers: () => void; canAccessAdmin: boolean; onOpenNotifications: () => void; onOpenAuditLog: () => void; unreadNotificationCount: number }) {
   const { t, locale } = useI18n();
 
-  if (!profile) return <div className="flex flex-col gap-4"><Card><CardContent className="p-5"><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p className="text-sm text-[var(--muted-foreground)] mt-2">{t("profile.incompleteDetails")}</p><Button className="mt-4" onClick={onEditProfile}>{t("profile.edit")}</Button></CardContent></Card><Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 gap-2" onClick={onLogout}><Icon d={icons.logout} size={15} /> {t("auth.signOut")}</Button></div>;
+  if (!profile) return <div className="flex flex-col gap-4"><Card><CardContent className="p-5"><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p className="text-sm text-[var(--muted-foreground)] mt-2">{t("profile.incompleteDetails")}</p><Button className="mt-4" onClick={onEditProfile}>{t("profile.edit")}</Button></CardContent></Card><Button variant="outline" className="justify-start gap-3" onClick={onOpenAuditLog}><ClipboardList size={16} />{t("audit.open")}</Button><Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 gap-2" onClick={onLogout}><Icon d={icons.logout} size={15} /> {t("auth.signOut")}</Button></div>;
   const initials = `${profile.user.firstName[0] || ""}${profile.user.lastName[0] || ""}`.toUpperCase() || "?";
   const address = profile.profile ? `${profile.profile.street} ${profile.profile.houseNumber}, ${profile.profile.postalCode} ${profile.profile.city}` : t("profile.incomplete");
   const localizedBirthDate = profile.profile?.birthDate ? formatLocaleDate(`${profile.profile.birthDate}T12:00:00Z`, locale) : "-";
@@ -543,6 +545,7 @@ function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, canAcce
           {[
             { label: t("profile.edit"), icon: icons.pencil, action: onEditProfile },
             { label: t("common.notifications"), icon: icons.bell, action: onOpenNotifications },
+            { label: t("audit.open"), icon: icons.clipboardList, action: onOpenAuditLog },
           ].map((item, i, arr) => (
             <div key={item.label}>
               <button onClick={item.action} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--muted)] text-left transition-colors">
@@ -573,6 +576,19 @@ function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, canAcce
       </Button>
     </div>
   );
+}
+
+function MyAuditLogOverlay({ onClose }: { onClose: () => void }) {
+  const { t } = useI18n();
+  return <div className="fixed inset-0 z-[100] flex flex-col bg-[var(--background)]">
+    <header className="flex items-center gap-3 border-b border-[var(--border)] bg-[var(--card)] px-4 py-4">
+      <Button variant="ghost" size="icon" onClick={onClose} aria-label={t("common.back")}><ArrowLeft size={18} /></Button>
+      <h1 className="text-base font-semibold">{t("audit.title")}</h1>
+    </header>
+    <main className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
+      <div className="mx-auto w-full max-w-3xl"><AuditLogPanel /></div>
+    </main>
+  </div>;
 }
 
 // ─── Navigation ────────────────────────────────────────────────────────────────
@@ -929,6 +945,7 @@ export function AppShell({ initialTab = "dashboard", onLogout, routeContent = fa
   const [events, setEvents] = useState<Event[]>(EVENTS);
   const [cardOpen, setCardOpen] = useState(false);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [auditLogOpen, setAuditLogOpen] = useState(false);
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const mobileNavigationTrigger = useRef<HTMLButtonElement>(null);
@@ -965,6 +982,7 @@ export function AppShell({ initialTab = "dashboard", onLogout, routeContent = fa
     logout,
     canAccessAdmin,
     openNotifications: () => setNotificationsOpen(true),
+    openAuditLog: () => setAuditLogOpen(true),
     unreadNotificationCount: announcements.data?.unreadCount ?? 0,
   };
 
@@ -999,7 +1017,7 @@ export function AppShell({ initialTab = "dashboard", onLogout, routeContent = fa
       case "profile":
         if (profileLoading) return <div><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p className="mt-2 text-sm text-[var(--muted-foreground)]">{t("profile.loading")}</p></div>;
         if (profileError) return <Card><CardContent className="p-5"><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p role="alert" className="mt-2 text-sm text-red-600">{t("profile.loadError")}</p><Button className="mt-4" onClick={() => void refetchProfile()}>{t("common.retry")}</Button></CardContent></Card>;
-        return <ProfileView profile={profile || null} onEditProfile={() => setEditProfileOpen(true)} onLogout={logout} onAdminMembers={() => navigate(routes.adminMembers)} canAccessAdmin={canAccessAdmin} onOpenNotifications={() => setNotificationsOpen(true)} unreadNotificationCount={announcements.data?.unreadCount ?? 0} />;
+        return <ProfileView profile={profile || null} onEditProfile={() => setEditProfileOpen(true)} onLogout={logout} onAdminMembers={() => navigate(routes.adminMembers)} canAccessAdmin={canAccessAdmin} onOpenNotifications={() => setNotificationsOpen(true)} onOpenAuditLog={() => setAuditLogOpen(true)} unreadNotificationCount={announcements.data?.unreadCount ?? 0} />;
     }
   }
 
@@ -1048,6 +1066,7 @@ export function AppShell({ initialTab = "dashboard", onLogout, routeContent = fa
 
         {cardOpen && <MemberCardOverlay onClose={() => setCardOpen(false)} />}
         {editProfileOpen && <EditProfileOverlay onClose={() => setEditProfileOpen(false)} />}
+        {auditLogOpen && <MyAuditLogOverlay onClose={() => setAuditLogOpen(false)} />}
         <AnnouncementCenter open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
 
       </div>
@@ -1077,11 +1096,11 @@ export function HomePageContent() {
 }
 
 export function ProfilePageContent() {
-  const { profile, profileLoading, profileError, refetchProfile, logout, canAccessAdmin, openProfileEditor, openNotifications, unreadNotificationCount } = useOutletContext<MemberAppContext>();
+  const { profile, profileLoading, profileError, refetchProfile, logout, canAccessAdmin, openProfileEditor, openNotifications, openAuditLog, unreadNotificationCount } = useOutletContext<MemberAppContext>();
   const { t } = useI18n();
   const navigate = useNavigate();
 
   if (profileLoading) return <div><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p className="mt-2 text-sm text-[var(--muted-foreground)]">{t("profile.loading")}</p></div>;
   if (profileError) return <Card><CardContent className="p-5"><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p role="alert" className="mt-2 text-sm text-red-600">{t("profile.loadError")}</p><Button className="mt-4" onClick={() => void refetchProfile()}>{t("common.retry")}</Button></CardContent></Card>;
-  return <ProfileView profile={profile} onEditProfile={openProfileEditor} onLogout={logout} onAdminMembers={() => navigate(routes.adminMembers)} canAccessAdmin={canAccessAdmin} onOpenNotifications={openNotifications} unreadNotificationCount={unreadNotificationCount} />;
+  return <ProfileView profile={profile} onEditProfile={openProfileEditor} onLogout={logout} onAdminMembers={() => navigate(routes.adminMembers)} canAccessAdmin={canAccessAdmin} onOpenNotifications={openNotifications} onOpenAuditLog={openAuditLog} unreadNotificationCount={unreadNotificationCount} />;
 }

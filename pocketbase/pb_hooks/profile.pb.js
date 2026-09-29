@@ -29,6 +29,18 @@ routerAdd("PATCH", "/api/bvhub/me/profile", (e) => {
       updatedProfile = api.findProfile(txApp, authUser.id);
       const profileFields = ["street", "houseNumber", "postalCode", "city", "birthDate", "phone", "contactInfo"];
       const submittedProfileFields = profileFields.filter((key) => Object.hasOwn(value, key));
+      const changes = {};
+
+      ["displayName", "firstName", "lastName"].forEach((key) => {
+        if (!Object.hasOwn(value, key)) return;
+        const oldValue = updatedUser.getString(key);
+        if (oldValue !== value[key]) changes[key] = { old: oldValue, new: value[key] };
+      });
+      submittedProfileFields.forEach((key) => {
+        const storedValue = updatedProfile ? updatedProfile.getString(key) : "";
+        const oldValue = key === "birthDate" ? storedValue.slice(0, 10) : storedValue;
+        if (oldValue !== value[key]) changes[key] = { old: oldValue, new: value[key] };
+      });
 
       if (!updatedProfile && submittedProfileFields.length > 0) {
         const required = ["street", "houseNumber", "postalCode", "city", "birthDate"];
@@ -46,6 +58,9 @@ routerAdd("PATCH", "/api/bvhub/me/profile", (e) => {
         if (Object.hasOwn(value, key)) updatedUser.set(key, value[key]);
       });
       txApp.save(updatedUser);
+      if (Object.keys(changes).length) {
+        require(`${__hooks}/admin-service.js`).audit(txApp, authUser.id, authUser.id, "USER_PROFILE_UPDATED", { changes });
+      }
     });
   } catch (error) {
     if (error && (error.status === 400 || error.status === 409)) throw error;
