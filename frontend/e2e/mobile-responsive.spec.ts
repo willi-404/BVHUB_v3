@@ -168,6 +168,8 @@ async function mockSession(
               lastName: user.lastName,
             },
           ],
+          waitlist: [{ registrationId: "waiting-1", displayName: "Waiting member", avatar: null, position: 2 }],
+          myWaitlistPosition: 2,
           totalItems: 1,
         },
       })
@@ -201,6 +203,19 @@ test.describe("responsive application shell", () => {
     const participantAvatar = page.locator('img[src*="/api/files/user_avatars/"][src*="thumb=64x64"]')
     await expect(participantAvatar).toBeVisible()
     await expect(participantAvatar).toHaveAttribute("src", /token=file-token/)
+    await expectNoHorizontalOverflow(page)
+  })
+
+  test("shows the accessible capacity and waitlist position on a phone", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    await mockSession(page, { event: eventRecord({ capacity: 5, registeredCount: 2, spotsLeft: 3, myRegistrationStatus: "WAITING" }) })
+    await page.goto("/events/responsive-event")
+    await expect(page.getByRole("progressbar", { name: "2/5 participants" })).toHaveAttribute("aria-valuenow", "2")
+    await expect(page.getByText("Your waitlist position: 2")).toBeVisible()
+    await expect(page.getByText("Position 2")).toBeVisible()
+    await expectNoHorizontalOverflow(page)
+    await page.goto("/home")
+    await expect(page.getByRole("progressbar", { name: "2/5 participants" })).toBeVisible()
     await expectNoHorizontalOverflow(page)
   })
 

@@ -1,5 +1,5 @@
 import { pb } from "../../../lib/pocketbase"
-import type { EventInput, EventParticipant, EventRecord, Venue } from "../types"
+import type { EventInput, EventParticipants, EventRecord, Venue } from "../types"
 export async function getEvents(showAll = false): Promise<EventRecord[]> {
   const result = await pb.send<{ items: EventRecord[] }>(`/api/bvhub/events${showAll ? "?showAll=true" : ""}`, {
     method: "GET",
@@ -68,8 +68,8 @@ export async function cancelRegistration(id: string) {
 }
 export async function getParticipants(
   id: string,
-): Promise<{ items: EventParticipant[]; totalItems: number }> {
-  return pb.send<{ items: EventParticipant[]; totalItems: number }>(
+): Promise<EventParticipants> {
+  return pb.send<EventParticipants>(
     `/api/bvhub/events/${encodeURIComponent(id)}/participants`,
     { method: "GET" },
   )
