@@ -1,5 +1,6 @@
 import { pb } from "../../../lib/pocketbase";
 import type { Member, Group } from "../../../app/components/shared/MemberTypes";
+import type { AdminMemberDetails } from "../../memberCardScanner/types";
 
 export interface MemberFilters { page?: number; perPage?: number; search?: string; }
 export interface MemberListResult { items: Member[]; page: number; perPage: number; totalItems: number; totalPages: number; }
@@ -26,4 +27,8 @@ export async function getAllMembers(search: string): Promise<Member[]> {
     items.push(...(await getMembers({ search, page, perPage: 100 })).items);
   }
   return items;
+}
+
+export async function getMemberDetails(id: string): Promise<AdminMemberDetails> {
+  return pb.send<AdminMemberDetails>(`/api/bvhub/admin/users/${encodeURIComponent(id)}`, { method: "GET" });
 }

@@ -13,8 +13,13 @@ export type AdminMemberDetails = {
   memberSince: string;
   groups: Array<{ id: string; name: string }>;
   address: string;
+  street: string;
+  houseNumber: string;
+  postalCode: string;
+  city: string;
   birthDate: string;
   phone: string;
+  contactInfo: string;
 };
 
 export type AdminMemberCardScanResult =

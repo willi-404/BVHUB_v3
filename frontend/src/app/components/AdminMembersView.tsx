@@ -5,7 +5,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Member, Group, groupConfig, initials } from "./shared/MemberTypes";
 import { MemberDetailPopup } from "./shared/MemberDetailPopup";
-import { getAllMembers } from "../../features/members/api/getMembers";
+import { getAllMembers, getMemberDetails } from "../../features/members/api/getMembers";
 import { useMembers } from "../../features/members/hooks/useMembers";
 import { useI18n, type MessageKey } from "../../i18n";
 
@@ -105,18 +105,41 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
     setExportError(false);
     try {
       const members = (await getAllMembers(search)).filter((member) => matchesGroups(member, filterGroups));
+      const details = await Promise.all(members.map((member) => getMemberDetails(member.id)));
       const groupLabels: Record<string, MessageKey> = { "Member ER": "groups.memberER", "Member NUE": "groups.memberNUE", Guest: "groups.guest" };
+      const roleLabel = (role: string) => t((roleConfig[role as keyof typeof roleConfig] ?? roleConfig.GUEST).key);
+      const activeLabel = (active: boolean) => t(active ? "profile.active" : "profile.inactive");
+      const verifiedLabel = (verified: boolean) => t(verified ? "profile.verified" : "profile.unverified");
+      const columns: MessageKey[] = [
+        "admin.members.memberId", "admin.members.username", "admin.members.displayName", "profile.firstName", "profile.lastName", "auth.email",
+        "profile.role", "profile.active", "profile.verified", "profile.groups", "admin.members.memberSince",
+        "profile.createdAt", "profile.updatedAt", "profile.birthDate", "profile.street", "profile.houseNumber",
+        "profile.postalCode", "profile.city", "profile.address", "profile.phone", "profile.contactInfo",
+      ];
       const rows = [
-        ["admin.members.memberId", "admin.members.displayName", "profile.firstName", "profile.lastName", "auth.email", "profile.role", "profile.groups", "admin.members.memberSince"].map((key) => t(key as MessageKey)),
-        ...members.map((member) => [
+        columns.map((key) => t(key)),
+        ...details.map((member) => [
           member.id,
-          member.displayName || member.username,
-          member.vorname,
-          member.nachname,
+          member.username,
+          member.displayName,
+          member.firstName,
+          member.lastName,
           member.email,
-          t(roleConfig[member.role ?? "GUEST"].key),
+          roleLabel(member.role),
+          activeLabel(member.active),
+          verifiedLabel(member.verified),
           member.groups?.map((group) => groupLabels[group.name] ? t(groupLabels[group.name]) : group.name).join(", ") || "-",
           member.memberSince,
+          member.created,
+          member.updated,
+          member.birthDate,
+          member.street,
+          member.houseNumber,
+          member.postalCode,
+          member.city,
+          member.address,
+          member.phone,
+          member.contactInfo,
         ]),
       ];
       const now = new Date();

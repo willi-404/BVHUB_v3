@@ -20,6 +20,14 @@ routerAdd("GET", "/api/bvhub/admin/users", (e) => {
   return e.json(200, { items, page, perPage, totalItems, totalPages: Math.max(1, Math.ceil(totalItems / perPage)) });
 }, $apis.requireAuth("users"));
 
+routerAdd("GET", "/api/bvhub/admin/users/{id}", (e) => {
+  const service = require(`${__hooks}/admin-service.js`);
+  service.actor(e);
+  const user = service.findUser($app, service.pathId(e));
+  if (user.getString("role") === "SUPER_ADMIN") throw new ForbiddenError("Dieser Benutzer darf nicht verwaltet werden");
+  return e.json(200, service.memberDetailDto($app, user));
+}, $apis.requireAuth("users"));
+
 routerAdd("PUT", "/api/bvhub/admin/users/{id}/groups", (e) => {
   const service = require(`${__hooks}/admin-service.js`);
   const current = service.actor(e);

@@ -80,13 +80,19 @@ function memberDetailDto(app, user) {
       city: record.getString("city"),
       birthDate: record.getString("birthDate").slice(0, 10),
       phone: record.getString("phone"),
+      contactInfo: record.getString("contactInfo"),
     };
   } catch (_) {}
   return {
     ...value,
+    street: profile?.street || "",
+    houseNumber: profile?.houseNumber || "",
+    postalCode: profile?.postalCode || "",
+    city: profile?.city || "",
     address: profile ? [profile.street, profile.houseNumber].filter(Boolean).join(" ") + (profile.postalCode || profile.city ? `, ${[profile.postalCode, profile.city].filter(Boolean).join(" ")}` : "") : "",
     birthDate: profile?.birthDate || "",
     phone: profile?.phone || "",
+    contactInfo: profile?.contactInfo || "",
     memberSince: value.created,
   };
 }

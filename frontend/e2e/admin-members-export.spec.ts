@@ -16,6 +16,7 @@ const token = `${Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toStr
 
 async function mockAdmin(page: Page) {
   const exportPages: string[] = []
+  const detailIds: string[] = []
   const members = Array.from({ length: 125 }, (_, index) => ({
     id: `member-${String(index).padStart(4, "0")}`,
     displayName: `Member ${index}`,
@@ -89,15 +90,38 @@ async function mockAdmin(page: Page) {
         },
       })
     }
+    if (url.pathname.startsWith("/api/bvhub/admin/users/")) {
+      const id = url.pathname.split("/").at(-1)!
+      const member = members.find((item) => item.id === id)!
+      detailIds.push(id)
+      return route.fulfill({
+        json: {
+          ...member,
+          username: member.displayName,
+          active: true,
+          verified: true,
+          updated: "2026-09-01T00:00:00.000Z",
+          memberSince: member.created,
+          street: "Test Street",
+          houseNumber: "42A",
+          postalCode: "91052",
+          city: "Erlangen",
+          address: "Test Street 42A, 91052 Erlangen",
+          birthDate: "1990-05-06",
+          phone: "+49 911 123456",
+          contactInfo: "Preferred contact information",
+        },
+      })
+    }
     return route.fulfill({ json: { items: [] } })
   })
-  return exportPages
+  return { exportPages, detailIds }
 }
 
 test("exports every member matching selected groups to a timestamped xlsx", async ({
   page,
 }) => {
-  const exportPages = await mockAdmin(page)
+  const { exportPages, detailIds } = await mockAdmin(page)
   await page.setViewportSize({ width: 1280, height: 720 })
   await page.goto("/admin/members")
   await page.getByPlaceholder("Search email, display name, or legal name").fill("Member")
@@ -116,4 +140,6 @@ test("exports every member matching selected groups to a timestamped xlsx", asyn
   expect(content.subarray(0, 2).toString()).toBe("PK")
   expect(content.byteLength).toBeGreaterThan(1000)
   expect(exportPages).toEqual(["1:member", "2:member"])
+  expect(detailIds).toHaveLength(84)
+  expect(new Set(detailIds).size).toBe(84)
 })
