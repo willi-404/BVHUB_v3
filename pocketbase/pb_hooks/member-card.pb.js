@@ -77,7 +77,7 @@ routerAdd("POST", "/api/bvhub/admin/member-card/verify", (e) => {
   if (user.getBool("active") !== true) return e.json(200, { status: "INVALID", reason: "INACTIVE_ACCOUNT" });
   if (user.getBool("verified") !== true) return e.json(200, { status: "INVALID", reason: "UNVERIFIED_ACCOUNT" });
 
-  const member = admin.memberDetailDto($app, user);
+  const member = admin.memberCardDto($app, user);
   const verifiedAt = new Date().toISOString();
   if (card.isCurrentMember($app, user)) return e.json(200, { status: "VALID_MEMBER", reason: null, member, tokenExpiresAt, verifiedAt });
   const reason = user.getString("role") === "GUEST" ? "GUEST_ACCOUNT" : "NO_ACTIVE_MEMBER_GROUP";

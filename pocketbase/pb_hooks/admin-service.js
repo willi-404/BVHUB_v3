@@ -97,6 +97,28 @@ function memberDetailDto(app, user) {
   };
 }
 
+function memberCardDto(app, user) {
+  const member = memberDetailDto(app, user);
+  return {
+    id: member.id,
+    username: member.username,
+    displayName: member.displayName,
+    firstName: member.firstName,
+    lastName: member.lastName,
+    email: member.email,
+    role: member.role,
+    active: member.active,
+    verified: member.verified,
+    created: member.created,
+    updated: member.updated,
+    groups: member.groups,
+    address: member.address,
+    birthDate: member.birthDate,
+    phone: member.phone,
+    memberSince: member.memberSince,
+  };
+}
+
 function audit(app, actorId, targetId, eventType, metadata) {
   const collection = app.findCollectionByNameOrId("audit_events");
   const record = new Record(collection);
@@ -118,4 +140,4 @@ function targetGroupIds(app, value) {
   return value;
 }
 
-module.exports = { MANAGED_GROUPS, MANAGED_ROLES, body, actor, findUser, groupRecords, groupsFor, userDto, memberDetailDto, audit, targetGroupIds, pathId };
+module.exports = { MANAGED_GROUPS, MANAGED_ROLES, body, actor, findUser, groupRecords, groupsFor, userDto, memberDetailDto, memberCardDto, audit, targetGroupIds, pathId };
