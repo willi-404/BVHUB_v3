@@ -4,8 +4,8 @@ Frontend des Badminton Vereins Erlangen. Die bestehenden Event-, Zahlungs- und A
 
 ## Voraussetzungen
 
-- Node.js 22
-- pnpm 10.34.3 (die Version ist in `frontend/.mise.toml` festgelegt)
+- Node.js 22.23.3 (die Version ist in `frontend/.mise.toml` festgelegt)
+- pnpm 12.9.1 (die Version ist in `frontend/.mise.toml` und `frontend/package.json` festgelegt)
 
 ## Lokal entwickeln
 
