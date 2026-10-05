@@ -11,8 +11,8 @@ Frontend des Badminton Vereins Erlangen. Die bestehenden Event-, Zahlungs- und A
 
 ```bash
 cd frontend
-pnpm install --frozen-lockfile
-pnpm dev
+corepack pnpm install --frozen-lockfile
+corepack pnpm dev
 ```
 
 Der Entwicklungsserver ist anschliessend unter `http://localhost:8443` erreichbar.
@@ -39,10 +39,10 @@ und müssen manuell im Dashboard oder per Migration gesetzt werden.
 
 ```bash
 cd frontend
-pnpm typecheck
-pnpm build
+corepack pnpm typecheck
+corepack pnpm build
 # oder beides zusammen
-pnpm check
+corepack pnpm check
 ```
 
 `pnpm check` führt Typecheck, die Auth-/Guard-Regressionstests und den Production-Build aus.
@@ -60,7 +60,7 @@ Labels und die Checkliste stehen in
 
 ```bash
 cd frontend
-pnpm preview
+corepack pnpm preview
 ```
 
 ## Deployment

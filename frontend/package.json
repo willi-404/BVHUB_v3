@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "pnpm typecheck && pnpm test && pnpm build",
+    "check": "corepack pnpm typecheck && corepack pnpm test && corepack pnpm build",
     "format": "oxfmt"
   },
   "dependencies": {

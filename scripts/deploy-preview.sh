@@ -5,9 +5,9 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 frontend_dir="$repo_root/frontend"
 
 cd "$frontend_dir"
-pnpm install --frozen-lockfile
-pnpm typecheck
-pnpm build
+corepack pnpm install --frozen-lockfile
+corepack pnpm typecheck
+corepack pnpm build
 
 deploy_host="${BVHUB_DEPLOY_HOST:-}"
 if [[ -z "$deploy_host" ]]; then

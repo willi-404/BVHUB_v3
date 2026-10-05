@@ -75,7 +75,7 @@ Dieses Repository verwendet PocketBase Server `0.40.1` und den PocketBase-JS-SDK
    ```bash
    cd frontend
    printf 'VITE_POCKETBASE_URL=http://127.0.0.1:18099\n' > .env.local
-   pnpm dev
+   corepack pnpm dev
    ```
 
 9. Die Anmeldung des BVHUB-Superadmins über den Passwort-Flow prüfen. OTP ist ausschließlich für aktive `GUEST`- und `MEMBER`-Konten vorgesehen; Passwortlogin ausschließlich für aktive `ADMIN`- und `SUPER_ADMIN`-Konten.
