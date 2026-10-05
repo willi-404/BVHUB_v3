@@ -80,14 +80,42 @@ function memberDetailDto(app, user) {
       city: record.getString("city"),
       birthDate: record.getString("birthDate").slice(0, 10),
       phone: record.getString("phone"),
+      contactInfo: record.getString("contactInfo"),
     };
   } catch (_) {}
   return {
     ...value,
+    street: profile?.street || "",
+    houseNumber: profile?.houseNumber || "",
+    postalCode: profile?.postalCode || "",
+    city: profile?.city || "",
     address: profile ? [profile.street, profile.houseNumber].filter(Boolean).join(" ") + (profile.postalCode || profile.city ? `, ${[profile.postalCode, profile.city].filter(Boolean).join(" ")}` : "") : "",
     birthDate: profile?.birthDate || "",
     phone: profile?.phone || "",
+    contactInfo: profile?.contactInfo || "",
     memberSince: value.created,
+  };
+}
+
+function memberCardDto(app, user) {
+  const member = memberDetailDto(app, user);
+  return {
+    id: member.id,
+    username: member.username,
+    displayName: member.displayName,
+    firstName: member.firstName,
+    lastName: member.lastName,
+    email: member.email,
+    role: member.role,
+    active: member.active,
+    verified: member.verified,
+    created: member.created,
+    updated: member.updated,
+    groups: member.groups,
+    address: member.address,
+    birthDate: member.birthDate,
+    phone: member.phone,
+    memberSince: member.memberSince,
   };
 }
 
@@ -97,9 +125,7 @@ function audit(app, actorId, targetId, eventType, metadata) {
   record.set("eventType", eventType);
   record.set("actorUser", actorId);
   record.set("targetUser", targetId);
-  if (metadata !== undefined) {
-    try { record.set("metadata", JSON.stringify(metadata)); } catch (_) {}
-  }
+  if (metadata !== undefined) record.set("metadata", JSON.stringify(metadata));
   app.save(record);
 }
 
@@ -114,4 +140,4 @@ function targetGroupIds(app, value) {
   return value;
 }
 
-module.exports = { MANAGED_GROUPS, MANAGED_ROLES, body, actor, findUser, groupRecords, groupsFor, userDto, memberDetailDto, audit, targetGroupIds, pathId };
+module.exports = { MANAGED_GROUPS, MANAGED_ROLES, body, actor, findUser, groupRecords, groupsFor, userDto, memberDetailDto, memberCardDto, audit, targetGroupIds, pathId };

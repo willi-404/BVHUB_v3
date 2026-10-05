@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ArrowLeft, ClipboardList } from "lucide-react";
 import { Member, groupConfig, initials } from "./MemberTypes";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
@@ -9,6 +10,7 @@ import { useAuthUser } from "../../../features/auth/AuthProvider";
 import { canManageMemberGroups, canManageMemberRole } from "../../../features/members/policy";
 import type { Role } from "../../../features/auth/policy";
 import { useI18n } from "../../../i18n";
+import { AuditLogPanel } from "../../../features/auditLog/components/AuditLogPanel";
 
 function Icon({ d, size = 18, className = "" }: { d: string; size?: number; className?: string }) {
   return (
@@ -88,6 +90,7 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
   const [available, setAvailable] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [showAuditLog, setShowAuditLog] = useState(false);
   const canManageGroups = canManageMemberGroups(currentUser?.role, role);
   const canManageRole = canManageMemberRole(currentUser?.role, role);
   const localizedRole = role === "SUPER_ADMIN" ? t("roles.superAdmin") : role === "ADMIN" ? t("roles.admin") : role === "MEMBER" ? t("roles.member") : t("roles.guest");
@@ -154,6 +157,10 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
 
         {/* Body */}
         <div className="overflow-y-auto flex-1 px-5 py-4">
+          {showAuditLog ? <div className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold">{t("audit.title")}</h2>
+            <AuditLogPanel memberId={member.id} />
+          </div> :
           <div className="flex flex-col gap-4">
             <Section title={t("profile.identity")}>
               <Row icon={ic.shield}   label={t("admin.members.memberId")}   value={member.id} mono />
@@ -199,10 +206,11 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
                 </Section>
               </>
             )}
-          </div>
+          </div>}
         </div>
 
         <div className="px-5 py-3 border-t border-[var(--border)] shrink-0">
+          {showAuditLog ? <Button variant="outline" className="mb-2 w-full" onClick={onClose}><ArrowLeft size={16} />{t("audit.backToMembers")}</Button> : <Button variant="outline" className="mb-2 w-full" onClick={() => setShowAuditLog(true)}><ClipboardList size={16} />{t("audit.open")}</Button>}
           <Button variant="outline" className="w-full" onClick={onClose}>{t("common.close")}</Button>
         </div>
       </div>

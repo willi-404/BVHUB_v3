@@ -20,6 +20,14 @@ routerAdd("GET", "/api/bvhub/admin/users", (e) => {
   return e.json(200, { items, page, perPage, totalItems, totalPages: Math.max(1, Math.ceil(totalItems / perPage)) });
 }, $apis.requireAuth("users"));
 
+routerAdd("GET", "/api/bvhub/admin/users/{id}", (e) => {
+  const service = require(`${__hooks}/admin-service.js`);
+  service.actor(e);
+  const user = service.findUser($app, service.pathId(e));
+  if (user.getString("role") === "SUPER_ADMIN") throw new ForbiddenError("Dieser Benutzer darf nicht verwaltet werden");
+  return e.json(200, service.memberDetailDto($app, user));
+}, $apis.requireAuth("users"));
+
 routerAdd("PUT", "/api/bvhub/admin/users/{id}/groups", (e) => {
   const service = require(`${__hooks}/admin-service.js`);
   const current = service.actor(e);
@@ -31,6 +39,7 @@ routerAdd("PUT", "/api/bvhub/admin/users/{id}/groups", (e) => {
   const ids = service.targetGroupIds($app, payload.groups);
 
   $app.runInTransaction((txApp) => {
+    const previousGroups = service.groupsFor(txApp, target.id).map((group) => group.name);
     txApp.findRecordsByFilter("user_groups", `user = '${target.id}'`, "", 100, 0).forEach((assignment) => txApp.delete(assignment));
     ids.forEach((groupId) => {
       const assignment = new Record(txApp.findCollectionByNameOrId("user_groups"));
@@ -38,7 +47,8 @@ routerAdd("PUT", "/api/bvhub/admin/users/{id}/groups", (e) => {
       assignment.set("group", groupId);
       txApp.save(assignment);
     });
-    service.audit(txApp, current.id, target.id, "USER_GROUPS_CHANGED");
+    const groups = service.groupsFor(txApp, target.id).map((group) => group.name);
+    service.audit(txApp, current.id, target.id, "USER_GROUPS_CHANGED", { previousGroups, groups });
   });
   return e.json(200, service.userDto($app, service.findUser($app, targetId)));
 }, $apis.requireAuth("users"));
@@ -63,7 +73,7 @@ routerAdd("PATCH", "/api/bvhub/admin/users/{id}/role", (e) => {
   const tokenKey = target.getString("tokenKey");
   $app.runInTransaction((txApp) => {
     txApp.db().newQuery("UPDATE users SET role = {:role}, tokenKey = {:tokenKey} WHERE id = {:id}").bind({ role: payload.role, tokenKey, id: targetId }).execute();
-    service.audit(txApp, current.id, targetId, "USER_ROLE_CHANGED");
+    service.audit(txApp, current.id, targetId, "USER_ROLE_CHANGED", { previousRole, role: payload.role });
   });
   return e.json(200, service.userDto($app, service.findUser($app, targetId)));
 }, $apis.requireAuth("users"));

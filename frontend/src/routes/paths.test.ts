@@ -13,6 +13,7 @@ describe("canonical application routes", () => {
     expect(primaryTabForPath(routes.events)).toBe("events");
     expect(primaryTabForPath(routes.payments)).toBe("payments");
     expect(primaryTabForPath(routes.profile)).toBe("profile");
+    expect(primaryTabForPath(routes.profileLog)).toBe("profile");
   });
 
   it("keeps administrative destinations separate from member navigation", () => {
