@@ -124,7 +124,8 @@ function purge(app, request, now = new Date()) {
     const user = txApp.findRecordById("users", job.getString("user"));
     assertEligible(txApp, user);
     const deletedDate = require(`${__hooks}/notification-service.js`).berlinDate(now).toISOString().slice(0, 10);
-    const name = `${user.getString("displayName")} (${user.getString("firstName")} ${user.getString("lastName")})（此用户已于${deletedDate} 已删除）`;
+    const note = `（此用户已于${deletedDate} 已删除）`;
+    const name = `${user.getString("displayName")} (${user.getString("firstName")} ${user.getString("lastName")})${note}`;
     const registrations = findAll(txApp, "event_registrations", "user = {:user}", "", { user: user.id });
     for (const registration of registrations) {
       for (const notice of findAll(txApp, "notification_outbox", "registration = {:registration}", "", { registration: registration.id })) txApp.delete(notice);
@@ -133,6 +134,7 @@ function purge(app, request, now = new Date()) {
       if (["CANCELLED", "COMPLETED"].includes(event.getString("status")) && registration.getString("status") === "REGISTERED") {
         registration.set("user", "");
         registration.set("deletedParticipantName", name);
+        registration.set("deletedParticipantPublicName", `${user.getString("displayName")}${note}`);
         txApp.save(registration);
       } else txApp.delete(registration);
     }

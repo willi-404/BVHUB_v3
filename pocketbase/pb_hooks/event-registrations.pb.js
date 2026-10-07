@@ -92,6 +92,7 @@ routerAdd("GET", "/api/bvhub/events/{id}/participants", (e) => {
   const records = $app.findRecordsByFilter("event_registrations", `event = '${event.id}' && status = 'REGISTERED'`, "registeredAt", 10000, 0);
   const items = records.map((registration) => {
     if (!registration.getString("user")) {
+      if (!isAdmin) return { displayName: registration.getString("deletedParticipantPublicName"), avatar: null };
       return { registrationId: registration.id, userId: null, displayName: registration.getString("deletedParticipantName"), firstName: "", lastName: "", registeredAt: registration.getString("registeredAt"), avatar: null };
     }
     const target = api.userRecord($app, registration.getString("user"));

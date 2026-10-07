@@ -1342,6 +1342,8 @@ expectStatus(await request("POST", deletionPath, { token: guestLoginToken, body:
 expectStatus(await request("POST", deletionPath, { token: adminLogin.token, body: { confirmationId: "wrong-id" } }), 400, "incorrect confirmation ID is rejected");
 expectStatus(await request("POST", `/api/bvhub/admin/users/${member.id}/deletion`, { token: adminLogin.token, body: { confirmationId: member.id } }), 409, "member role is not deletable");
 expectStatus(await request("POST", deletionPath, { token: adminLogin.token, body: { confirmationId: deletionGuest.id } }), 409, "unpaid payment blocks deletion");
+expectStatus(await request("PATCH", `/api/collections/payments/records/${deletionPayment.id}`, { token: rootToken, body: { active: false } }), 200, "deactivate unpaid deletion payment");
+expectStatus(await request("POST", deletionPath, { token: adminLogin.token, body: { confirmationId: deletionGuest.id } }), 409, "inactive unpaid payment still blocks deletion");
 expectStatus(await request("PATCH", `/api/collections/payments/records/${deletionPayment.id}`, { token: rootToken, body: { status: "PAID" } }), 200, "mark deletion payment paid");
 expectStatus(await request("POST", deletionPath, { token: adminLogin.token, body: { confirmationId: deletionGuest.id } }), 409, "open event registration blocks deletion");
 expectStatus(await request("PATCH", `/api/collections/events/records/${deletionEvent.id}`, { token: rootToken, body: { status: "COMPLETED" } }), 200, "complete deletion event");
@@ -1396,6 +1398,9 @@ const preserved = expectStatus(await request("GET", `/api/bvhub/events/${deletio
 assert.equal(preserved.items.length, 1);
 assert.equal(preserved.items[0].userId, null);
 assert.match(preserved.items[0].displayName, /此用户已于\d{4}-\d{2}-\d{2} 已删除/);
+const publicPreserved = expectStatus(await request("GET", `/api/bvhub/events/${deletionEvent.id}/participants`, { token: memberLoginToken }), 200, "public historical participant list still loads");
+assert.equal(publicPreserved.items[0].displayName.includes("Delete Guest)"), false, "public historical participant hides private names");
+assert.match(publicPreserved.items[0].displayName, /^Delete Guest（此用户已于\d{4}-\d{2}-\d{2} 已删除）$/);
 assert.equal(expectStatus(await request("GET", `/api/collections/events/records/${deletionEvent.id}`, { token: rootToken }), 200, "read event after guest deletion").createdBy, "", "creator relation is cleared");
 const anonymizedChangelog = expectStatus(await request("GET", `/api/collections/event_changelog/records/${deletionChangelog.id}`, { token: rootToken }), 200, "read guest changelog after deletion");
 assert.equal(anonymizedChangelog.actor, "");
