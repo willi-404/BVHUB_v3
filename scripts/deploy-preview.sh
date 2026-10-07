@@ -15,6 +15,11 @@ if [[ -z "$deploy_host" ]]; then
   printf 'BVHUB_DEPLOY_HOST is not set; local build completed, deployment skipped.\n'
   exit 0
 fi
+public_host="${BVHUB_PUBLIC_HOST:-portal.bv-erlangen2025.de}"
+if ! curl --fail --silent --show-error --max-time 15 -X OPTIONS "$pocketbase_url/api/collections/users/auth-with-password" -H "Origin: https://$public_host" -H 'Access-Control-Request-Method: POST' -H 'Access-Control-Request-Headers: content-type,x-csrf-token' -D - -o /dev/null | tr -d '\r' | grep -Fxi "access-control-allow-origin: https://$public_host" >/dev/null; then
+  printf 'PocketBase does not allow frontend origin https://%s.\n' "$public_host" >&2
+  exit 1
+fi
 
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/bvhub-deploy.XXXXXX")"
 trap 'rm -rf "$tmp_dir"' EXIT
@@ -74,7 +79,6 @@ if [[ "$deploy_pocketbase" == "1" ]]; then
   ssh "$deploy_host" "set -eu; mkdir -p -- $pocketbase_root_q; tar -xzf $remote_backend_archive_q -C $pocketbase_root_q; sh -c $restart_command_q; rm -f -- $remote_backend_archive_q"
 fi
 
-public_host="${BVHUB_PUBLIC_HOST:-portal.bv-erlangen2025.de}"
 frontend_port="${BVHUB_FRONTEND_PORT:-23010}"
 expected_index_sha="$(sha256sum "$frontend_dir/dist/index.html" | awk '{print $1}')"
 rollback_frontend() {

@@ -76,3 +76,5 @@ export BVHUB_DEPLOY_HOST='root@SERVER_IP'
 Das Skript schaltet den Symlink `current` erst nach erfolgreichem Upload und Entpacken atomar um. Vorhandene Releases werden nicht automatisch geloescht.
 
 Das lokale, nicht versionierte `build_deploy.sh` bleibt der regulaere Ein-Kommando-Deploy fuer Frontend und geaenderten PocketBase-Code. Vor der ersten Ausfuehrung unter der neuen Domain muss in PocketBase die App URL `https://portal.bv-erlangen2025.de` gesetzt und die Verifikations-E-Mail geprueft sein.
+
+Auf dem Remote-Server muss zusaetzlich `PB_ALLOWED_ORIGINS=https://portal.bv-erlangen2025.de` in `/etc/bvhub-v3/pocketbase.env` gesetzt und `bvhub-v3-pocketbase.service` neu gestartet sein. Die App URL steuert E-Mail-Links; `PB_ALLOWED_ORIGINS` steuert separat, ob der Browser Login-Anfragen an `data-v3` senden darf. Beide Deployment-Skripte pruefen die erlaubte Origin vor dem Upload.
