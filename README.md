@@ -65,7 +65,7 @@ corepack pnpm preview
 
 ## Deployment
 
-Das dauerhafte Skript `scripts/deploy-preview.sh` installiert, prueft und baut lokal und uebertraegt danach nur `frontend/dist/` auf einen nativen Nginx-Server. Ohne `BVHUB_DEPLOY_HOST` wird nur der lokale Build ausgefuehrt.
+Das Skript `scripts/deploy-preview.sh` installiert, prueft und baut lokal und uebertraegt danach standardmaessig nur `frontend/dist/` auf den Server. Dort liefert Nginx das Frontend auf `127.0.0.1:23010` aus; der Cloudflare Tunnel auf demselben Server stellt es unter `portal.bv-erlangen2025.de` bereit. Ohne `BVHUB_DEPLOY_HOST` wird nur der lokale Build ausgefuehrt.
 
 ```bash
 export BVHUB_DEPLOY_HOST='root@SERVER_IP'
@@ -74,3 +74,5 @@ export BVHUB_DEPLOY_HOST='root@SERVER_IP'
 ```
 
 Das Skript schaltet den Symlink `current` erst nach erfolgreichem Upload und Entpacken atomar um. Vorhandene Releases werden nicht automatisch geloescht.
+
+Das lokale, nicht versionierte `build_deploy.sh` bleibt der regulaere Ein-Kommando-Deploy fuer Frontend und geaenderten PocketBase-Code. Vor der ersten Ausfuehrung unter der neuen Domain muss in PocketBase die App URL `https://portal.bv-erlangen2025.de` gesetzt und die Verifikations-E-Mail geprueft sein.

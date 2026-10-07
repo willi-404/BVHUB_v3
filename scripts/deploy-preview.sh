@@ -7,7 +7,8 @@ frontend_dir="$repo_root/frontend"
 cd "$frontend_dir"
 corepack pnpm install --frozen-lockfile
 corepack pnpm typecheck
-corepack pnpm build
+pocketbase_url="${BVHUB_POCKETBASE_URL:-https://data-v3.bv-erlangen2025.de}"
+VITE_POCKETBASE_URL="$pocketbase_url" corepack pnpm build
 
 deploy_host="${BVHUB_DEPLOY_HOST:-}"
 if [[ -z "$deploy_host" ]]; then
@@ -63,6 +64,7 @@ release_dir_q="$(printf '%q' "$release_dir")"
 remote_archive_q="$(printf '%q' "$remote_archive")"
 current_link_q="$(printf '%q' "$current_link")"
 staging_link_q="$(printf '%q' "$staging_link")"
+previous_link="$(ssh "$deploy_host" "if [ -L $current_link_q ]; then readlink -- $current_link_q; fi")"
 ssh "$deploy_host" "set -eu; mkdir -p -- $release_dir_q; tar -xzf $remote_archive_q -C $release_dir_q; ln -s -- $release_dir_q $staging_link_q; mv -Tf -- $staging_link_q $current_link_q; rm -f -- $remote_archive_q"
 
 if [[ "$deploy_pocketbase" == "1" ]]; then
@@ -72,10 +74,32 @@ if [[ "$deploy_pocketbase" == "1" ]]; then
   ssh "$deploy_host" "set -eu; mkdir -p -- $pocketbase_root_q; tar -xzf $remote_backend_archive_q -C $pocketbase_root_q; sh -c $restart_command_q; rm -f -- $remote_backend_archive_q"
 fi
 
-curl_args=(--fail --silent --show-error --location --max-time "${BVHUB_CURL_TIMEOUT:-15}")
-for url in "http://127.0.0.1:23010" "https://v2.bv-erlangen2025.de"; do
-  printf 'Checking %s\n' "$url"
-  curl "${curl_args[@]}" "$url" >/dev/null
-done
+public_host="${BVHUB_PUBLIC_HOST:-portal.bv-erlangen2025.de}"
+frontend_port="${BVHUB_FRONTEND_PORT:-23010}"
+expected_index_sha="$(sha256sum "$frontend_dir/dist/index.html" | awk '{print $1}')"
+rollback_frontend() {
+  if [[ -n "$previous_link" ]]; then
+    previous_link_q="$(printf '%q' "$previous_link")"
+    ssh "$deploy_host" "ln -sfn -- $previous_link_q $staging_link_q; mv -Tf -- $staging_link_q $current_link_q"
+  else
+    ssh "$deploy_host" "rm -f -- $current_link_q"
+  fi
+}
+printf 'Checking remote frontend on port %s\n' "$frontend_port"
+if ! ssh "$deploy_host" bash -s -- "$public_host" "$frontend_port" "$expected_index_sha" <<'REMOTE'
+set -euo pipefail
+actual_sha="$(curl --fail --silent --show-error --max-time 15 -H "Host: $1" "http://127.0.0.1:$2/" | sha256sum | awk '{print $1}')"
+[[ "$actual_sha" == "$3" ]]
+REMOTE
+then
+  printf 'Remote frontend content does not match this build.\n' >&2
+  rollback_frontend
+  exit 1
+fi
+printf 'Checking https://%s\n' "$public_host"
+if ! public_status="$(curl --fail --silent --show-error --max-time "${BVHUB_CURL_TIMEOUT:-15}" --output /dev/null --write-out '%{http_code}' "https://$public_host/?deploy=$release_name")" || [[ "$public_status" != "200" ]]; then
+  rollback_frontend
+  exit 1
+fi
 
 printf 'Deployment complete: %s\n' "$release_name"

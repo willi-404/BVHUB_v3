@@ -223,7 +223,7 @@ expectStatus(await request("PATCH", "/api/settings", {
   body: {
     ...settings,
     smtp: { ...settings.smtp, enabled: true, host: "127.0.0.1", port: smtpPort, username: "", password: "", authMethod: "", tls: false, localName: "bvhub-integration.test" },
-    meta: { ...settings.meta, appURL: "https://v2.bv-erlangen2025.de", senderName: "bvHub Test", senderAddress: "test@example.test" },
+    meta: { ...settings.meta, appURL: "https://portal.bv-erlangen2025.de", senderName: "bvHub Test", senderAddress: "test@example.test" },
   },
 }), 200, "configure isolated SMTP sink");
 
@@ -264,7 +264,8 @@ const registration = expectStatus(await request("POST", "/api/bvhub/register", {
   },
 }), 201, "guest registration");
 assert.equal(registration.email, "ne***@example.test", "registration response masks email");
-await waitForMail(registrationBeforeMail);
+const registrationMessage = await waitForMail(registrationBeforeMail);
+assert.match(registrationMessage, /https:\/\/portal\.bv-erlangen2025\.de\/verify-email\?token=/, "registration mail links to the production portal");
 
 const registeredUsers = expectStatus(await request(
   "GET",
