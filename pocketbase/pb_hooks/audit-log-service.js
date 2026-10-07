@@ -53,6 +53,8 @@ function list(e, targetUser) {
 
 function recordLogin(e, eventType, method) {
   if (!e.record) return;
+  const request = require(`${__hooks}/user-deletion-service.js`).requestFor(e.app, e.record.id);
+  if (request && ["EMAIL_PENDING", "SCHEDULED"].includes(request.getString("status"))) return;
   const service = require(`${__hooks}/admin-service.js`);
   const headers = e.requestInfo().headers || {};
   const userAgentKey = Object.keys(headers).find((key) => key.toLowerCase().replace(/_/g, "-") === "user-agent");

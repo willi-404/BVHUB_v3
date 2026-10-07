@@ -605,9 +605,7 @@ const transientDashboardGuest = expectStatus(await request("POST", "/api/collect
 }), 200, "create dashboard deletion boundary user");
 const dashboardAfterCreate = expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: memberLoginToken }), 200, "dashboard refreshes after user create");
 assert.equal(dashboardAfterCreate.current.registeredUsers, expectedRegisteredUsers + 1);
-expectStatus(await request("DELETE", `/api/collections/users/records/${transientDashboardGuest.id}`, { token: rootToken }), 204, "delete dashboard boundary user");
-const dashboardAfterDelete = expectStatus(await request("GET", "/api/bvhub/dashboard/statistics", { token: memberLoginToken }), 200, "dashboard refreshes after user delete");
-assert.equal(dashboardAfterDelete.current.registeredUsers, expectedRegisteredUsers);
+expectStatus(await request("DELETE", `/api/collections/users/records/${transientDashboardGuest.id}`, { token: rootToken }), 403, "generic user deletion is forbidden");
 
 // WU-05 routes must load their authorization helpers explicitly in the hook module.
 expectStatus(await request("GET", "/api/bvhub/admin/events"), 401, "unauthenticated admin event list");
@@ -1313,6 +1311,99 @@ if (serverLogPath) {
   const serverLog = fs.readFileSync(serverLogPath, "utf8");
   for (const rawToken of issuedRawMemberCardTokens) assert.equal(serverLog.includes(rawToken), false, "server logs contain no raw member-card token");
 }
+
+const deletionGuest = expectStatus(await request("POST", "/api/collections/users/records", {
+  token: rootToken, body: { ...userBody("deletion-guest@example.test", "GUEST"), displayName: "Delete Guest", firstName: "Delete", lastName: "Guest" },
+}), 200, "create deletion guest");
+expectStatus(await request("POST", "/api/collections/user_profiles/records", {
+  token: rootToken,
+  body: { user: deletionGuest.id, street: "Audit Street", houseNumber: "7", postalCode: "91052", city: "Erlangen", birthDate: "2000-01-01", phone: "123456", contactInfo: "Audit contact" },
+}), 200, "create deletion guest profile");
+const deletionEvent = expectStatus(await request("POST", "/api/collections/events/records", {
+  token: rootToken,
+  body: { title: "Deletion history event", description: "", venue: createdVenue.id, start: "2099-08-01T18:00:00.000Z", end: "2099-08-01T20:00:00.000Z", abmeldefrist: "2099-08-01T17:00:00.000Z", capacity: 10, guestFeeCents: 380, published: true, status: "OPEN_TO_ALL", createdBy: deletionGuest.id },
+}), 200, "create deletion history event");
+const deletionChangelog = expectStatus(await request("POST", "/api/collections/event_changelog/records", {
+  token: rootToken, body: { event: deletionEvent.id, action: "CREATED", actor: deletionGuest.id, actorName: "Delete Guest", actorRole: "GUEST", changes: { title: "Deletion history event" }, correlationId: "deletion-fixture" },
+}), 200, "create historical guest changelog");
+const deletionRegistration = expectStatus(await request("POST", "/api/collections/event_registrations/records", {
+  token: rootToken,
+  body: { event: deletionEvent.id, user: deletionGuest.id, status: "REGISTERED", registeredAt: "2099-07-01T12:00:00.000Z", checkoutRegion: "ER", termsVersion: "TEST", termsAcceptedAt: "2099-07-01T12:00:00.000Z" },
+}), 200, "create deletion registration");
+const deletionPayment = expectStatus(await request("POST", "/api/collections/payments/records", {
+  token: rootToken,
+  body: { registration: deletionRegistration.id, event: deletionEvent.id, user: deletionGuest.id, roleSnapshot: "GUEST", paymentRequired: true, amountCents: 380, status: "UNPAID", purpose: `DELETION-${deletionGuest.id}`, active: true },
+}), 200, "create unpaid deletion payment");
+expectStatus(await request("POST", "/api/collections/audit_events/records", {
+  token: rootToken, body: { actorUser: deletionGuest.id, targetUser: deletionGuest.id, eventType: "DELETION_FIXTURE", metadata: { detail: "complete-log-marker" } },
+}), 200, "create deletion audit entry");
+const deletionPath = `/api/bvhub/admin/users/${deletionGuest.id}/deletion`;
+expectStatus(await request("POST", deletionPath, { token: guestLoginToken, body: { confirmationId: deletionGuest.id } }), 403, "guest cannot delete accounts");
+expectStatus(await request("POST", deletionPath, { token: adminLogin.token, body: { confirmationId: "wrong-id" } }), 400, "incorrect confirmation ID is rejected");
+expectStatus(await request("POST", `/api/bvhub/admin/users/${member.id}/deletion`, { token: adminLogin.token, body: { confirmationId: member.id } }), 409, "member role is not deletable");
+expectStatus(await request("POST", deletionPath, { token: adminLogin.token, body: { confirmationId: deletionGuest.id } }), 409, "unpaid payment blocks deletion");
+expectStatus(await request("PATCH", `/api/collections/payments/records/${deletionPayment.id}`, { token: rootToken, body: { status: "PAID" } }), 200, "mark deletion payment paid");
+expectStatus(await request("POST", deletionPath, { token: adminLogin.token, body: { confirmationId: deletionGuest.id } }), 409, "open event registration blocks deletion");
+expectStatus(await request("PATCH", `/api/collections/events/records/${deletionEvent.id}`, { token: rootToken, body: { status: "COMPLETED" } }), 200, "complete deletion event");
+expectStatus(await request("POST", deletionPath, { token: adminLogin.token, body: { confirmationId: deletionGuest.id } }), 503, "sender mismatch blocks deletion");
+const failedDeletion = expectStatus(await request("GET", `/api/collections/user_deletion_requests/records?filter=${encodeURIComponent(`user = "${deletionGuest.id}"`)}`, { token: rootToken }), 200, "read failed deletion request").items[0];
+assert.equal(failedDeletion.status, "EMAIL_FAILED");
+assert.equal(expectStatus(await request("GET", `/api/collections/users/records/${deletionGuest.id}`, { token: rootToken }), 200, "failed deletion keeps account").active, true);
+const deletionMailSettings = expectStatus(await request("GET", "/api/settings", { token: rootToken }), 200, "read deletion mail settings");
+expectStatus(await request("PATCH", "/api/settings", {
+  token: rootToken, body: { ...deletionMailSettings, meta: { ...deletionMailSettings.meta, senderAddress: "noreply@bv-erlangen2025.de" } },
+}), 200, "configure required deletion sender");
+const deletionMailBefore = smtpMessages.length;
+const deletionStarted = expectStatus(await request("POST", deletionPath, { token: superLogin.token, body: { confirmationId: deletionGuest.id } }), 202, "superadmin starts deletion");
+assert.equal(deletionStarted.status, "SCHEDULED");
+assert.ok(Date.parse(deletionStarted.deleteAfter) - Date.now() > 23 * 60 * 60 * 1000, "deadline starts after accepted email");
+const deletionMail = await waitForMail(deletionMailBefore);
+assert.match(deletionMail, /audit-log-.*\.txt/, "audit log is attached as TXT");
+const attachmentSection = deletionMail.split(/Content-Disposition: attachment/i)[1];
+assert.ok(attachmentSection, "audit log has an attachment MIME part");
+const attachmentPayload = attachmentSection.split(/\n\n/)[1]?.split(/\n--/)[0].replace(/\s/g, "") || "";
+assert.match(Buffer.from(attachmentPayload, "base64").toString("utf8"), /complete-log-marker/, "TXT attachment contains the full audit record");
+assert.match(Buffer.from(attachmentPayload, "base64").toString("utf8"), /USER_DELETION_REQUESTED/, "TXT attachment includes the deletion request audit event");
+assert.match(deletionMail, /systeminfo: deleted user Delete Guest Delete Guest/, "deletion subject identifies the user");
+assert.match(deletionMail, /vorstand@bv-erlangen2025.de/, "deletion mail goes to the board");
+assert.match(deletionMail, /Audit Street/, "deletion mail includes the address");
+assert.match(deletionMail, new RegExp(superAdmin.id), "deletion mail identifies the requesting administrator");
+assert.equal(expectStatus(await request("GET", `/api/collections/users/records/${deletionGuest.id}`, { token: rootToken }), 200, "scheduled guest remains until deadline").active, false);
+expectStatus(await request("POST", deletionPath, { token: adminLogin.token, body: { confirmationId: deletionGuest.id } }), 409, "duplicate deletion request is rejected");
+expectStatus(await request("PATCH", `/api/collections/users/records/${deletionGuest.id}`, { token: rootToken, body: { active: true } }), 409, "scheduled account cannot be reactivated through API");
+expectStatus(await request("PATCH", `/api/bvhub/admin/payments/${deletionPayment.id}/status`, { token: adminLogin.token, body: { status: "UNPAID" } }), 409, "scheduled account payment is frozen");
+expectStatus(await request("PUT", `/api/bvhub/admin/users/${deletionGuest.id}/groups`, { token: adminLogin.token, body: { groups: [] } }), 409, "scheduled account groups are frozen");
+expectStatus(await request("DELETE", `/api/bvhub/admin/events/${deletionEvent.id}/participants/${deletionGuest.id}`, { token: adminLogin.token }), 409, "scheduled participant cannot be removed");
+expectStatus(await request("PATCH", `/api/bvhub/admin/events/${deletionEvent.id}`, { token: adminLogin.token, body: { status: "OPEN_TO_ALL" } }), 409, "event with scheduled participant cannot reopen");
+assert.equal(expectStatus(await request("GET", `/api/collections/payments/records/${deletionPayment.id}`, { token: rootToken }), 200, "read frozen payment").status, "PAID");
+assert.equal(expectStatus(await request("GET", `/api/collections/event_registrations/records/${deletionRegistration.id}`, { token: rootToken }), 200, "read frozen registration").status, "REGISTERED");
+const visibleMembers = expectStatus(await request("GET", "/api/bvhub/admin/users?perPage=100", { token: adminLogin.token }), 200, "read members after scheduling");
+assert.ok(!visibleMembers.items.some((user) => user.id === deletionGuest.id), "scheduled account is hidden from member list");
+const scheduledRequest = expectStatus(await request("GET", `/api/collections/user_deletion_requests/records/${failedDeletion.id}`, { token: rootToken }), 200, "read scheduled deletion request");
+expectStatus(await request("PATCH", `/api/collections/user_deletion_requests/records/${scheduledRequest.id}`, {
+  token: rootToken, body: { deleteAfter: new Date(Date.now() - 1000).toISOString() },
+}), 200, "advance deletion deadline in isolated integration database");
+let deleted = false;
+for (let attempt = 0; attempt < 70; attempt += 1) {
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  if ((await request("GET", `/api/collections/users/records/${deletionGuest.id}`, { token: rootToken })).status === 404) { deleted = true; break; }
+}
+if (!deleted) {
+  const blocked = await request("GET", `/api/collections/user_deletion_requests/records/${scheduledRequest.id}`, { token: rootToken });
+  assert.equal(deleted, true, `scheduled cleanup physically deletes the account: ${JSON.stringify(blocked.data)}`);
+}
+const preserved = expectStatus(await request("GET", `/api/bvhub/events/${deletionEvent.id}/participants`, { token: adminLogin.token }), 200, "historical participant list still loads");
+assert.equal(preserved.items.length, 1);
+assert.equal(preserved.items[0].userId, null);
+assert.match(preserved.items[0].displayName, /此用户已于\d{4}-\d{2}-\d{2} 已删除/);
+assert.equal(expectStatus(await request("GET", `/api/collections/events/records/${deletionEvent.id}`, { token: rootToken }), 200, "read event after guest deletion").createdBy, "", "creator relation is cleared");
+const anonymizedChangelog = expectStatus(await request("GET", `/api/collections/event_changelog/records/${deletionChangelog.id}`, { token: rootToken }), 200, "read guest changelog after deletion");
+assert.equal(anonymizedChangelog.actor, "");
+assert.equal(anonymizedChangelog.actorName, "Deleted user");
+expectStatus(await request("PATCH", `/api/bvhub/admin/events/${deletionEvent.id}`, { token: adminLogin.token, body: { status: "OPEN_TO_ALL" } }), 409, "historical event with deleted participant cannot reopen");
+assert.equal(expectStatus(await request("GET", `/api/collections/payments/records?filter=${encodeURIComponent(`user = "${deletionGuest.id}"`)}`, { token: rootToken }), 200, "read deleted guest payments").items.length, 0);
+assert.equal(expectStatus(await request("GET", `/api/collections/audit_events/records?filter=${encodeURIComponent(`actorUser = "${deletionGuest.id}" || targetUser = "${deletionGuest.id}"`)}`, { token: rootToken }), 200, "read deleted guest audits").items.length, 0);
+expectStatus(await request("GET", `/api/collections/user_deletion_requests/records/${scheduledRequest.id}`, { token: rootToken }), 404, "deletion request removed after purge");
 
 expectStatus(await request("PATCH", `/api/collections/users/records/${admin.id}`, {
   token: rootToken, body: { active: false },

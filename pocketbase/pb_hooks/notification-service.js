@@ -127,4 +127,4 @@ function deliver(app, id) {
 
 function retryDelayMinutes(attempts) { return RETRY_MINUTES[Math.min(Math.max(attempts - 1, 0), RETRY_MINUTES.length - 1)]; }
 
-module.exports = { MAX_ATTEMPTS, send, deliver, retryDelayMinutes, subjectFor, renderHtml };
+module.exports = { MAX_ATTEMPTS, send, deliver, retryDelayMinutes, subjectFor, renderHtml, berlinDate };

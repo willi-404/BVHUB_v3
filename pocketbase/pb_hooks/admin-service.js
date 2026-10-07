@@ -120,6 +120,7 @@ function memberCardDto(app, user) {
 }
 
 function audit(app, actorId, targetId, eventType, metadata) {
+  if (eventType !== "USER_DELETION_REQUESTED") require(`${__hooks}/user-deletion-service.js`).assertNotDeleting(app, targetId);
   const collection = app.findCollectionByNameOrId("audit_events");
   const record = new Record(collection);
   record.set("eventType", eventType);

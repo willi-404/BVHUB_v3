@@ -383,10 +383,7 @@ function AdminParticipants({ eventId }: { eventId: string }) {
           key={participant.registrationId ?? participant.userId}
           className="mt-2 flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] py-2 text-sm"
         >
-          <span>
-            {participant.displayName} ({participant.firstName}{" "}
-            {participant.lastName})
-          </span>
+          <span>{participant.displayName}{participant.userId ? ` (${participant.firstName} ${participant.lastName})` : ""}</span>
           {participant.userId && (
             <Button
               size="sm"
