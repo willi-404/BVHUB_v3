@@ -16,7 +16,7 @@ export default defineConfig({
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined
     : {
-        command: "pnpm dev --host 127.0.0.1 --port 18443",
+        command: "corepack pnpm dev --host 127.0.0.1 --port 18443",
         env: { ...process.env, VITE_POCKETBASE_URL: e2ePocketBaseUrl },
         url: "http://127.0.0.1:18443",
         reuseExistingServer: !process.env.CI,
