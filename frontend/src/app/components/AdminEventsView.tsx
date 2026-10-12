@@ -548,6 +548,7 @@ function EventPanel({
               <Input
                 required
                 type="datetime-local"
+                step={900}
                 value={form.start}
                 onChange={(e) => onChange({ ...form, start: e.target.value })}
                 className="h-10"
@@ -558,6 +559,7 @@ function EventPanel({
               <Input
                 required
                 type="datetime-local"
+                step={900}
                 value={form.end}
                 onChange={(e) => onChange({ ...form, end: e.target.value })}
                 className="h-10"
@@ -566,7 +568,7 @@ function EventPanel({
           </div>
           <label className="grid gap-1 text-sm">
             {t("admin.events.cancellationDeadline")}
-            <Input required type="datetime-local" value={form.abmeldefrist} max={form.start} onChange={(e) => onChange({ ...form, abmeldefrist: e.target.value })} className="h-10" />
+            <Input required type="datetime-local" step={900} value={form.abmeldefrist} max={form.start} onChange={(e) => onChange({ ...form, abmeldefrist: e.target.value })} className="h-10" />
             <span className="text-xs text-[var(--muted-foreground)]">{t("admin.events.cancellationDeadlineHint")}</span>
           </label>
           <label className="grid gap-1 text-sm">

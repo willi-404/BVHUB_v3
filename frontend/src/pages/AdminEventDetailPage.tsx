@@ -191,6 +191,7 @@ export default function AdminEventDetailPage() {
                 <Input
                   required
                   type="datetime-local"
+                  step={900}
                   value={form.start}
                   onChange={(e) => setForm({ ...form, start: e.target.value })}
                   className="h-10"
@@ -201,6 +202,7 @@ export default function AdminEventDetailPage() {
                 <Input
                   required
                   type="datetime-local"
+                  step={900}
                   value={form.end}
                   onChange={(e) => setForm({ ...form, end: e.target.value })}
                   className="h-10"
@@ -212,6 +214,7 @@ export default function AdminEventDetailPage() {
               <Input
                 required
                 type="datetime-local"
+                step={900}
                 value={form.abmeldefrist}
                 max={form.start}
                 onChange={(e) => setForm({ ...form, abmeldefrist: e.target.value })}
