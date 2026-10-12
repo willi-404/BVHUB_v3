@@ -91,6 +91,10 @@ routerAdd("GET", "/api/bvhub/events/{id}/participants", (e) => {
   if (!isAdmin && !event.getBool("published")) throw new ApiError(404, "Event nicht gefunden", {});
   const records = $app.findRecordsByFilter("event_registrations", `event = '${event.id}' && status = 'REGISTERED'`, "registeredAt", 10000, 0);
   const items = records.map((registration) => {
+    if (!registration.getString("user")) {
+      if (!isAdmin) return { displayName: registration.getString("deletedParticipantPublicName"), avatar: null };
+      return { registrationId: registration.id, userId: null, displayName: registration.getString("deletedParticipantName"), firstName: "", lastName: "", registeredAt: registration.getString("registeredAt"), avatar: null };
+    }
     const target = api.userRecord($app, registration.getString("user"));
     // ponytail: one indexed avatar lookup per participant; batch when event lists become large.
     const avatar = profile.avatarRef($app, target.id);

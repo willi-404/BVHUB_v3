@@ -204,6 +204,20 @@ test("event management navigation uses the admin route and its scroll container"
     .toBeGreaterThan(0)
 })
 
+test("event create and edit forms use quarter-hour date-time steps", async ({
+  page,
+}) => {
+  await mockApi(page, admin)
+
+  for (const path of ["/admin/events/new", "/admin/events/admin-event-000"]) {
+    await page.goto(path)
+    const dateTimeInputs = page.locator('input[type="datetime-local"]')
+    await expect(dateTimeInputs).toHaveCount(3)
+    for (const input of await dateTimeInputs.all())
+      await expect(input).toHaveAttribute("step", "900")
+  }
+})
+
 test("activity list requests all published statuses only after Show all", async ({
   page,
 }) => {

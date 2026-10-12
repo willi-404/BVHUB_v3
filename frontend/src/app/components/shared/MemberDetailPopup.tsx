@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, ClipboardList } from "lucide-react";
+import { ArrowLeft, ClipboardList, Trash2 } from "lucide-react";
 import { Member, groupConfig, initials } from "./MemberTypes";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
 import { Select } from "../ui/select";
 import { Checkbox } from "../ui/checkbox";
+import { Input } from "../ui/input";
 import { pb } from "../../../lib/pocketbase";
 import { useAuthUser } from "../../../features/auth/AuthProvider";
 import { canManageMemberGroups, canManageMemberRole } from "../../../features/members/policy";
@@ -79,7 +80,7 @@ function Row({ icon, label, value, mono = false, action }: { icon: string; label
   );
 }
 
-export function MemberDetailPopup({ member, onClose, onReload }: { member: Member; onClose: () => void; onReload?: () => Promise<void> }) {
+export function MemberDetailPopup({ member, onClose, onReload, onDeleted }: { member: Member; onClose: () => void; onReload?: () => Promise<void>; onDeleted?: () => Promise<void> }) {
   const { t } = useI18n();
   const cfg = groupConfig[member.gruppe];
   const initialRole = member.role ?? "GUEST";
@@ -91,6 +92,11 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [showAuditLog, setShowAuditLog] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmationId, setConfirmationId] = useState("");
+  const [deletionError, setDeletionError] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const canDelete = (currentUser?.role === "ADMIN" || currentUser?.role === "SUPER_ADMIN") && role === "GUEST";
   const canManageGroups = canManageMemberGroups(currentUser?.role, role);
   const canManageRole = canManageMemberRole(currentUser?.role, role);
   const localizedRole = role === "SUPER_ADMIN" ? t("roles.superAdmin") : role === "ADMIN" ? t("roles.admin") : role === "MEMBER" ? t("roles.member") : t("roles.guest");
@@ -123,6 +129,28 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
       setMessage(t("admin.role.saved"));
     } catch (_) { setMessage(t("admin.role.saveError")); }
     finally { setSaving(false); }
+  }
+  async function deleteUser() {
+    if (confirmationId !== member.id || deleting) return;
+    setDeleting(true);
+    setDeletionError("");
+    try {
+      await pb.send(`/api/bvhub/admin/users/${encodeURIComponent(member.id)}/deletion`, { method: "POST", body: { confirmationId } });
+      if (onDeleted) await onDeleted().catch(() => undefined);
+      onClose();
+    } catch (error) {
+      const code = (error as { response?: { data?: { code?: string } } })?.response?.data?.code;
+      const messages = {
+        DELETION_ROLE: "admin.members.deleteRoleBlocked",
+        DELETION_UNPAID: "admin.members.deleteUnpaidBlocked",
+        DELETION_ACTIVE_EVENT: "admin.members.deleteEventBlocked",
+        DELETION_PENDING: "admin.members.deletePending",
+        DELETION_MAIL_FAILED: "admin.members.deleteMailFailed",
+      } as const;
+      setDeletionError(t(code && code in messages ? messages[code as keyof typeof messages] : "admin.members.deleteError"));
+    } finally {
+      setDeleting(false);
+    }
   }
   return (
     <>
@@ -211,9 +239,24 @@ export function MemberDetailPopup({ member, onClose, onReload }: { member: Membe
 
         <div className="px-5 py-3 border-t border-[var(--border)] shrink-0">
           {showAuditLog ? <Button variant="outline" className="mb-2 w-full" onClick={onClose}><ArrowLeft size={16} />{t("audit.backToMembers")}</Button> : <Button variant="outline" className="mb-2 w-full" onClick={() => setShowAuditLog(true)}><ClipboardList size={16} />{t("audit.open")}</Button>}
+          {canDelete && !showAuditLog && <Button variant="destructive" className="mb-2 w-full" onClick={() => { setConfirmationId(""); setDeletionError(""); setConfirmDelete(true); }}><Trash2 size={16} />{t("admin.members.deleteUser")}</Button>}
           <Button variant="outline" className="w-full" onClick={onClose}>{t("common.close")}</Button>
         </div>
       </div>
+      {confirmDelete && <div className="fixed inset-0 z-[112] flex items-center justify-center bg-black/60 p-4" role="presentation">
+        <form role="alertdialog" aria-modal="true" aria-labelledby="delete-user-title" aria-describedby="delete-user-description" className="w-full max-w-sm rounded-lg border bg-card p-5 shadow-2xl" onSubmit={(event) => { event.preventDefault(); void deleteUser(); }}>
+          <h2 id="delete-user-title" className="text-base font-semibold text-red-700">{t("admin.members.deleteUser")}</h2>
+          <p id="delete-user-description" className="mt-2 text-sm text-muted-foreground">{t("admin.members.deleteDescription")}</p>
+          <label htmlFor="delete-user-id" className="mt-4 block text-xs font-semibold">{t("admin.members.deleteConfirmId", { id: member.id })}</label>
+          <Input id="delete-user-id" autoFocus autoComplete="off" spellCheck={false} value={confirmationId} onChange={(event) => setConfirmationId(event.target.value)} disabled={deleting} className="mt-2 font-mono" />
+          {confirmationId && confirmationId !== member.id && <p role="alert" className="mt-2 text-xs text-red-700">{t("admin.members.deleteIdMismatch")}</p>}
+          {deletionError && <p role="alert" className="mt-2 text-xs text-red-700">{deletionError}</p>}
+          <div className="mt-5 flex flex-wrap justify-end gap-2">
+            <Button type="button" variant="outline" disabled={deleting} onClick={() => setConfirmDelete(false)} className="w-full sm:w-auto">{t("admin.members.cancelDeletion")}</Button>
+            <Button type="submit" variant="destructive" disabled={deleting || confirmationId !== member.id} className="w-full sm:w-auto"><Trash2 size={16} />{deleting ? t("admin.members.deletingUser") : t("admin.members.deleteUser")}</Button>
+          </div>
+        </form>
+      </div>}
     </>
   );
 }

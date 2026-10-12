@@ -51,9 +51,12 @@ test("members open their own log and combine activity filters in place", async (
   await page.getByRole("button", { name: "Audit log" }).click();
   await expect(page).toHaveURL("/profile/log");
   await expect(page.getByRole("heading", { name: "Audit log" })).toBeVisible();
-  const firstResponse = page.waitForResponse((response) => response.url().includes("/api/bvhub/me/audit-log"));
+  const filteredResponse = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return url.pathname === "/api/bvhub/me/audit-log" && url.searchParams.get("categories") === "1,2,3,4,5";
+  });
   await page.getByRole("checkbox", { name: "Login" }).check();
-  const response = await firstResponse;
+  const response = await filteredResponse;
   expect(new URL(response.url()).searchParams.get("categories")).toBe("1,2,3,4,5");
   await expect(page.getByRole("heading", { name: "Audit log" })).toHaveCount(1);
 });

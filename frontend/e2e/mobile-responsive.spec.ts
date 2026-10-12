@@ -315,6 +315,34 @@ test.describe("responsive application shell", () => {
     expect(columnCount).toBe(2)
   })
 
+  test("registration requires privacy consent and opens the policy dialog", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    await mockSession(page)
+    await page.route("**/datenshutz_text.md", async (route) => {
+      await route.fulfill({
+        contentType: "text/markdown",
+        body: "# Privacy policy\n\nPolicy content for the registration test.",
+      })
+    })
+    await page.goto("/register")
+
+    const registerRequest = page.waitForRequest(
+      (request) => new URL(request.url()).pathname === "/api/bvhub/register",
+      { timeout: 500 },
+    ).catch(() => null)
+    await page.getByRole("button", { name: "Register" }).click()
+    await expect(page.getByText("Please confirm that you have read and agree to the Privacy Policy.")).toBeVisible()
+    expect(await registerRequest).toBeNull()
+
+    await page.getByRole("button", { name: "Privacy Policy" }).click()
+    const dialog = page.getByRole("dialog", { name: "Privacy Policy" })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByText("Policy content for the registration test.")).toBeVisible()
+    await page.keyboard.press("Escape")
+    await expect(dialog).toBeHidden()
+    await expectNoHorizontalOverflow(page)
+  })
+
   test("drawer traps focus, locks scroll, closes by Escape and restores focus", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 })
     await mockSession(page)

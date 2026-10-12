@@ -283,7 +283,7 @@ export default function EventDetailPage() {
                   <UserAvatar avatar={participant.avatar} fallback={participant.displayName.slice(0, 2).toUpperCase()} />
                   <span className="min-w-0 break-words">{participant.displayName}</span>
                 </div>
-                {adminViewer && (
+                {adminViewer && participant.userId && (
                   <span className="min-w-0 break-words">
                     {participant.firstName} {participant.lastName}
                   </span>

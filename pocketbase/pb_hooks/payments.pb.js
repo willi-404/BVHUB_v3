@@ -76,6 +76,7 @@ routerAdd("PATCH", "/api/bvhub/admin/payments/{paymentId}/status", (e) => {
   const nextStatus = service.statusPayload(e);
   $app.runInTransaction((txApp) => {
     const current = txApp.findRecordById("payments", payment.id);
+    require(`${__hooks}/user-deletion-service.js`).assertNotDeleting(txApp, current.getString("user"));
     const oldStatus = current.getString("status");
     if (oldStatus === nextStatus) return;
     current.set("status", nextStatus);

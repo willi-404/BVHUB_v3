@@ -14,6 +14,8 @@ routerAdd("GET", "/api/bvhub/admin/users", (e) => {
   const page = Math.max(1, Number.parseInt(String(query.page || "1"), 10) || 1);
   const perPage = Math.min(100, Math.max(1, Number.parseInt(String(query.perPage || "50"), 10) || 50));
   let users = $app.findRecordsByFilter("users", "role != 'SUPER_ADMIN'", "displayName,firstName,lastName,email", 10000, 0);
+  const scheduled = new Set($app.findRecordsByFilter("user_deletion_requests", "status = 'SCHEDULED'", "", 10000, 0).map((request) => request.getString("user")));
+  users = users.filter((user) => !scheduled.has(user.id));
   if (search) users = users.filter((user) => ["email", "displayName", "firstName", "lastName"].some((field) => user.getString(field).toLocaleLowerCase().includes(search)));
   const totalItems = users.length;
   const items = users.slice((page - 1) * perPage, page * perPage).map((user) => service.userDto($app, user));
@@ -62,6 +64,7 @@ routerAdd("PATCH", "/api/bvhub/admin/users/{id}/role", (e) => {
   if (Object.keys(payload).length !== 2 || payload.confirmation !== "ROLE_CHANGE" || !["ADMIN", "MEMBER", "GUEST"].includes(payload.role)) throw new BadRequestError("Bestätigung oder Zielrolle ungültig");
   const target = service.findUser($app, targetId);
   const previousRole = target.getString("role");
+  require(`${__hooks}/user-deletion-service.js`).assertNotDeleting($app, target.id);
   if (target.id === current.id || previousRole === "SUPER_ADMIN") throw new ForbiddenError("Dieser Benutzer darf nicht verwaltet werden");
   if (actorRole === "ADMIN" && (!service.MANAGED_ROLES.includes(previousRole) || !service.MANAGED_ROLES.includes(payload.role))) throw new ForbiddenError("Admins dürfen nur Gäste und Mitglieder verwalten");
   if (actorRole === "SUPER_ADMIN" && ![...service.MANAGED_ROLES, "ADMIN"].includes(previousRole)) throw new ForbiddenError("Diese Zielrolle darf nicht verwaltet werden");

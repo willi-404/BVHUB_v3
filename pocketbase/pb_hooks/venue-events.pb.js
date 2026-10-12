@@ -190,6 +190,17 @@ routerAdd(
       ]),
       record,
     );
+    if (!["CANCELLED", "COMPLETED"].includes(data.status) && $app.findRecordsByFilter("event_registrations", "event = {:event} && deletedParticipantName != ''", "", 1, 0, { event: record.id }).length) {
+      throw new ApiError(409, "Events mit gelöschten Teilnehmern können nicht wieder geöffnet werden", {});
+    }
+    if (!["CANCELLED", "COMPLETED"].includes(data.status)) {
+      const deletion = require(`${__hooks}/user-deletion-service.js`);
+      const participants = $app.findRecordsByFilter("event_registrations", "event = {:event} && status = 'REGISTERED'", "", 10000, 0, { event: record.id });
+      if (participants.some((participant) => {
+        const request = deletion.requestFor($app, participant.getString("user"));
+        return request && ["EMAIL_PENDING", "SCHEDULED"].includes(request.getString("status"));
+      })) throw new ApiError(409, "Event mit ausstehender Benutzerlöschung kann nicht wieder geöffnet werden", {});
+    }
     const v = service.venue($app, data.venue);
     if (data.published && (!v.getBool("active") || !v.getString("checkoutRegion")))
       throw new ApiError(409, "Aktiver Veranstaltungsort erforderlich", {});
