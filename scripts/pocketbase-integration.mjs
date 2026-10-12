@@ -13,6 +13,8 @@ assert.equal(
   "ny30ikx3qywkcw7",
   "announcement read routes resolve the PocketBase path value",
 );
+const multilineAnnouncement = announcementService.parseAnnouncement({ zhTitle: "标题", zhContent: "第一行\n第二行", deTitle: "", deContent: "" });
+assert.equal(multilineAnnouncement.zhContent, "第一行\n第二行", "announcement content accepts intentional line breaks");
 
 const purposeEventId = "abc123def456ghi";
 assert.equal(paymentService.paymentPurpose(purposeEventId, "\u0000 \t"), `EVT-${purposeEventId}-PAY-MEMBER`, "an empty normalized payment name has a stable fallback");

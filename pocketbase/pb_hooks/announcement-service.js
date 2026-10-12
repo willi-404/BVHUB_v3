@@ -25,17 +25,18 @@ function idOf(e) {
   return id;
 }
 
-function text(body, key, max) {
+function text(body, key, max, multiline = false) {
   if (typeof body[key] !== "string") throw new BadRequestError("Ungültige Ankündigung");
   const value = body[key].trim();
-  if (Array.from(value).length > max || /[\x00-\x1f\x7f-\x9f]/.test(value)) throw new BadRequestError("Ungültige Ankündigung");
+  const controls = multiline ? /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/ : /[\x00-\x1f\x7f-\x9f]/;
+  if (Array.from(value).length > max || controls.test(value)) throw new BadRequestError("Ungültige Ankündigung");
   return value;
 }
 
 function parseAnnouncement(body) {
   const allowed = ["zhTitle", "zhContent", "deTitle", "deContent"];
   if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).some((key) => !allowed.includes(key)) || Object.keys(body).length !== allowed.length) throw new BadRequestError("Ungültige Ankündigungsfelder");
-  const value = { zhTitle: text(body, "zhTitle", 100), zhContent: text(body, "zhContent", 800), deTitle: text(body, "deTitle", 100), deContent: text(body, "deContent", 800) };
+  const value = { zhTitle: text(body, "zhTitle", 100), zhContent: text(body, "zhContent", 800, true), deTitle: text(body, "deTitle", 100), deContent: text(body, "deContent", 800, true) };
   const hasZh = value.zhTitle && value.zhContent;
   const hasDe = value.deTitle && value.deContent;
   if (!hasZh && !hasDe) throw new BadRequestError("Mindestens eine Sprache muss vollständig ausgefüllt sein");
