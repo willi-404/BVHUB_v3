@@ -10,6 +10,7 @@ const MembersPage = lazy(() => import("../pages/MembersPage"));
 const MemberAppLayout = lazy(() => import("../pages/MemberAppLayout"));
 const EventListPage = lazy(() => import("../pages/EventListPage"));
 const PaymentsPage = lazy(() => import("../pages/PaymentsPage"));
+const MemberApplicationPage = lazy(() => import("../pages/MemberApplicationPage"));
 const ProfilePage = lazy(() => import("../pages/ProfilePage"));
 const ProfileAuditLogPage = lazy(() => import("../pages/ProfileAuditLogPage"));
 const EventDetailPage = lazy(() => import("../pages/EventDetailPage"));
@@ -37,6 +38,7 @@ export const router = createBrowserRouter([
       { path: routes.home, element: load(<DashboardPage />) },
       { path: routes.events, element: load(<EventListPage />) },
       { path: routes.payments, element: load(<PaymentsPage />) },
+      { path: routes.memberApplication, element: load(<MemberApplicationPage />) },
       { path: routes.profile, element: load(<ProfilePage />) },
       { path: routes.profileLog, element: load(<ProfileAuditLogPage />) },
       { path: routes.news, element: load(<NewsPage />) },

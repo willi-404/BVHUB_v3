@@ -4,6 +4,7 @@ export const routes = {
   home: "/home",
   events: "/events",
   payments: "/payments",
+  memberApplication: "/member-application",
   profile: "/profile",
   profileLog: "/profile/log",
   news: "/news",
@@ -18,6 +19,7 @@ export const primaryNavigation: Readonly<Record<PrimaryNavTab, string>> = {
   dashboard: routes.home,
   events: routes.events,
   payments: routes.payments,
+  memberApplication: routes.memberApplication,
   profile: routes.profile,
 };
 

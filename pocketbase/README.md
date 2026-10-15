@@ -90,6 +90,12 @@ Für Produktion: PocketBase-Superuser-IP-Whitelist, MFA, HTTPS hinter einem Reve
 
 ## Migrationen und Tests
 
+Für Mitgliedsanträge muss PocketBase SMTP aktiviert sein. Die Meta-Absenderadresse
+muss `noreply@bv-erlangen2025.de` sein. Der Antrag wird als geschütztes PDF
+gespeichert und an `vorstand@bv-erlangen2025.de` gesendet. Nach Änderungen an
+`frontend/public/Aufnahmeantrag_muster_15Okt2026.odt` muss die gleichnamige
+PDF-Datei mit LibreOffice neu exportiert und zusammen mit dem ODT geprüft werden.
+
 `1710000000_create_auth_foundation.js` erstellt beziehungsweise repariert `users`, `groups` und `user_groups` in einem frischen temporären `pb_data`. Die Bool-Felder `active` akzeptieren ausdrücklich `true` und `false`; ein eindeutiger Index verhindert doppelte Benutzer-Gruppen-Zuordnungen. Die API-Regeln und Hooks verlangen für geschützte Aktionen einen aktiven Request-User und erzwingen die serverseitige RBAC-Trennung.
 
 Die isolierten Integrationstests verwenden einen eigenen konfigurierbaren Port (Standard `18101`) und ein temporäres Datenverzeichnis:

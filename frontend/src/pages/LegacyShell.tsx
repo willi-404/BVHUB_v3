@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useLocation, useNavigate, useOutletContext } from "react-router-dom";
-import { ClipboardList, ImagePlus, Trash2 } from "lucide-react";
+import { ClipboardList, FilePenLine, ImagePlus, Trash2 } from "lucide-react";
 import { Badge } from "../app/components/ui/badge";
 import { Button } from "../app/components/ui/button";
 import { Card, CardContent } from "../app/components/ui/card";
@@ -27,6 +28,7 @@ import { primaryNavigation, primaryTabForPath, routes } from "../routes/paths";
 import EventListPage from "./EventListPage";
 import { useNews } from "../features/news/hooks/useNews";
 import AnnouncementCenter, { NotificationButton } from "../features/announcements/components/AnnouncementCenter";
+import { getApplication } from "../features/memberApplication/api";
 import { useAnnouncements } from "../features/announcements/hooks/useAnnouncements";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -522,6 +524,8 @@ function LiveEventCards({ events }: { events: EventRecord[] }) {
 
 function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, canAccessAdmin, onOpenNotifications, onOpenAuditLog, unreadNotificationCount }: { profile: ProfileDto | null; onEditProfile: () => void; onLogout: () => void; onAdminMembers: () => void; canAccessAdmin: boolean; onOpenNotifications: () => void; onOpenAuditLog: () => void; unreadNotificationCount: number }) {
   const { t, locale } = useI18n();
+  const navigate = useNavigate();
+  const application = useQuery({ queryKey: ["member-application", profile?.user.id], queryFn: getApplication, enabled: profile?.user.role === "MEMBER", staleTime: 0 });
 
   if (!profile) return <div className="flex flex-col gap-4"><Card><CardContent className="p-5"><h1 id="view-title-profile" tabIndex={-1} className="page-title">{t("profile.title")}</h1><p className="text-sm text-[var(--muted-foreground)] mt-2">{t("profile.incompleteDetails")}</p><Button className="mt-4" onClick={onEditProfile}>{t("profile.edit")}</Button></CardContent></Card><Button variant="outline" className="justify-start gap-3" onClick={onOpenAuditLog}><ClipboardList size={16} />{t("audit.open")}</Button><Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 gap-2" onClick={onLogout}><Icon d={icons.logout} size={15} /> {t("auth.signOut")}</Button></div>;
   const initials = `${profile.user.firstName[0] || ""}${profile.user.lastName[0] || ""}`.toUpperCase() || "?";
@@ -543,6 +547,7 @@ function ProfileView({ profile, onEditProfile, onLogout, onAdminMembers, canAcce
         <CardContent className="p-0">
           {[
             { label: t("profile.edit"), icon: icons.pencil, action: onEditProfile },
+            ...(application.data?.application ? [{ label: t("profile.signedApplication"), icon: icons.pencil, action: () => navigate(routes.memberApplication) }] : []),
             { label: t("common.notifications"), icon: icons.bell, action: onOpenNotifications },
             { label: t("audit.open"), icon: icons.clipboardList, action: onOpenAuditLog },
           ].map((item, i, arr) => (
@@ -591,6 +596,7 @@ const NAV_ITEMS: Array<{ key: NavTab; label: string; icon: string }> = [
   { key: "dashboard", label: "Home", icon: icons.home },
   { key: "events", label: "Events", icon: icons.calendar },
   { key: "payments", label: "Payments", icon: icons.creditCard },
+  { key: "memberApplication", label: "Become a member", icon: icons.pencil },
   { key: "profile", label: "Profile", icon: icons.user },
 ];
 
@@ -610,6 +616,7 @@ function MobileNavigationDrawer({
   onSelect,
   unpaidCount,
   canAccessAdmin,
+  canApply,
   onAdminMembers,
   onAdminPayments,
   onAdminEvents,
@@ -624,6 +631,7 @@ function MobileNavigationDrawer({
   onSelect: (tab: NavTab) => void;
   unpaidCount: number;
   canAccessAdmin: boolean;
+  canApply: boolean;
   onAdminMembers: () => void;
   onAdminPayments: () => void;
   onAdminEvents: () => void;
@@ -732,7 +740,7 @@ function MobileNavigationDrawer({
         </div>
 
         <nav aria-label={t("navigation.primary")} className="flex flex-1 flex-col gap-1 overflow-y-auto p-4">
-          {NAV_ITEMS.map((item) => {
+          {NAV_ITEMS.filter((item) => item.key !== "memberApplication" || canApply).map((item) => {
             const isActive = active === item.key;
             const showCount = item.key === "payments" && unpaidCount > 0;
             return (
@@ -743,7 +751,7 @@ function MobileNavigationDrawer({
                 onClick={() => onSelect(item.key)}
                 className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] ${isActive ? "bg-[var(--secondary)] text-[var(--primary)]" : "text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"}`}
               >
-                <Icon d={item.icon} size={18} />
+                {item.key === "memberApplication" ? <FilePenLine size={18} /> : <Icon d={item.icon} size={18} />}
                 <span className="min-w-0 flex-1 break-words">{t(primaryNavMessageKey(item.key))}</span>
                 {showCount && (
                   <span className="flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
@@ -805,6 +813,7 @@ function Sidebar({
   onAdminScanner,
   onAdminNews,
   canAccessAdmin,
+  canApply,
   profile,
   onOpenNotifications,
   unreadNotificationCount,
@@ -819,6 +828,7 @@ function Sidebar({
   onAdminScanner: () => void;
   onAdminNews: () => void;
   canAccessAdmin: boolean;
+  canApply: boolean;
   profile: ProfileDto | null;
   onOpenNotifications: () => void;
   unreadNotificationCount: number;
@@ -857,7 +867,7 @@ function Sidebar({
 
       {/* Nav */}
       <nav className="flex-1 p-3 flex flex-col gap-1">
-        {NAV_ITEMS.map((item) => {
+        {NAV_ITEMS.filter((item) => item.key !== "memberApplication" || canApply).map((item) => {
           const isActive = active === item.key;
           const showDot = item.key === "payments" && unpaidCount > 0;
           return (
@@ -868,7 +878,7 @@ function Sidebar({
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 w-full ${isActive ? "bg-[var(--secondary)] text-[var(--primary)]" : "text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"}`}
             >
               <div className="relative">
-                <Icon d={item.icon} size={17} />
+                {item.key === "memberApplication" ? <FilePenLine size={17} /> : <Icon d={item.icon} size={17} />}
                 {showDot && (
                   <span className="absolute -top-1.5 -right-1.5 h-3.5 w-3.5 rounded-full bg-red-500 text-white text-[8px] font-bold flex items-center justify-center">
                     {unpaidCount}
@@ -928,6 +938,7 @@ export function AppShell({ initialTab = "dashboard", onLogout, routeContent = fa
   const announcements = useAnnouncements(announcementLocale);
   const { data: profile, isLoading: profileLoading, isError: profileError, refetch: refetchProfile } = useMyProfile();
   const canAccessAdmin = isAdminRole(user?.role);
+  const canApply = user?.role === "GUEST";
   const [events, setEvents] = useState<Event[]>(EVENTS);
   const [cardOpen, setCardOpen] = useState(false);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
@@ -950,6 +961,7 @@ export function AppShell({ initialTab = "dashboard", onLogout, routeContent = fa
     dashboard: t(primaryNavMessageKey("dashboard")),
     events: t(primaryNavMessageKey("events")),
     payments: t(primaryNavMessageKey("payments")),
+    memberApplication: t(primaryNavMessageKey("memberApplication")),
     profile: t(primaryNavMessageKey("profile")),
   };
 
@@ -1009,7 +1021,7 @@ export function AppShell({ initialTab = "dashboard", onLogout, routeContent = fa
   return (
     <div className="relative h-full bg-[var(--background)]" style={{ fontFamily: "var(--font-sans)" }}>
       <div className="app-shell-background flex h-full" data-drawer-open={mobileNavigationOpen} inert={mobileNavigationOpen ? true : undefined}>
-        <Sidebar active={tab} onChange={selectNavigation} unpaidCount={unpaidCount} onLogout={logout} onAdminMembers={() => navigate(routes.adminMembers)} onAdminPayments={() => navigate(routes.adminPayments)} onAdminEvents={() => navigate(routes.adminEvents)} onAdminScanner={() => navigate(routes.adminMemberCardScanner)} onAdminNews={() => navigate(routes.adminNews)} canAccessAdmin={canAccessAdmin} profile={profile || null} onOpenNotifications={() => setNotificationsOpen(true)} unreadNotificationCount={announcements.data?.unreadCount ?? 0} />
+        <Sidebar active={tab} onChange={selectNavigation} unpaidCount={unpaidCount} onLogout={logout} onAdminMembers={() => navigate(routes.adminMembers)} onAdminPayments={() => navigate(routes.adminPayments)} onAdminEvents={() => navigate(routes.adminEvents)} onAdminScanner={() => navigate(routes.adminMemberCardScanner)} onAdminNews={() => navigate(routes.adminNews)} canAccessAdmin={canAccessAdmin} canApply={canApply} profile={profile || null} onOpenNotifications={() => setNotificationsOpen(true)} unreadNotificationCount={announcements.data?.unreadCount ?? 0} />
 
         <main ref={mainRef} id="app-main-content" className="min-w-0 w-full max-w-full flex-1 overflow-x-hidden overflow-y-auto">
         <div className="hidden lg:flex items-center justify-between px-8 py-5 border-b border-[var(--border)] bg-[var(--card)] sticky top-0 z-10">
@@ -1062,6 +1074,7 @@ export function AppShell({ initialTab = "dashboard", onLogout, routeContent = fa
         onSelect={selectNavigation}
         unpaidCount={unpaidCount}
         canAccessAdmin={canAccessAdmin}
+        canApply={canApply}
         onAdminMembers={() => navigate(routes.adminMembers)}
         onAdminPayments={() => navigate(routes.adminPayments)}
         onAdminEvents={() => navigate(routes.adminEvents)}

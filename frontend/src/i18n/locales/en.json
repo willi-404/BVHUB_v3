@@ -229,6 +229,8 @@
   "nav.home": "Home",
   "nav.events": "Event",
   "nav.payments": "Payments",
+  "nav.memberApplication": "Become a member",
+  "profile.signedApplication": "Signed membership application",
   "nav.profile": "Profile",
   "dashboard.welcome": "Welcome back",
   "dashboard.memberTrend": "Membership trend",

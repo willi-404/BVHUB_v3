@@ -7,11 +7,13 @@ describe("canonical application routes", () => {
       dashboard: "/home",
       events: "/events",
       payments: "/payments",
+      memberApplication: "/member-application",
       profile: "/profile",
     });
     expect(primaryTabForPath(routes.home)).toBe("dashboard");
     expect(primaryTabForPath(routes.events)).toBe("events");
     expect(primaryTabForPath(routes.payments)).toBe("payments");
+    expect(primaryTabForPath(routes.memberApplication)).toBe("memberApplication");
     expect(primaryTabForPath(routes.profile)).toBe("profile");
     expect(primaryTabForPath(routes.profileLog)).toBe("profile");
   });

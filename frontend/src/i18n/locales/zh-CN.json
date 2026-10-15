@@ -229,6 +229,8 @@
   "nav.home": "首页",
   "nav.events": "活动",
   "nav.payments": "付款",
+  "nav.memberApplication": "成为会员",
+  "profile.signedApplication": "已签署的入会申请书",
   "nav.profile": "个人资料",
   "dashboard.welcome": "欢迎回来",
   "dashboard.memberTrend": "会员趋势",
