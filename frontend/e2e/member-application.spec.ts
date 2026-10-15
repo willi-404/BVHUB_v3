@@ -212,6 +212,68 @@ test.describe
         rmSync(dataDir, { recursive: true, force: true })
     })
 
+    test("guest preview renders on desktop production build", async ({
+      browser,
+    }) => {
+      const { context, page } = await session(browser, {
+        width: 1280,
+        height: 900,
+      })
+      const pageErrors: string[] = []
+      page.on("pageerror", (error) => pageErrors.push(error.message))
+      page.on("console", (message) => {
+        if (message.type() === "error") pageErrors.push(message.text())
+      })
+      await page.goto("/member-application")
+      await page.getByLabel("Bank name").fill("Desktop Bank")
+      await page.getByLabel("IBAN").fill("DE89370400440532013001")
+      await page.getByLabel("BIC").fill("desktop-bic")
+      await page.getByRole("button", { name: "Continue" }).click()
+      await page.getByRole("checkbox").check()
+      await page.getByRole("button", { name: "Generate PDF" }).click()
+      const canvas = page.locator('canvas[aria-label="PDF page 1"]')
+      await expect(canvas).toBeVisible()
+      await expect
+        .poll(() =>
+          canvas.evaluate((element) => {
+            const node = element as HTMLCanvasElement
+            const data = node
+              .getContext("2d")
+              ?.getImageData(0, 0, node.width, node.height).data
+            return Boolean(
+              data?.some(
+                (value, index) =>
+                  index % 4 === 0 && value < 200 && data[index + 3] > 0,
+              ),
+            )
+          }),
+        )
+        .toBe(true)
+      expect(pageErrors).toEqual([])
+      await context.close()
+    })
+
+    test("desktop preview falls back when the PDF worker is unavailable", async ({
+      browser,
+    }) => {
+      const { context, page } = await session(browser, {
+        width: 1280,
+        height: 900,
+      })
+      await page.route("**/assets/pdf.worker*.mjs", (route) => route.abort())
+      await page.goto("/member-application")
+      await page.getByLabel("Bank name").fill("Fallback Bank")
+      await page.getByLabel("IBAN").fill("DE89370400440532013001")
+      await page.getByLabel("BIC").fill("fallback-bic")
+      await page.getByRole("button", { name: "Continue" }).click()
+      await page.getByRole("checkbox").check()
+      await page.getByRole("button", { name: "Generate PDF" }).click()
+      await expect(
+        page.locator('iframe[title="Review your application"]'),
+      ).toBeVisible()
+      await context.close()
+    })
+
     test("guest confirms, previews, signs and downloads on mobile", async ({
       browser,
     }, testInfo) => {

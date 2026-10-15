@@ -89,12 +89,17 @@ export default function PdfPreview({
   const [pdfDocument, setPdfDocument] = useState<PDFDocumentProxy | null>(null)
   const [zoom, setZoom] = useState(1)
   const [error, setError] = useState(false)
+  const [fallbackFailed, setFallbackFailed] = useState(false)
+  const [fallbackUrl, setFallbackUrl] = useState("")
   const onRenderError = useCallback(() => setError(true), [])
   useEffect(() => {
     let active = true
     let task: ReturnType<typeof getDocument> | null = null
+    const objectUrl = URL.createObjectURL(pdf)
     setPdfDocument(null)
     setError(false)
+    setFallbackFailed(false)
+    setFallbackUrl(objectUrl)
     setZoom(1)
     void pdf
       .arrayBuffer()
@@ -115,6 +120,7 @@ export default function PdfPreview({
     return () => {
       active = false
       void task?.destroy()
+      URL.revokeObjectURL(objectUrl)
     }
   }, [pdf])
   return (
@@ -150,7 +156,14 @@ export default function PdfPreview({
         </p>
       )}
       <div className="max-h-[70vh] min-h-[420px] space-y-4 overflow-auto p-2 sm:p-4">
-        {error ? (
+        {error && fallbackUrl && !fallbackFailed ? (
+          <iframe
+            title={title}
+            src={fallbackUrl}
+            className="h-[70vh] min-h-[420px] w-full border-0"
+            onError={() => setFallbackFailed(true)}
+          />
+        ) : error || fallbackFailed ? (
           <p role="alert" className="p-3 text-sm text-red-700">
             {errorText}
           </p>
