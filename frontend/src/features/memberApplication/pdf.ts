@@ -17,7 +17,7 @@ function textImage(text: string, maxWidth: number): string {
   canvas.width = Math.ceil(maxWidth * 2)
   canvas.height = 36
   context.font = `${fontSize * 2}px Arial, sans-serif`
-  context.fillStyle = "#111827"
+  context.fillStyle = "#1d4ed8"
   context.textBaseline = "middle"
   context.fillText(text, 0, 18, canvas.width)
   return canvas.toDataURL("image/png")
@@ -78,7 +78,7 @@ export async function createApplicationPdf(
   await add(first, bank.bic, 115, 603, 400)
   await add(
     last,
-    `${profile.profile.city}, ${signedDate.split("-").reverse().join(".")}`,
+    `Erlangen, ${signedDate.split("-").reverse().join(".")}`,
     170,
     582,
   )

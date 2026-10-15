@@ -1,5 +1,12 @@
 const SENDER = "noreply@bv-erlangen2025.de";
 const RECIPIENT = "vorstand@bv-erlangen2025.de";
+const MONTHS = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+
+function fileName(userRecord, signedDate) {
+  const safe = (value) => String(value).normalize("NFKC").trim().replace(/[^A-Za-z0-9\u00C0-\u024F\u4E00-\u9FFF-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 80) || "unbekannt";
+  const [year, month] = signedDate.split("-").map(Number);
+  return `Aufnahmeantrag_${safe(userRecord.getString("firstName"))}_${safe(userRecord.getString("lastName"))}_${MONTHS[month - 1]}_${year}.pdf`;
+}
 
 function berlinToday() {
   const now = new Date();
@@ -31,13 +38,16 @@ function find(app, userId) {
   return app.findRecordsByFilter("member_applications", "user = {:user}", "", 1, 0, { user: userId })[0] || null;
 }
 
-function dto(record) {
-  return record ? { id: record.id, pdf: record.getString("pdf"), status: record.getString("status"), signedDate: record.getString("signedDate"), updated: record.getString("updated") } : null;
+function dto(app, record) {
+  if (!record) return null;
+  const savedName = record.getString("fileName");
+  const name = savedName || fileName(app.findRecordById("users", record.getString("user")), record.getString("signedDate"));
+  return { id: record.id, pdf: record.getString("pdf"), fileName: name, status: record.getString("status"), signedDate: record.getString("signedDate"), updated: record.getString("updated") };
 }
 
 function current(e) {
   const currentUser = user(e);
-  return { today: berlinToday(), application: dto(find(e.app, currentUser.id)) };
+  return { today: berlinToday(), application: dto(e.app, find(e.app, currentUser.id)) };
 }
 
 function assertAvailable(record) {
@@ -55,14 +65,14 @@ function send(e, record, currentUser) {
     const message = new MailerMessage({
       from: { address: SENDER, name: "Noreply BV Portal new Member" },
       to: [{ address: RECIPIENT }],
-      subject: `Neuer Mitgliedsantrag: ${currentUser.getString("firstName")} ${currentUser.getString("lastName")}`,
+      subject: record.getString("fileName") || fileName(currentUser, record.getString("signedDate")),
       text: `Ein neuer unterschriebener Mitgliedsantrag liegt bei. Benutzer-ID: ${currentUser.id}`,
-      attachments: { "Aufnahmeantrag.pdf": attachment },
+      attachments: { [record.getString("fileName") || fileName(currentUser, record.getString("signedDate"))]: attachment },
     });
     e.app.newMailClient().send(message);
     record.set("status", "SENT");
     e.app.save(record);
-    return { today: berlinToday(), application: dto(record) };
+    return { today: berlinToday(), application: dto(e.app, record) };
   } catch (error) {
     record.set("status", "FAILED");
     e.app.save(record);
@@ -89,6 +99,7 @@ function submit(e) {
     record.set("user", currentUser.id);
     record.set("pdf", files[0]);
     record.set("signedDate", signedDate);
+    record.set("fileName", fileName(currentUser, signedDate));
     record.set("status", "SENDING");
     txApp.save(record);
   });

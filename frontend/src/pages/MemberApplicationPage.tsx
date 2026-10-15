@@ -5,6 +5,7 @@ import { Button } from "../app/components/ui/button"
 import { useI18n } from "../i18n"
 import type { MemberAppContext } from "./LegacyShell"
 import { createApplicationPdf } from "../features/memberApplication/pdf"
+import { getApplicationFileName } from "../features/memberApplication/filename"
 import PdfPreview from "../features/memberApplication/PdfPreview"
 import {
   getApplication,
@@ -43,7 +44,15 @@ const copy = {
     again: "Start a new application",
     missing: "Complete your profile before applying.",
     underage: "You must be at least 18 to sign this application.",
-    invalidBank: "Check the bank name, IBAN and BIC.",
+    invalidBank:
+      "Enter a bank name and BIC. The German IBAN must have 22 characters.",
+    sepaNotice:
+      "Only German bank accounts are currently supported for SEPA direct debit.",
+    signatureOrientation:
+      "For easier signing on a phone, rotate your device to landscape.",
+    previewLoading: "Loading PDF preview...",
+    previewError:
+      "The PDF preview could not be loaded. You can still download the PDF.",
     error: "The application could not be completed. Try again.",
     dateChanged: "The date changed. Review the PDF and sign again.",
     pending: "The application is being sent.",
@@ -78,7 +87,15 @@ const copy = {
     again: "Neuen Antrag stellen",
     missing: "Bitte vervollständige zuerst dein Profil.",
     underage: "Für diesen Antrag musst du mindestens 18 Jahre alt sein.",
-    invalidBank: "Bitte prüfe Kreditinstitut, IBAN und BIC.",
+    invalidBank:
+      "Bitte gib ein Kreditinstitut und eine BIC an. Die deutsche IBAN muss 22 Zeichen haben.",
+    sepaNotice:
+      "Derzeit werden für das SEPA-Lastschriftverfahren nur deutsche Bankkonten unterstützt.",
+    signatureOrientation:
+      "Für eine bequemere Unterschrift bitte das Smartphone ins Querformat drehen.",
+    previewLoading: "PDF-Vorschau wird geladen ...",
+    previewError:
+      "Die PDF-Vorschau konnte nicht geladen werden. Du kannst die PDF trotzdem herunterladen.",
     error:
       "Der Antrag konnte nicht abgeschlossen werden. Bitte versuche es erneut.",
     dateChanged:
@@ -114,7 +131,11 @@ const copy = {
     again: "重新申请",
     missing: "请先补全个人资料。",
     underage: "签署申请书必须年满 18 岁。",
-    invalidBank: "请检查银行名称、IBAN 和 BIC。",
+    invalidBank: "请填写银行名称和 BIC。德国 IBAN 必须为 22 位。",
+    sepaNotice: "目前 SEPA 扣款仅支持德国银行账户。",
+    signatureOrientation: "为了更方便地签名，请将手机横向旋转。",
+    previewLoading: "正在加载 PDF 预览…",
+    previewError: "PDF 预览加载失败。你仍然可以下载 PDF。",
     error: "申请未完成，请重试。",
     dateChanged: "日期已变化。请重新核对 PDF 并签名。",
     pending: "申请书正在发送。",
@@ -124,17 +145,8 @@ const copy = {
   },
 } as const
 
-function validIban(value: string): boolean {
-  const compact = value.replace(/\s/g, "").toUpperCase()
-  if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(compact)) return false
-  const rearranged = compact.slice(4) + compact.slice(0, 4)
-  let remainder = 0
-  for (const char of rearranged) {
-    const digits = char >= "A" ? String(char.charCodeAt(0) - 55) : char
-    for (const digit of digits)
-      remainder = (remainder * 10 + Number(digit)) % 97
-  }
-  return remainder === 1
+function validIbanLength(value: string): boolean {
+  return value.replace(/\s/g, "").length === 22
 }
 
 function SignaturePad({
@@ -201,8 +213,12 @@ function SignaturePad({
         onPointerMove={move}
         onPointerUp={end}
         onPointerCancel={end}
-        className="block w-full max-w-[600px] aspect-[600/170] rounded border border-[var(--border)] bg-white touch-none"
+        style={{ maxWidth: 600 }}
+        className="block w-full aspect-[600/170] rounded border border-[var(--border)] bg-white touch-none"
       />
+      <p className="hidden text-sm text-[var(--muted-foreground)] max-sm:portrait:block">
+        {c.signatureOrientation}
+      </p>
       <Button type="button" variant="outline" onClick={clear}>
         <Eraser size={16} />
         {c.clear}
@@ -277,11 +293,8 @@ export default function MemberApplicationPage() {
   )
   const bankValid =
     bank.institute.trim().length > 0 &&
-    bank.institute.trim().length <= 100 &&
-    validIban(bank.iban) &&
-    /^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?$/.test(
-      bank.bic.replace(/\s/g, "").toUpperCase(),
-    )
+    validIbanLength(bank.iban) &&
+    bank.bic.trim().length > 0
   const fields = profile?.profile
     ? [
         ["Vorname", profile.user.firstName],
@@ -337,7 +350,11 @@ export default function MemberApplicationPage() {
         signature,
       )
       setPdf(signed)
-      const result = await submitApplication(signed, today)
+      const result = await submitApplication(
+        signed,
+        today,
+        getApplicationFileName(profile, today),
+      )
       setApplication(result.application)
       setStep("done")
     } catch {
@@ -374,6 +391,7 @@ export default function MemberApplicationPage() {
     }
   }
   const download = async () => {
+    if (!profile) return
     try {
       const file =
         pdf || (application && (await loadApplicationPdf(application)))
@@ -381,7 +399,9 @@ export default function MemberApplicationPage() {
       const url = URL.createObjectURL(file)
       const link = document.createElement("a")
       link.href = url
-      link.download = "Aufnahmeantrag.pdf"
+      link.download =
+        (step === "done" && application?.fileName) ||
+        getApplicationFileName(profile, today)
       link.click()
       setTimeout(() => URL.revokeObjectURL(url), 60000)
     } catch {
@@ -467,6 +487,9 @@ export default function MemberApplicationPage() {
               }}
             >
               <h2 className="text-lg font-semibold">{c.bank}</h2>
+              <p className="rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+                {c.sepaNotice}
+              </p>
               {(["institute", "iban", "bic"] as const).map((key) => (
                 <label
                   key={key}
@@ -547,7 +570,17 @@ export default function MemberApplicationPage() {
           {step === "preview" && (
             <div className="space-y-4">
               <h2 className="text-lg font-semibold">{c.preview}</h2>
-              {pdf && <PdfPreview pdf={pdf} title={c.preview} />}
+              {pdf && (
+                <PdfPreview
+                  pdf={pdf}
+                  title={c.preview}
+                  fileName={
+                    profile ? getApplicationFileName(profile, today) : undefined
+                  }
+                  loadingText={c.previewLoading}
+                  errorText={c.previewError}
+                />
+              )}
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" onClick={() => void download()}>
                   <Download size={16} />
@@ -612,7 +645,20 @@ export default function MemberApplicationPage() {
                   {c.preview}
                 </Button>
               )}
-              {pdf && <PdfPreview pdf={pdf} title={c.signed} />}
+              {pdf && (
+                <PdfPreview
+                  pdf={pdf}
+                  title={c.signed}
+                  fileName={
+                    application?.fileName ||
+                    (profile
+                      ? getApplicationFileName(profile, today)
+                      : undefined)
+                  }
+                  loadingText={c.previewLoading}
+                  errorText={c.previewError}
+                />
+              )}
               {application?.status === "SENT" &&
                 profile?.user.role === "GUEST" && (
                   <Button

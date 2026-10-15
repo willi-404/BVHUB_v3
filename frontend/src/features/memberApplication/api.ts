@@ -3,6 +3,7 @@ import { pb } from "../../lib/pocketbase"
 export interface ApplicationRecord {
   id: string
   pdf: string
+  fileName: string
   status: "SENDING" | "FAILED" | "SENT"
   signedDate: string
   updated: string
@@ -21,9 +22,10 @@ export const getApplication = () =>
 export async function submitApplication(
   pdf: Blob,
   signedDate: string,
+  fileName: string,
 ): Promise<ApplicationState> {
   const body = new FormData()
-  body.append("pdf", pdf, "Aufnahmeantrag.pdf")
+  body.append("pdf", pdf, fileName)
   body.append("signedDate", signedDate)
   return pb.send<ApplicationState>("/api/bvhub/me/member-application", {
     method: "POST",

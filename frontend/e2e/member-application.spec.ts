@@ -47,7 +47,13 @@ async function session(
     height: number
   },
 ) {
-  const context = await browser.newContext({ viewport, acceptDownloads: true })
+  const mobile = viewport.width < 600
+  const context = await browser.newContext({
+    viewport,
+    acceptDownloads: true,
+    isMobile: mobile,
+    hasTouch: mobile,
+  })
   await context.addInitScript(
     ({ record, auth }) => {
       sessionStorage.setItem("pb_auth", JSON.stringify({ token: auth, record }))
@@ -218,13 +224,20 @@ test.describe
         page.getByRole("heading", { name: "Become a member" }),
       ).toBeVisible()
       await page.getByLabel("Bank name").fill("Test Bank")
-      await page.getByLabel("IBAN").fill("DE89370400440532013001")
-      await page.getByLabel("BIC").fill("COBADEFFXXX")
+      await expect(
+        page.getByText(
+          "Only German bank accounts are currently supported for SEPA direct debit.",
+        ),
+      ).toBeVisible()
+      await page.getByLabel("IBAN").fill("DE8937040044053201300")
+      await page.getByLabel("BIC").fill("not-a-bic")
       await page.getByRole("button", { name: "Continue" }).click()
       await expect(
-        page.getByText("Check the bank name, IBAN and BIC."),
+        page.getByText(
+          "Enter a bank name and BIC. The German IBAN must have 22 characters.",
+        ),
       ).toBeVisible()
-      await page.getByLabel("IBAN").fill("DE89370400440532013000")
+      await page.getByLabel("IBAN").fill("DE89370400440532013001")
       await page.getByRole("button", { name: "Continue" }).click()
       await expect(page.getByText("Ada", { exact: true })).toBeVisible()
       await expect(page.getByText("Test Bank", { exact: true })).toBeVisible()
@@ -243,11 +256,36 @@ test.describe
               .getContext("2d")
               ?.getImageData(0, 0, node.width, node.height).data
             return data
-              ? data.some((value, index) => index % 4 === 3 && value > 0)
+              ? data.some(
+                  (value, index) =>
+                    index % 4 === 0 && value < 200 && data[index + 3] > 0,
+                )
               : false
           }),
         )
         .toBe(true)
+      const { today } = await api<{ today: string }>(
+        "GET",
+        "/api/bvhub/me/member-application",
+        token,
+      )
+      const expectedName = `Aufnahmeantrag_Ada_Beispiel_${
+        [
+          "Januar",
+          "Februar",
+          "März",
+          "April",
+          "Mai",
+          "Juni",
+          "Juli",
+          "August",
+          "September",
+          "Oktober",
+          "November",
+          "Dezember",
+        ][Number(today.slice(5, 7)) - 1]
+      }_${today.slice(0, 4)}.pdf`
+      await expect(page.getByText(expectedName)).toBeVisible()
       await page.screenshot({
         path: testInfo.outputPath("mobile-preview.png"),
         fullPage: true,
@@ -271,16 +309,59 @@ test.describe
       const unsigned = page.waitForEvent("download")
       await page.getByRole("button", { name: "Download PDF" }).click()
       const unsignedFile = await unsigned
-      expect(unsignedFile.suggestedFilename()).toBe("Aufnahmeantrag.pdf")
+      expect(unsignedFile.suggestedFilename()).toBe(expectedName)
       await unsignedFile.saveAs(testInfo.outputPath("unsigned.pdf"))
       await page.getByRole("button", { name: "Continue" }).click()
       const signature = page.locator("#member-signature")
+      await expect(
+        page.getByText(
+          "For easier signing on a phone, rotate your device to landscape.",
+        ),
+      ).toBeVisible()
       const box = await signature.boundingBox()
       if (!box) throw new Error("Signature pad is missing")
-      await page.mouse.move(box.x + 30, box.y + 55)
-      await page.mouse.down()
-      await page.mouse.move(box.x + 120, box.y + 70, { steps: 8 })
-      await page.mouse.up()
+      expect(box.width).toBeLessThanOrEqual(390)
+      expect(
+        await page.evaluate(
+          () =>
+            document.documentElement.scrollWidth -
+            document.documentElement.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(0)
+      await page.setViewportSize({ width: 844, height: 390 })
+      await expect(
+        page.getByText(
+          "For easier signing on a phone, rotate your device to landscape.",
+        ),
+      ).toBeHidden()
+      const landscapeBox = await signature.boundingBox()
+      if (!landscapeBox) throw new Error("Landscape signature pad is missing")
+      expect(landscapeBox.width).toBeLessThanOrEqual(600)
+      expect(
+        await page.evaluate(
+          () =>
+            document.documentElement.scrollWidth -
+            document.documentElement.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(0)
+      const touch = await context.newCDPSession(page)
+      const startX = landscapeBox.x + 40
+      const startY = landscapeBox.y + 40
+      await touch.send("Input.dispatchTouchEvent", {
+        type: "touchStart",
+        touchPoints: [{ x: startX, y: startY }],
+      })
+      await touch.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [{ x: startX + 100, y: startY + 30 }],
+      })
+      await touch.send("Input.dispatchTouchEvent", {
+        type: "touchEnd",
+        touchPoints: [],
+      })
+      await expect(
+        page.getByRole("button", { name: "Sign and send" }),
+      ).toBeEnabled()
       await page.getByRole("button", { name: "Sign and send" }).click()
       await expect(
         page.getByText("Your signed application was emailed to the board."),
@@ -289,11 +370,11 @@ test.describe
         path: testInfo.outputPath("mobile-complete.png"),
         fullPage: true,
       })
-      expect(messages.at(-1)).toContain("Aufnahmeantrag.pdf")
+      expect(messages.at(-1)).toContain(expectedName)
       const signed = page.waitForEvent("download")
       await page.getByRole("button", { name: "Download PDF" }).click()
       const signedFile = await signed
-      expect(signedFile.suggestedFilename()).toBe("Aufnahmeantrag.pdf")
+      expect(signedFile.suggestedFilename()).toBe(expectedName)
       await signedFile.saveAs(testInfo.outputPath("signed.pdf"))
       const overflow = await page.evaluate(
         () =>
@@ -344,7 +425,9 @@ test.describe
         ).toBeVisible()
         const failedPdf = page.waitForEvent("download")
         await page.getByRole("button", { name: "Download PDF" }).click()
-        expect((await failedPdf).suggestedFilename()).toBe("Aufnahmeantrag.pdf")
+        expect((await failedPdf).suggestedFilename()).toMatch(
+          /^Aufnahmeantrag_Ada_Beispiel_\p{L}+_\d{4}\.pdf$/u,
+        )
         await api("PATCH", "/api/settings", rootToken, settings)
         await page.getByRole("button", { name: "Retry email" }).click()
         await expect(
@@ -394,7 +477,9 @@ test.describe
       ).toHaveCount(0)
       const signed = page.waitForEvent("download")
       await page.getByRole("button", { name: "Download PDF" }).click()
-      expect((await signed).suggestedFilename()).toBe("Aufnahmeantrag.pdf")
+      expect((await signed).suggestedFilename()).toMatch(
+        /^Aufnahmeantrag_Ada_Beispiel_\p{L}+_\d{4}\.pdf$/u,
+      )
       await context.close()
     })
   })
