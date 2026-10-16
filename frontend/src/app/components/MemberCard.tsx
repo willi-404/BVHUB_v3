@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react"
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import logoSrc from "../../imports/logo1-high-resolution.png"
 import { formatLocaleDate, useI18n } from "../../i18n"
 import type { Role } from "../../features/auth/policy"
@@ -71,14 +71,10 @@ export function MemberCardFlip({
     : "-"
   const theme = role === "MEMBER" ? "member" : role === "GUEST" ? "guest" : "neutral"
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const button = flipped ? backButton.current : frontButton.current
     if (!button) return
-    const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-      ? 0
-      : 420
-    const timer = window.setTimeout(() => button.focus({ preventScroll: true }), delay)
-    return () => window.clearTimeout(timer)
+    button.focus({ preventScroll: true })
   }, [flipped])
 
   return (
@@ -199,7 +195,13 @@ export function MemberCardFlip({
             ref={backButton}
             type="button"
             data-slot="button"
-            onClick={() => setFlipped(false)}
+            onClick={() => {
+              setFlipped(false)
+              // Let the browser apply inert before restoring focus.
+              window.setTimeout(() => {
+                frontButton.current?.focus({ preventScroll: true })
+              }, 500)
+            }}
             className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             {t("memberCard.backToCard")}

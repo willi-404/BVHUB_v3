@@ -260,8 +260,13 @@ test.describe
         width: 1280,
         height: 900,
       })
-      await page.route("**/assets/pdf.worker*.mjs", (route) => route.abort())
       await page.goto("/member-application")
+      await page.getByLabel("Bank name").waitFor()
+      await page.route("**/*", (route) => {
+        if (route.request().url().toLowerCase().includes("worker"))
+          return route.abort()
+        return route.continue()
+      })
       await page.getByLabel("Bank name").fill("Fallback Bank")
       await page.getByLabel("IBAN").fill("DE89370400440532013001")
       await page.getByLabel("BIC").fill("fallback-bic")
