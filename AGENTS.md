@@ -39,3 +39,7 @@ user-visible release notes and a maintainer has agreed.
 Release Drafter creates or updates a draft; it does not publish releases.
 Before manually publishing, verify the exact target commit, tag and title,
 green CI for that commit, and the draft notes. See `docs/RELEASE_WORKFLOW.md`.
+
+## Answer me with HTML
+
+[answer-me-with-html always-on] Whenever a reply gives a conclusion, summary, plan, comparison, review or explanation, even a short one, also make a page with the answer-me-with-html skill (2 to 4 panels for routine answers), render it with `--no-open` before you write the reply, and end the reply with a `file://` link to the page. Skip casual chat, one- or two-sentence replies with no conclusion, pure command output, and requests for plain text.

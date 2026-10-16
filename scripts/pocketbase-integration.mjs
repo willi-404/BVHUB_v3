@@ -174,6 +174,8 @@ assert.equal(migratedMemberPayment[0].status, "PAID");
 const initialSettings = expectStatus(await request("GET", "/api/settings", { token: rootToken }), 200, "read initial settings");
 const registrationRateLimit = initialSettings.rateLimits.rules.find((rule) => rule.label === "POST /api/bvhub/register");
 assert.equal(initialSettings.rateLimits.enabled, true, "rate limiting is enabled");
+assert.ok(initialSettings.rateLimits.rules.some((rule) => rule.label === "POST /api/bvhub/me/member-application" && rule.maxRequests === 5), "member application submissions are rate limited");
+assert.ok(initialSettings.rateLimits.rules.some((rule) => rule.label === "POST /api/bvhub/me/member-application/retry" && rule.maxRequests === 10), "member application retries are rate limited");
 assert.deepEqual(registrationRateLimit, {
   label: "POST /api/bvhub/register",
   audience: "@guest",
@@ -1411,6 +1413,55 @@ expectStatus(await request("PATCH", `/api/bvhub/admin/events/${deletionEvent.id}
 assert.equal(expectStatus(await request("GET", `/api/collections/payments/records?filter=${encodeURIComponent(`user = "${deletionGuest.id}"`)}`, { token: rootToken }), 200, "read deleted guest payments").items.length, 0);
 assert.equal(expectStatus(await request("GET", `/api/collections/audit_events/records?filter=${encodeURIComponent(`actorUser = "${deletionGuest.id}" || targetUser = "${deletionGuest.id}"`)}`, { token: rootToken }), 200, "read deleted guest audits").items.length, 0);
 expectStatus(await request("GET", `/api/collections/user_deletion_requests/records/${scheduledRequest.id}`, { token: rootToken }), 404, "deletion request removed after purge");
+
+const applicationPath = "/api/bvhub/me/member-application";
+const applicationProfile = { street: "Teststrasse", houseNumber: "12", postalCode: "91052", city: "Erlangen", birthDate: "1990-04-12" };
+expectStatus(await request("PATCH", "/api/bvhub/me/profile", { token: guestLoginToken, body: applicationProfile }), 200, "complete applicant profile");
+const applicationToday = expectStatus(await request("GET", applicationPath, { token: guestLoginToken }), 200, "read applicant status").today;
+const applicationMonth = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"][Number(applicationToday.slice(5, 7)) - 1];
+const applicationFileName = `Aufnahmeantrag_Synthetic_Account_${applicationMonth}_${applicationToday.slice(0, 4)}.pdf`;
+const applicationPdf = fs.readFileSync(new URL("../frontend/public/Aufnahmeantrag_muster_15Okt2026.pdf", import.meta.url));
+const applicationForm = () => {
+  const form = new FormData();
+  form.set("pdf", new Blob([applicationPdf], { type: "application/pdf" }), applicationFileName);
+  form.set("signedDate", applicationToday);
+  return form;
+};
+expectStatus(await request("POST", applicationPath, { token: memberLoginToken, form: applicationForm() }), 403, "member cannot submit application");
+expectStatus(await request("POST", applicationPath, { token: adminLogin.token, form: applicationForm() }), 403, "admin cannot submit application");
+expectStatus(await request("PATCH", "/api/bvhub/me/profile", { token: guestLoginToken, body: { birthDate: "2020-04-12" } }), 200, "set underage applicant date");
+expectStatus(await request("POST", applicationPath, { token: guestLoginToken, form: applicationForm() }), 403, "underage guest cannot submit application");
+expectStatus(await request("PATCH", "/api/bvhub/me/profile", { token: guestLoginToken, body: { birthDate: applicationProfile.birthDate } }), 200, "restore adult applicant date");
+const applicationSettings = expectStatus(await request("GET", "/api/settings", { token: rootToken }), 200, "read application mail settings");
+expectStatus(await request("PATCH", "/api/settings", { token: rootToken, body: { ...applicationSettings, smtp: { ...applicationSettings.smtp, enabled: false } } }), 200, "disable SMTP for application retry test");
+expectStatus(await request("POST", applicationPath, { token: guestLoginToken, form: applicationForm() }), 503, "failed application email reports failure");
+const failedApplication = expectStatus(await request("GET", applicationPath, { token: guestLoginToken }), 200, "read failed application").application;
+assert.equal(failedApplication.status, "FAILED", "failed email retains the PDF");
+assert.ok(failedApplication.pdf, "failed email leaves a downloadable PDF");
+assert.equal(failedApplication.fileName, applicationFileName, "failed application keeps the visible filename");
+expectStatus(await request("PATCH", `/api/collections/member_applications/records/${failedApplication.id}`, { token: rootToken, body: { fileName: "" } }), 200, "simulate an application created before filename migration");
+assert.equal(expectStatus(await request("GET", applicationPath, { token: guestLoginToken }), 200, "read legacy application").application.fileName, applicationFileName, "legacy application derives its visible filename");
+expectStatus(await request("POST", `${applicationPath}/retry`, { token: guestLoginToken }), 503, "retry reports SMTP failure");
+expectStatus(await request("PATCH", "/api/settings", { token: rootToken, body: applicationSettings }), 200, "restore application SMTP");
+const applicationMailBefore = smtpMessages.length;
+const sentApplication = expectStatus(await request("POST", `${applicationPath}/retry`, { token: guestLoginToken }), 200, "retry sends existing application").application;
+assert.equal(sentApplication.status, "SENT");
+const applicationMail = await waitForMail(applicationMailBefore);
+assert.match(applicationMail, /Noreply BV Portal new Member/, "application mail uses the requested sender name");
+assert.match(applicationMail, /noreply@bv-erlangen2025.de/, "application mail uses the requested sender address");
+assert.match(applicationMail, /vorstand@bv-erlangen2025.de/, "application mail goes to the board");
+assert.ok(applicationMail.includes(applicationFileName), "application mail uses the expected subject and attachment name");
+const guestFileToken = expectStatus(await request("POST", "/api/files/token", { token: guestLoginToken }), 200, "create applicant file token").token;
+const memberFileToken = expectStatus(await request("POST", "/api/files/token", { token: memberLoginToken }), 200, "create other-user file token").token;
+const applicationFile = `/api/files/member_applications/${sentApplication.id}/${sentApplication.pdf}`;
+assert.equal((await request("GET", `${applicationFile}?token=${encodeURIComponent(guestFileToken)}`)).status, 200, "applicant downloads saved PDF");
+assert.notEqual((await request("GET", `${applicationFile}?token=${encodeURIComponent(memberFileToken)}`)).status, 200, "another user cannot download applicant PDF");
+const secondMailBefore = smtpMessages.length;
+const replacedApplication = expectStatus(await request("POST", applicationPath, { token: guestLoginToken, form: applicationForm() }), 200, "guest replaces latest application").application;
+assert.equal(replacedApplication.id, sentApplication.id, "resubmission replaces the existing record");
+assert.equal(replacedApplication.status, "SENT");
+await waitForMail(secondMailBefore);
+assert.notEqual(replacedApplication.pdf, sentApplication.pdf, "resubmission replaces the signed PDF");
 
 expectStatus(await request("PATCH", `/api/collections/users/records/${admin.id}`, {
   token: rootToken, body: { active: false },
