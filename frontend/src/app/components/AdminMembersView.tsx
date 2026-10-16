@@ -1,121 +1,282 @@
-import { useState } from "react";
-import { Download } from "lucide-react";
-import writeExcelFile from "write-excel-file/browser";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Member, Group, groupConfig, initials } from "./shared/MemberTypes";
-import { MemberDetailPopup } from "./shared/MemberDetailPopup";
-import { getAllMembers, getMemberDetails } from "../../features/members/api/getMembers";
-import { useMembers } from "../../features/members/hooks/useMembers";
-import { useI18n, type MessageKey } from "../../i18n";
+import { useMemo, useState } from "react"
+import { ArrowDown, ArrowUp, ArrowUpDown, Download, Plus } from "lucide-react"
+import writeExcelFile from "write-excel-file/browser"
+import { Button } from "./ui/button"
+import { Input } from "./ui/input"
+import { Member, Group, groupConfig, initials } from "./shared/MemberTypes"
+import { MemberDetailPopup } from "./shared/MemberDetailPopup"
+import { AdminMemberCreateDialog } from "./AdminMemberCreateDialog"
+import UserAvatar from "../../features/profile/components/UserAvatar"
+import {
+  sortMembers,
+  type MemberSort,
+  type MemberSortKey,
+} from "../../features/members/sorting"
+import {
+  getAllMembers,
+  getMemberDetails,
+} from "../../features/members/api/getMembers"
+import { useMembers } from "../../features/members/hooks/useMembers"
+import { useI18n, type MessageKey } from "../../i18n"
 
-function Icon({ d, size = 18, className = "" }: { d: string; size?: number; className?: string }) {
+function Icon({
+  d,
+  size = 18,
+  className = "",
+}: {
+  d: string
+  size?: number
+  className?: string
+}) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
       <path d={d} />
     </svg>
-  );
+  )
 }
 
 const ic = {
-  search:      "M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z",
-  filter:      "M22 3H2l8 9.46V19l4 2v-8.54L22 3z",
-  x:           "M18 6 6 18M6 6l12 12",
+  search: "M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z",
+  filter: "M22 3H2l8 9.46V19l4 2v-8.54L22 3z",
+  x: "M18 6 6 18M6 6l12 12",
   chevronLeft: "M15 18l-6-6 6-6",
-  chevronRight:"M9 18l6-6-6-6",
-  check:       "M20 6 9 17l-5-5",
-  user:        "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
-};
+  chevronRight: "M9 18l6-6-6-6",
+  check: "M20 6 9 17l-5-5",
+  user: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
+}
 
-const ALL_GROUPS: Group[] = ["MemberER", "MemberNUE", "guest", "Admin"];
+const ALL_GROUPS: Group[] = ["MemberER", "MemberNUE", "guest", "Admin"]
 const roleConfig = {
   GUEST: { key: "roles.guest", color: "#b45309", bg: "#fef3c7" },
   MEMBER: { key: "roles.member", color: "#15803d", bg: "#dcfce7" },
   ADMIN: { key: "roles.admin", color: "#7c3aed", bg: "#ede9fe" },
   SUPER_ADMIN: { key: "roles.superAdmin", color: "#be123c", bg: "#ffe4e6" },
-} as const;
+} as const
 
 function matchesGroups(member: Member, groups: Group[]) {
-  return groups.length === 0 || groups.some((group) => {
-    if (group === "Admin") return member.role === "ADMIN";
-    const names = member.groups?.map((item) => item.name) ?? [];
-    return group === "MemberER" ? names.includes("Member ER") : group === "MemberNUE" ? names.includes("Member NUE") : names.includes("Guest");
-  });
+  return (
+    groups.length === 0 ||
+    groups.some((group) => {
+      if (group === "Admin") return member.role === "ADMIN"
+      const names = member.groups?.map((item) => item.name) ?? []
+      return group === "MemberER"
+        ? names.includes("Member ER")
+        : group === "MemberNUE"
+          ? names.includes("Member NUE")
+          : names.includes("Guest")
+    })
+  )
 }
 
 // ─── Filter Sheet ─────────────────────────────────────────────────────────────
 
-function FilterSheet({ selected, onApply, onClose }: { selected: Group[]; onApply: (g: Group[]) => void; onClose: () => void }) {
-  const { t } = useI18n();
-  const [local, setLocal] = useState<Group[]>(selected);
+function FilterSheet({
+  selected,
+  onApply,
+  onClose,
+}: {
+  selected: Group[]
+  onApply: (g: Group[]) => void
+  onClose: () => void
+}) {
+  const { t } = useI18n()
+  const [local, setLocal] = useState<Group[]>(selected)
   function toggle(g: Group) {
-    setLocal((prev) => prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]);
+    setLocal((prev) =>
+      prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g],
+    )
   }
   return (
     <>
-      <div className="fixed inset-0 z-[110] bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed bottom-0 left-0 right-0 z-[111] bg-[var(--card)] rounded-t-2xl border-t border-[var(--border)] pb-8 max-w-2xl mx-auto" style={{ boxShadow: "0 -8px 40px rgba(0,0,0,0.15)" }}>
-        <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-[var(--border)]" /></div>
+      <div
+        className="fixed inset-0 z-[110] bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div
+        className="fixed bottom-0 left-0 right-0 z-[111] bg-[var(--card)] rounded-t-2xl border-t border-[var(--border)] pb-8 max-w-2xl mx-auto"
+        style={{ boxShadow: "0 -8px 40px rgba(0,0,0,0.15)" }}
+      >
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 rounded-full bg-[var(--border)]" />
+        </div>
         <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
-          <p className="font-bold text-sm">{t("admin.members.filterByGroup")}</p>
-          <button onClick={() => setLocal([])} className="text-xs text-[var(--primary)] font-medium">{t("common.clearAll")}</button>
+          <p className="font-bold text-sm">
+            {t("admin.members.filterByGroup")}
+          </p>
+          <button
+            onClick={() => setLocal([])}
+            className="text-xs text-[var(--primary)] font-medium"
+          >
+            {t("common.clearAll")}
+          </button>
         </div>
         <div className="px-5 py-4 flex flex-col gap-2">
           {ALL_GROUPS.map((g) => {
-            const cfg = groupConfig[g];
-            const on = local.includes(g);
+            const cfg = groupConfig[g]
+            const on = local.includes(g)
             return (
-              <button key={g} onClick={() => toggle(g)}
+              <button
+                key={g}
+                onClick={() => toggle(g)}
                 className="flex items-center gap-3 px-4 py-3 rounded-lg border transition-all duration-150 w-full text-left"
-                style={{ background: on ? cfg.bg : "var(--card)", borderColor: on ? cfg.color : "var(--border)" }}>
-                <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: cfg.bg, color: cfg.color }}>{g[0]}</div>
-                <span className="flex-1 text-sm font-medium" style={{ color: on ? cfg.color : "var(--foreground)" }}>{g === "MemberER" ? t("groups.memberER") : g === "MemberNUE" ? t("groups.memberNUE") : g === "guest" ? t("groups.guest") : t("groups.admin")}</span>
-                {on && <div className="h-5 w-5 rounded-full flex items-center justify-center" style={{ background: cfg.color }}><Icon d={ic.check} size={11} className="text-white" /></div>}
+                style={{
+                  background: on ? cfg.bg : "var(--card)",
+                  borderColor: on ? cfg.color : "var(--border)",
+                }}
+              >
+                <div
+                  className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold"
+                  style={{ background: cfg.bg, color: cfg.color }}
+                >
+                  {g[0]}
+                </div>
+                <span
+                  className="flex-1 text-sm font-medium"
+                  style={{ color: on ? cfg.color : "var(--foreground)" }}
+                >
+                  {g === "MemberER"
+                    ? t("groups.memberER")
+                    : g === "MemberNUE"
+                      ? t("groups.memberNUE")
+                      : g === "guest"
+                        ? t("groups.guest")
+                        : t("groups.admin")}
+                </span>
+                {on && (
+                  <div
+                    className="h-5 w-5 rounded-full flex items-center justify-center"
+                    style={{ background: cfg.color }}
+                  >
+                    <Icon d={ic.check} size={11} className="text-white" />
+                  </div>
+                )}
               </button>
-            );
+            )
           })}
         </div>
         <div className="px-5">
-          <Button className="w-full" onClick={() => { onApply(local); onClose(); }}>
-            {t("common.apply")} ({local.length === 0 ? t("common.all") : t("common.selectedGroups", { count: local.length })})
+          <Button
+            className="w-full"
+            onClick={() => {
+              onApply(local)
+              onClose()
+            }}
+          >
+            {t("common.apply")} (
+            {local.length === 0
+              ? t("common.all")
+              : t("common.selectedGroups", { count: local.length })}
+            )
           </Button>
         </div>
       </div>
     </>
-  );
+  )
 }
 
 // ─── Main View ────────────────────────────────────────────────────────────────
 
 export default function AdminMembersView({ onBack }: { onBack: () => void }) {
-  const { t } = useI18n();
-  const [search, setSearch] = useState("");
-  const [filterGroups, setFilterGroups] = useState<Group[]>([]);
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [selected, setSelected] = useState<Member | null>(null);
-  const [exporting, setExporting] = useState(false);
-  const [exportError, setExportError] = useState(false);
+  const { t } = useI18n()
+  const [search, setSearch] = useState("")
+  const [filterGroups, setFilterGroups] = useState<Group[]>([])
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [selected, setSelected] = useState<Member | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [sort, setSort] = useState<MemberSort>({
+    key: "created",
+    direction: "desc",
+  })
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState(false)
 
-  const membersQuery = useMembers({ search, page: 1, perPage: 50 });
-  const filtered = (membersQuery.data?.items ?? []).filter((member) => matchesGroups(member, filterGroups));
-  const hasFilter = filterGroups.length > 0;
+  const membersQuery = useMembers({ search, page: 1, perPage: 50 })
+  const filtered = useMemo(
+    () =>
+      sortMembers(
+        (membersQuery.data?.items ?? []).filter((member) =>
+          matchesGroups(member, filterGroups),
+        ),
+        sort,
+      ),
+    [filterGroups, membersQuery.data?.items, sort],
+  )
+  const hasFilter = filterGroups.length > 0
+
+  function toggleSort(key: MemberSortKey) {
+    setSort((current) =>
+      current.key === key
+        ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
+        : { key, direction: "asc" },
+    )
+  }
+
+  function sortIcon(key: MemberSortKey) {
+    if (sort.key !== key) return <ArrowUpDown aria-hidden="true" />
+    return sort.direction === "asc" ? (
+      <ArrowUp aria-hidden="true" />
+    ) : (
+      <ArrowDown aria-hidden="true" />
+    )
+  }
 
   async function exportMembers() {
-    setExporting(true);
-    setExportError(false);
+    setExporting(true)
+    setExportError(false)
     try {
-      const members = (await getAllMembers(search)).filter((member) => matchesGroups(member, filterGroups));
-      const details = await Promise.all(members.map((member) => getMemberDetails(member.id)));
-      const groupLabels: Record<string, MessageKey> = { "Member ER": "groups.memberER", "Member NUE": "groups.memberNUE", Guest: "groups.guest" };
-      const roleLabel = (role: string) => t((roleConfig[role as keyof typeof roleConfig] ?? roleConfig.GUEST).key);
-      const activeLabel = (active: boolean) => t(active ? "profile.active" : "profile.inactive");
-      const verifiedLabel = (verified: boolean) => t(verified ? "profile.verified" : "profile.unverified");
+      const members = (await getAllMembers(search)).filter((member) =>
+        matchesGroups(member, filterGroups),
+      )
+      const details = await Promise.all(
+        members.map((member) => getMemberDetails(member.id)),
+      )
+      const groupLabels: Record<string, MessageKey> = {
+        "Member ER": "groups.memberER",
+        "Member NUE": "groups.memberNUE",
+        Guest: "groups.guest",
+      }
+      const roleLabel = (role: string) =>
+        t(
+          (roleConfig[(role as keyof typeof roleConfig)] ?? roleConfig.GUEST)
+            .key,
+        )
+      const activeLabel = (active: boolean) =>
+        t(active ? "profile.active" : "profile.inactive")
+      const verifiedLabel = (verified: boolean) =>
+        t(verified ? "profile.verified" : "profile.unverified")
       const columns: MessageKey[] = [
-        "admin.members.memberId", "admin.members.username", "admin.members.displayName", "profile.firstName", "profile.lastName", "auth.email",
-        "profile.role", "profile.active", "profile.verified", "profile.groups", "admin.members.memberSince",
-        "profile.createdAt", "profile.updatedAt", "profile.birthDate", "profile.street", "profile.houseNumber",
-        "profile.postalCode", "profile.city", "profile.address", "profile.phone", "profile.contactInfo",
-      ];
+        "admin.members.memberId",
+        "admin.members.username",
+        "admin.members.displayName",
+        "profile.firstName",
+        "profile.lastName",
+        "auth.email",
+        "profile.role",
+        "profile.active",
+        "profile.verified",
+        "profile.groups",
+        "admin.members.memberSince",
+        "profile.createdAt",
+        "profile.updatedAt",
+        "profile.birthDate",
+        "profile.street",
+        "profile.houseNumber",
+        "profile.postalCode",
+        "profile.city",
+        "profile.address",
+        "profile.phone",
+        "profile.contactInfo",
+      ]
       const rows = [
         columns.map((key) => t(key)),
         ...details.map((member) => [
@@ -128,7 +289,11 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
           roleLabel(member.role),
           activeLabel(member.active),
           verifiedLabel(member.verified),
-          member.groups?.map((group) => groupLabels[group.name] ? t(groupLabels[group.name]) : group.name).join(", ") || "-",
+          member.groups
+            ?.map((group) =>
+              groupLabels[group.name] ? t(groupLabels[group.name]) : group.name,
+            )
+            .join(", ") || "-",
           member.memberSince,
           member.created,
           member.updated,
@@ -141,35 +306,90 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
           member.phone,
           member.contactInfo,
         ]),
-      ];
-      const now = new Date();
-      const stamp = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0"), String(now.getHours()).padStart(2, "0"), String(now.getMinutes()).padStart(2, "0"), String(now.getSeconds()).padStart(2, "0")].join("");
-      await writeExcelFile(rows).toFile(`bvhub-members-${stamp}.xlsx`);
+      ]
+      const now = new Date()
+      const stamp = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, "0"),
+        String(now.getDate()).padStart(2, "0"),
+        String(now.getHours()).padStart(2, "0"),
+        String(now.getMinutes()).padStart(2, "0"),
+        String(now.getSeconds()).padStart(2, "0"),
+      ].join("")
+      await writeExcelFile(rows).toFile(`bvhub-members-${stamp}.xlsx`)
     } catch {
-      setExportError(true);
+      setExportError(true)
     } finally {
-      setExporting(false);
+      setExporting(false)
     }
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflow: "hidden" }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        flex: 1,
+        minHeight: 0,
+        overflow: "hidden",
+      }}
+    >
       {/* Sticky header */}
-      <div style={{ flexShrink: 0 }} className="bg-[var(--card)] border-b border-[var(--border)]">
+      <div
+        style={{ flexShrink: 0 }}
+        className="bg-[var(--card)] border-b border-[var(--border)]"
+      >
         <div className="flex items-center gap-3 px-4 pt-4 pb-2">
-          <button onClick={onBack} aria-label={t("common.back")} className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-[var(--muted)] text-[var(--muted-foreground)] transition-colors shrink-0">
+          <button
+            onClick={onBack}
+            aria-label={t("common.back")}
+            className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-[var(--muted)] text-[var(--muted-foreground)] transition-colors shrink-0"
+          >
             <Icon d={ic.chevronLeft} size={18} />
           </button>
           <div className="min-w-0 flex-1">
             <h1 className="page-title">{t("admin.members.title")}</h1>
-            <p className="text-[10px] text-[var(--muted-foreground)]">{t("admin.members.count", { count: hasFilter ? filtered.length : membersQuery.data?.totalItems ?? 0 })}</p>
+            <p className="text-[10px] text-[var(--muted-foreground)]">
+              {t("admin.members.count", {
+                count: hasFilter
+                  ? filtered.length
+                  : (membersQuery.data?.totalItems ?? 0),
+              })}
+            </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Button type="button" variant="outline" size="sm" className="hidden lg:inline-flex" onClick={() => void exportMembers()} disabled={exporting} data-testid="export-members">
-              <Download size={15} aria-hidden="true" />{exporting ? t("admin.members.exporting") : t("admin.members.exportExcel")}
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => setCreateOpen(true)}
+              data-testid="create-member"
+            >
+              <Plus data-icon="inline-start" />
+              {t("admin.members.create")}
             </Button>
-            <button onClick={() => setFilterOpen(true)} aria-label={t("common.filter")}
-              className={`relative h-9 w-9 rounded-full flex items-center justify-center transition-colors ${hasFilter ? "bg-[var(--primary)] text-white" : "hover:bg-[var(--muted)] text-[var(--muted-foreground)]"}`}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="hidden lg:inline-flex"
+              onClick={() => void exportMembers()}
+              disabled={exporting}
+              data-testid="export-members"
+            >
+              <Download size={15} aria-hidden="true" />
+              {exporting
+                ? t("admin.members.exporting")
+                : t("admin.members.exportExcel")}
+            </Button>
+            <button
+              onClick={() => setFilterOpen(true)}
+              aria-label={t("common.filter")}
+              className={`relative h-9 w-9 rounded-full flex items-center justify-center transition-colors ${
+                hasFilter
+                  ? "bg-[var(--primary)] text-white"
+                  : "hover:bg-[var(--muted)] text-[var(--muted-foreground)]"
+              }`}
+            >
               <Icon d={ic.filter} size={16} />
               {hasFilter && (
                 <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-[var(--card)]">
@@ -181,36 +401,86 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
         </div>
         <div className="px-4 pb-3">
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]"><Icon d={ic.search} size={15} /></span>
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("admin.members.searchPlaceholder")}
-              className="h-10 pl-9 pr-9" />
-            {search && <button onClick={() => setSearch("")} aria-label={t("common.clearSearch")} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"><Icon d={ic.x} size={14} /></button>}
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]">
+              <Icon d={ic.search} size={15} />
+            </span>
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t("admin.members.searchPlaceholder")}
+              className="h-10 pl-9 pr-9"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                aria-label={t("common.clearSearch")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+              >
+                <Icon d={ic.x} size={14} />
+              </button>
+            )}
           </div>
           {hasFilter && (
             <div className="flex gap-1.5 mt-2 flex-wrap">
               {filterGroups.map((g) => {
-                const cfg = groupConfig[g];
+                const cfg = groupConfig[g]
                 return (
-                  <button key={g} onClick={() => setFilterGroups((prev) => prev.filter((x) => x !== g))}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold" style={{ background: cfg.bg, color: cfg.color }}>
-                    {g === "MemberER" ? t("groups.memberER") : g === "MemberNUE" ? t("groups.memberNUE") : g === "guest" ? t("groups.guest") : t("groups.admin")}<Icon d={ic.x} size={9} />
+                  <button
+                    key={g}
+                    onClick={() =>
+                      setFilterGroups((prev) => prev.filter((x) => x !== g))
+                    }
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold"
+                    style={{ background: cfg.bg, color: cfg.color }}
+                  >
+                    {g === "MemberER"
+                      ? t("groups.memberER")
+                      : g === "MemberNUE"
+                        ? t("groups.memberNUE")
+                        : g === "guest"
+                          ? t("groups.guest")
+                          : t("groups.admin")}
+                    <Icon d={ic.x} size={9} />
                   </button>
-                );
+                )
               })}
             </div>
           )}
-          {exportError && <p role="alert" className="mt-2 text-xs text-red-600">{t("admin.members.exportError")}</p>}
+          {exportError && (
+            <p role="alert" className="mt-2 text-xs text-red-600">
+              {t("admin.members.exportError")}
+            </p>
+          )}
         </div>
       </div>
 
       {/* List */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "auto" }}>
-        {membersQuery.isLoading ? <div className="p-8 text-sm text-[var(--muted-foreground)]">{t("admin.members.loading")}</div> : membersQuery.isError ? (
-          <div className="flex flex-col items-center py-16"><p className="text-sm text-red-600">{t("admin.members.loadError")}</p><Button variant="outline" className="mt-3" onClick={() => void membersQuery.refetch()}>{t("common.retry")}</Button></div>
+      <div
+        style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "auto" }}
+      >
+        {membersQuery.isLoading ? (
+          <div className="p-8 text-sm text-[var(--muted-foreground)]">
+            {t("admin.members.loading")}
+          </div>
+        ) : membersQuery.isError ? (
+          <div className="flex flex-col items-center py-16">
+            <p className="text-sm text-red-600">
+              {t("admin.members.loadError")}
+            </p>
+            <Button
+              variant="outline"
+              className="mt-3"
+              onClick={() => void membersQuery.refetch()}
+            >
+              {t("common.retry")}
+            </Button>
+          </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center py-16 text-[var(--muted-foreground)]">
             <Icon d={ic.user} size={32} />
-            <p className="text-sm mt-3 font-medium">{t("admin.members.empty")}</p>
+            <p className="text-sm mt-3 font-medium">
+              {t("admin.members.empty")}
+            </p>
           </div>
         ) : (
           <>
@@ -219,31 +489,121 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-[var(--border)] bg-[var(--muted)]/50">
-                    {["admin.members.avatar", "admin.members.memberId", "admin.members.displayName", "profile.firstName", "profile.lastName", "auth.email", "profile.role", "profile.groups", "admin.members.memberSince"].map((h) => (
-                      <th key={h} className="sticky top-0 z-10 bg-[var(--muted)] text-left text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wide px-4 py-3">{t(h as MessageKey)}</th>
+                    <th className="sticky top-0 z-10 bg-[var(--muted)] px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-[var(--muted-foreground)]">
+                      {t("admin.members.avatar")}
+                    </th>
+                    {([
+                      ["admin.members.displayName", "displayName"],
+                      ["profile.firstName", "firstName"],
+                      ["profile.lastName", "lastName"],
+                    ] as const).map(([label, key]) => (
+                      <th
+                        key={key}
+                        className="sticky top-0 z-10 bg-[var(--muted)] px-4 py-2 text-left text-[10px] font-bold uppercase tracking-wide text-[var(--muted-foreground)]"
+                      >
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 rounded px-1 py-1 hover:bg-background"
+                          onClick={() => toggleSort(key)}
+                          aria-label={t(label as MessageKey)}
+                        >
+                          {t(label as MessageKey)}
+                          {sortIcon(key)}
+                        </button>
+                      </th>
                     ))}
+                    <th className="sticky top-0 z-10 bg-[var(--muted)] px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-[var(--muted-foreground)]">
+                      {t("auth.email")}
+                    </th>
+                    <th className="sticky top-0 z-10 bg-[var(--muted)] px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-[var(--muted-foreground)]">
+                      {t("profile.role")}
+                    </th>
+                    <th className="sticky top-0 z-10 bg-[var(--muted)] px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-[var(--muted-foreground)]">
+                      {t("profile.groups")}
+                    </th>
+                    <th className="sticky top-0 z-10 bg-[var(--muted)] px-4 py-2 text-left text-[10px] font-bold uppercase tracking-wide text-[var(--muted-foreground)]">
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 rounded px-1 py-1 hover:bg-background"
+                        onClick={() => toggleSort("created")}
+                        aria-label={t("admin.members.memberSince")}
+                      >
+                        {t("admin.members.memberSince")}
+                        {sortIcon("created")}
+                      </button>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((m, i) => {
-                    const roleCfg = roleConfig[m.role ?? "GUEST"];
+                    const roleCfg = roleConfig[m.role ?? "GUEST"]
                     return (
-                      <tr key={m.id} className={`border-b border-[var(--border)] hover:bg-[var(--muted)]/40 transition-colors ${i % 2 === 0 ? "" : "bg-[var(--background)]"}`}>
+                      <tr
+                        key={m.id}
+                        className={`border-b border-[var(--border)] hover:bg-[var(--muted)]/40 transition-colors ${
+                          i % 2 === 0 ? "" : "bg-[var(--background)]"
+                        }`}
+                      >
                         <td className="px-4 py-3">
-                          <button onClick={() => setSelected(m)} className="h-9 w-9 rounded-full flex items-center justify-center text-white text-xs font-bold hover:scale-110 transition-transform" style={{ background: m.avatarColor }}>
-                            {initials(m)}
+                          <button
+                            onClick={() => setSelected(m)}
+                            className="rounded-full transition-transform hover:scale-110"
+                            aria-label={`${m.vorname} ${m.nachname}`}
+                          >
+                            <UserAvatar
+                              avatar={m.avatar}
+                              fallback={initials(m)}
+                              alt={`${m.vorname} ${m.nachname}`}
+                            />
                           </button>
                         </td>
-                        <td className="px-4 py-3"><button onClick={() => setSelected(m)} className="font-mono text-xs text-[var(--primary)] hover:underline font-semibold">{m.id}</button></td>
-                        <td className="px-4 py-3"><button onClick={() => setSelected(m)} className="text-sm font-medium hover:text-[var(--primary)] hover:underline transition-colors">{m.displayName || m.username}</button></td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => setSelected(m)}
+                            className="text-sm font-medium hover:text-[var(--primary)] hover:underline transition-colors"
+                          >
+                            {m.displayName || m.username}
+                          </button>
+                        </td>
                         <td className="px-4 py-3 text-sm">{m.vorname}</td>
                         <td className="px-4 py-3 text-sm">{m.nachname}</td>
-                        <td className="px-4 py-3 text-xs text-[var(--muted-foreground)]">{m.email}</td>
-                        <td className="px-4 py-3"><span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: roleCfg.bg, color: roleCfg.color }}>{t(roleCfg.key)}</span></td>
-                        <td className="px-4 py-3"><div className="flex flex-wrap gap-1">{m.groups?.length ? m.groups.map((group) => <span key={group.id} className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-[var(--muted)]">{group.name}</span>) : <span className="text-xs text-[var(--muted-foreground)]">-</span>}</div></td>
-                        <td className="px-4 py-3 text-xs text-[var(--muted-foreground)]">{m.memberSince}</td>
+                        <td className="px-4 py-3 text-xs text-[var(--muted-foreground)]">
+                          {m.email}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                            style={{
+                              background: roleCfg.bg,
+                              color: roleCfg.color,
+                            }}
+                          >
+                            {t(roleCfg.key)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-1">
+                            {m.groups?.length ? (
+                              m.groups.map((group) => (
+                                <span
+                                  key={group.id}
+                                  className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-[var(--muted)]"
+                                >
+                                  {group.name}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-xs text-[var(--muted-foreground)]">
+                                -
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-[var(--muted-foreground)]">
+                          {m.memberSince}
+                        </td>
                       </tr>
-                    );
+                    )
                   })}
                 </tbody>
               </table>
@@ -252,37 +612,89 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
             {/* Mobile list */}
             <div className="lg:hidden flex flex-col divide-y divide-[var(--border)]">
               {filtered.map((m) => {
-                const roleCfg = roleConfig[m.role ?? "GUEST"];
+                const roleCfg = roleConfig[m.role ?? "GUEST"]
                 return (
-                  <button key={m.id} onClick={() => setSelected(m)}
-                    className="flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--muted)]/40 transition-colors text-left w-full active:bg-[var(--muted)]">
-                    <div className="h-10 w-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0" style={{ background: m.avatarColor }}>
-                      {initials(m)}
-                    </div>
+                  <button
+                    key={m.id}
+                    onClick={() => setSelected(m)}
+                    className="flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--muted)]/40 transition-colors text-left w-full active:bg-[var(--muted)]"
+                  >
+                    <UserAvatar
+                      avatar={m.avatar}
+                      fallback={initials(m)}
+                      alt={`${m.vorname} ${m.nachname}`}
+                      className="size-12 text-base"
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold truncate">{m.vorname} {m.nachname}</p>
-                        <span className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ background: roleCfg.bg, color: roleCfg.color }}>{t(roleCfg.key)}</span>
+                        <p className="text-sm font-semibold truncate">
+                          {m.vorname} {m.nachname}
+                        </p>
+                        <span
+                          className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold"
+                          style={{
+                            background: roleCfg.bg,
+                            color: roleCfg.color,
+                          }}
+                        >
+                          {t(roleCfg.key)}
+                        </span>
                       </div>
-                      <p className="text-[11px] text-[var(--muted-foreground)] truncate">{m.displayName || m.username} · {m.id}</p>
-                      <p className="text-[11px] text-[var(--muted-foreground)] truncate">{m.email}</p>
-                      <p className="text-[11px] text-[var(--muted-foreground)] truncate">{t("profile.groups")}: {m.groups?.map((group) => group.name).join(", ") || "-"}</p>
+                      <p className="text-[11px] text-[var(--muted-foreground)] truncate">
+                        {m.displayName || m.username}
+                      </p>
+                      <p className="text-[11px] text-[var(--muted-foreground)] truncate">
+                        {m.email}
+                      </p>
+                      <p className="text-[11px] text-[var(--muted-foreground)] truncate">
+                        {t("profile.groups")}:{" "}
+                        {m.groups?.map((group) => group.name).join(", ") || "-"}
+                      </p>
                     </div>
-                    <Icon d={ic.chevronRight} size={12} className="text-[var(--muted-foreground)] shrink-0" />
+                    <Icon
+                      d={ic.chevronRight}
+                      size={12}
+                      className="text-[var(--muted-foreground)] shrink-0"
+                    />
                   </button>
-                );
+                )
               })}
             </div>
           </>
         )}
       </div>
 
-      {filterOpen && <FilterSheet selected={filterGroups} onApply={setFilterGroups} onClose={() => setFilterOpen(false)} />}
-      {selected && <MemberDetailPopup member={selected} onClose={() => setSelected(null)} onDeleted={async () => { await membersQuery.refetch(); }} onReload={async () => {
-        const result = await membersQuery.refetch();
-        const refreshed = result.data?.items.find((member) => member.id === selected.id);
-        if (refreshed) setSelected(refreshed);
-      }} />}
+      {filterOpen && (
+        <FilterSheet
+          selected={filterGroups}
+          onApply={setFilterGroups}
+          onClose={() => setFilterOpen(false)}
+        />
+      )}
+      {createOpen && (
+        <AdminMemberCreateDialog
+          onClose={() => setCreateOpen(false)}
+          onCreated={async () => {
+            await membersQuery.refetch()
+          }}
+        />
+      )}
+      {selected && (
+        <MemberDetailPopup
+          member={selected}
+          onClose={() => setSelected(null)}
+          onDeleted={async () => {
+            await membersQuery.refetch()
+          }}
+          onReload={async () => {
+            const result = await membersQuery.refetch()
+            const refreshed = result.data?.items.find(
+              (member) => member.id === selected.id,
+            )
+            if (refreshed) setSelected(refreshed)
+          }}
+        />
+      )}
     </div>
-  );
+  )
 }

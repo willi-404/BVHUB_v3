@@ -116,13 +116,37 @@ function start(app, actor, userId) {
   return { status: "SCHEDULED", deleteAfter: new Date(sentAt.getTime() + DAY_MS).toISOString() };
 }
 
-function purge(app, request, now = new Date()) {
+function forceDelete(app, actor, userId) {
+  const service = require(`${__hooks}/admin-service.js`);
+  const user = service.findUser(app, userId);
+  const role = user.getString("role");
+  if (!service.MANAGED_ROLES.includes(role)) throw new ApiError(409, "Nur Gast- oder Mitgliedskonten können erzwungen gelöscht werden", { code: "DELETION_ROLE" });
+  if (user.getBool("active") === true && user.getBool("verified") === true) throw new ApiError(409, "Erzwungene Löschung ist nur für inaktive oder unbestätigte Konten erlaubt", { code: "DELETION_FORCE_ACTIVE" });
+  assertNotDeleting(app, user.id);
+  let request;
+  const now = new Date();
+  app.runInTransaction((txApp) => {
+    const current = txApp.findRecordById("users", user.id);
+    request = new Record(txApp.findCollectionByNameOrId("user_deletion_requests"));
+    request.set("user", current.id);
+    request.set("requestedBy", actor.id);
+    request.set("status", "SCHEDULED");
+    request.set("sentAt", now.toISOString());
+    request.set("deleteAfter", now.toISOString());
+    request.set("lastError", "");
+    txApp.save(request);
+  });
+  purge(app, request, new Date(now.getTime() + 1), true);
+  return { status: "DELETED" };
+}
+
+function purge(app, request, now = new Date(), skipEligibility = false) {
   if (request.getString("status") !== "SCHEDULED" || Date.parse(request.getString("deleteAfter")) > now.getTime()) return false;
   app.runInTransaction((txApp) => {
     const job = txApp.findRecordById("user_deletion_requests", request.id);
     if (job.getString("status") !== "SCHEDULED" || Date.parse(job.getString("deleteAfter")) > now.getTime()) return;
     const user = txApp.findRecordById("users", job.getString("user"));
-    assertEligible(txApp, user);
+    if (!skipEligibility) assertEligible(txApp, user);
     const deletedDate = require(`${__hooks}/notification-service.js`).berlinDate(now).toISOString().slice(0, 10);
     const note = `（此用户已于${deletedDate} 已删除）`;
     const name = `${user.getString("displayName")} (${user.getString("firstName")} ${user.getString("lastName")})${note}`;
@@ -150,4 +174,4 @@ function purge(app, request, now = new Date()) {
   return true;
 }
 
-module.exports = { assertEligible, assertNotDeleting, auditText, requestFor, start, purge, DAY_MS };
+module.exports = { assertEligible, assertNotDeleting, auditText, requestFor, start, forceDelete, purge, DAY_MS };

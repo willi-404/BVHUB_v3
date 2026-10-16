@@ -64,8 +64,30 @@ function userDto(app, user) {
     verified: user.getBool("verified"),
     created: user.getString("created"),
     updated: user.getString("updated"),
+    avatar: require(`${__hooks}/profile-service.js`).avatarRef(app, user.id),
     groups: groupsFor(app, user.id),
   };
+}
+
+function createPayload(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new BadRequestError("Ungültige Verwaltungsdaten");
+  const allowed = ["email", "displayName", "firstName", "lastName", "street", "houseNumber", "postalCode", "city", "birthDate", "phone", "contactInfo"];
+  if (Object.keys(value).some((key) => !allowed.includes(key))) throw new BadRequestError("Nicht erlaubte Verwaltungsfelder");
+  const email = typeof value.email === "string" ? value.email.trim().toLowerCase() : "";
+  if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new BadRequestError("Ungültige E-Mail-Adresse");
+  const profile = require(`${__hooks}/profile-service.js`).validate({
+    displayName: value.displayName,
+    firstName: value.firstName,
+    lastName: value.lastName,
+    street: value.street,
+    houseNumber: value.houseNumber,
+    postalCode: value.postalCode,
+    city: value.city,
+    birthDate: value.birthDate,
+    phone: value.phone || "",
+    contactInfo: value.contactInfo || "",
+  });
+  return { email, ...profile };
 }
 
 function memberDetailDto(app, user) {
@@ -141,4 +163,4 @@ function targetGroupIds(app, value) {
   return value;
 }
 
-module.exports = { MANAGED_GROUPS, MANAGED_ROLES, body, actor, findUser, groupRecords, groupsFor, userDto, memberDetailDto, memberCardDto, audit, targetGroupIds, pathId };
+module.exports = { MANAGED_GROUPS, MANAGED_ROLES, body, actor, findUser, groupRecords, groupsFor, userDto, memberDetailDto, memberCardDto, audit, targetGroupIds, pathId, createPayload };
