@@ -47,7 +47,6 @@ function Icon({
 
 const ic = {
   search: "M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z",
-  filter: "M22 3H2l8 9.46V19l4 2v-8.54L22 3z",
   x: "M18 6 6 18M6 6l12 12",
   chevronLeft: "M15 18l-6-6 6-6",
   chevronRight: "M9 18l6-6-6-6",
@@ -357,10 +356,16 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
               })}
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+        </div>
+        <div
+          className="flex flex-col gap-2 px-4 pb-2 sm:flex-row sm:items-center"
+          data-testid="member-actions"
+        >
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
             <Button
               type="button"
               size="sm"
+              className="w-full sm:w-auto"
               onClick={() => setCreateOpen(true)}
               data-testid="create-member"
             >
@@ -371,7 +376,7 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
               type="button"
               variant="outline"
               size="sm"
-              className="hidden lg:inline-flex"
+              className="w-full sm:w-auto"
               onClick={() => void exportMembers()}
               disabled={exporting}
               data-testid="export-members"
@@ -381,23 +386,24 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
                 ? t("admin.members.exporting")
                 : t("admin.members.exportExcel")}
             </Button>
-            <button
-              onClick={() => setFilterOpen(true)}
-              aria-label={t("common.filter")}
-              className={`relative h-9 w-9 rounded-full flex items-center justify-center transition-colors ${
-                hasFilter
-                  ? "bg-[var(--primary)] text-white"
-                  : "hover:bg-[var(--muted)] text-[var(--muted-foreground)]"
-              }`}
-            >
-              <Icon d={ic.filter} size={16} />
-              {hasFilter && (
-                <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-[var(--card)]">
-                  {filterGroups.length}
-                </span>
-              )}
-            </button>
           </div>
+          <Button
+            type="button"
+            variant={hasFilter ? "default" : "outline"}
+            size="sm"
+            className="relative w-full sm:w-auto"
+            onClick={() => setFilterOpen(true)}
+            aria-label={t("common.filter")}
+            aria-pressed={hasFilter}
+            data-testid="filter-members"
+          >
+            {t("common.filter")}
+            {hasFilter && (
+              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold text-white">
+                {filterGroups.length}
+              </span>
+            )}
+          </Button>
         </div>
         <div className="px-4 pb-3">
           <div className="relative">

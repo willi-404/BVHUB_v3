@@ -71,18 +71,18 @@ function details(user: typeof guest | typeof member) {
   }
 }
 
-async function mockAdmin(page: Page) {
+async function mockAdmin(page: Page, locale = "en") {
   const createdBodies: Record<string, unknown>[] = []
   const forceDeleted: string[] = []
   await page.addInitScript(
-    ({ record, sessionToken }) => {
+    ({ record, sessionToken, locale }) => {
       window.sessionStorage.setItem(
         "pb_auth",
         JSON.stringify({ token: sessionToken, record }),
       )
-      window.sessionStorage.setItem("bvhub.locale", "en")
+      window.sessionStorage.setItem("bvhub.locale", locale)
     },
-    { record: admin, sessionToken: token },
+    { record: admin, sessionToken: token, locale },
   )
   await page.route(e2ePocketBaseApiRoute, async (route) => {
     const request = route.request()
@@ -186,7 +186,7 @@ test("admin creates Guest accounts and force deletes unverified accounts", async
 test("admin member list remains within the mobile viewport", async ({
   page,
 }) => {
-  await mockAdmin(page)
+  await mockAdmin(page, "de")
   await page.setViewportSize({ width: 375, height: 844 })
   await page.goto("/admin/members")
   await expect(
@@ -195,6 +195,24 @@ test("admin member list remains within the mobile viewport", async ({
       .getByText("Pending Guest", { exact: true })
       .first(),
   ).toBeVisible()
+  const actions = page.getByTestId("member-actions")
+  await expect(actions).toBeVisible()
+  await expect(page.getByTestId("create-member")).toBeVisible()
+  await expect(page.getByTestId("export-members")).toBeVisible()
+  await expect(page.getByTestId("filter-members")).toHaveText("Filtern")
+  expect(
+    await Promise.all(
+      ["create-member", "export-members", "filter-members"].map((id) =>
+        page.getByTestId(id).evaluate((element) => {
+          const style = getComputedStyle(element)
+          return (
+            style.whiteSpace === "nowrap" &&
+            element.getBoundingClientRect().width > 0
+          )
+        }),
+      ),
+    ),
+  ).toEqual([true, true, true])
   expect(
     await page
       .locator("body")
