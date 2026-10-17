@@ -50,7 +50,7 @@ function eventRecord(overrides: Record<string, unknown> = {}) {
 
 async function mockSession(
   page: Page,
-  options: { role?: Role; event?: ReturnType<typeof eventRecord>; avatar?: boolean } = {},
+  options: { role?: Role; event?: ReturnType<typeof eventRecord>; avatar?: boolean; locale?: string } = {},
 ) {
   const role = options.role ?? "MEMBER"
   const token = authToken()
@@ -71,14 +71,14 @@ async function mockSession(
   const event = options.event ?? eventRecord()
 
   await page.addInitScript(
-    ({ token: initialToken, record }) => {
+    ({ token: initialToken, record, locale }) => {
       window.sessionStorage.setItem(
         "pb_auth",
         JSON.stringify({ token: initialToken, record }),
       )
-      window.sessionStorage.setItem("bvhub.locale", "en")
+      window.sessionStorage.setItem("bvhub.locale", locale)
     },
-    { token, record: user },
+    { token, record: user, locale: options.locale ?? "en" },
   )
 
   await page.route(e2ePocketBaseApiRoute, async (route) => {
@@ -196,6 +196,26 @@ async function expectNoHorizontalOverflow(page: Page) {
 }
 
 test.describe("responsive application shell", () => {
+  for (const { locale, phoneLabel, contactLabel } of [
+    {
+      locale: "de",
+      phoneLabel: "Telefonnummer (WhatsApp) (optional)",
+      contactLabel: "Weitere Kontaktmöglichkeit (z. B. WeChat) (optional)",
+    },
+    {
+      locale: "zh-CN",
+      phoneLabel: "电话号码（WhatsApp）（可选）",
+      contactLabel: "其他联系信息（微信等）（可选）",
+    },
+  ]) {
+    test(`registration contact labels use ${locale} translations`, async ({ page }) => {
+      await mockSession(page, { locale })
+      await page.goto("/register")
+      await expect(page.getByLabel(phoneLabel)).toBeVisible()
+      await expect(page.getByLabel(contactLabel)).toBeVisible()
+    })
+  }
+
   test("participant avatars load the small protected thumbnail on a phone", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 })
     await mockSession(page, { avatar: true })
@@ -298,6 +318,8 @@ test.describe("responsive application shell", () => {
     await page.setViewportSize({ width: 320, height: 844 })
     await mockSession(page)
     await page.goto("/register")
+    await expect(page.getByLabel("Phone number (WhatsApp) (optional)")).toBeVisible()
+    await expect(page.getByLabel("Additional contact information (WeChat, etc.) (optional)")).toBeVisible()
     await expect(page.locator("form .grid")).toHaveCount(3)
     for (const grid of await page.locator("form .grid").all()) {
       const columnCount = await grid.evaluate((element) =>

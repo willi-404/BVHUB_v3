@@ -75,7 +75,8 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      title={t("common.copyEmail")}
+      title={t("common.copy")}
+      aria-label={t("common.copy")}
       className="shrink-0 h-6 w-6 flex items-center justify-center rounded-md hover:bg-[var(--muted)] transition-colors"
       style={{ color: copied ? "#15803d" : "var(--muted-foreground)" }}
     >
@@ -305,6 +306,7 @@ export function MemberDetailPopup({
     "-"
   const detailBirthDate = details?.birthDate || member.geburtstag || "-"
   const detailPhone = details?.phone || member.phone || "-"
+  const detailContactInfo = details?.contactInfo || "-"
   const detailUsername = details?.username || member.username
   return (
     <>
@@ -410,6 +412,16 @@ export function MemberDetailPopup({
                   label={t("profile.address")}
                   value={detailAddress}
                   action={<CopyButton text={detailAddress} />}
+                />
+                <Row
+                  icon={ic.user}
+                  label={t("profile.contactInfo")}
+                  value={detailContactInfo}
+                  action={
+                    detailContactInfo !== "-" ? (
+                      <CopyButton text={detailContactInfo} />
+                    ) : undefined
+                  }
                 />
                 {member.instagram && (
                   <Row

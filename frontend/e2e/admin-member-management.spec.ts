@@ -67,7 +67,7 @@ function details(user: typeof guest | typeof member) {
     address: "Test Street 1, 91052 Erlangen",
     birthDate: "1990-01-01",
     phone: "+49 911 123456",
-    contactInfo: "",
+    contactInfo: "Preferred contact information",
   }
 }
 
@@ -169,6 +169,12 @@ test("admin creates Guest accounts and force deletes unverified accounts", async
     .getByRole("table")
     .getByText("Pending Guest", { exact: true })
     .click()
+  await expect(page.getByText("Preferred contact information")).toBeVisible()
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"])
+  await page.getByRole("button", { name: "Copy" }).last().click()
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe("Preferred contact information")
   await expect(
     page.getByRole("button", { name: "Force delete account" }),
   ).toBeVisible()
