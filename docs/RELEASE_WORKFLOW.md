@@ -1,14 +1,15 @@
 # Release Workflow
 
-BVHUB uses Release Drafter to maintain the next GitHub release draft. The
-workflow runs after pushes to `master`; publishing remains a deliberate manual
-maintainer action.
+BVHUB uses Release Drafter to maintain a draft for pull request releases. A
+direct push to `master` that has no merged pull request is published as the
+next patch release with GitHub's default generated release notes.
 
 ## Required Change Metadata
 
 Release Drafter reads pull request metadata. The PR title is the authoritative
 release-note input; individual commits must follow the same convention for
-clear history, but a direct push is not a dependable substitute for a PR.
+clear history. A pull request merge keeps the draft workflow so a maintainer can
+set the version and edit the release notes before publishing.
 
 Use this title format:
 
@@ -40,6 +41,21 @@ the **Release Metadata / validate** status check before merge and enable
 Without those branch rules, a failing check is visible but does not block a
 maintainer from merging or pushing.
 
+## Direct Push Releases
+
+The `Release Drafter and automatic patch releases` workflow classifies each
+push to `master`:
+
+- A push with an associated merged pull request updates the Release Drafter
+  draft. The maintainer chooses the version and writes the final notes.
+- A push without an associated merged pull request creates the next patch tag
+  from the latest semantic version tag and publishes a release with GitHub's
+  default generated notes.
+
+The workflow checks the commit already tagged by the latest release before
+publishing. Re-running the same workflow therefore does not create another
+patch release. This path does not change the frontend `package.json` version.
+
 ## Labels
 
 Conventional PR titles classify ordinary changes. Add labels when a change needs
@@ -58,8 +74,8 @@ an explicit signal:
 
 ## Pull Request Checklist
 
-1. Create a PR for every releasable change; do not merge via direct push to
-   `master`.
+1. Use a PR for features, security changes, and major changes. Intentional
+   direct patch commits are supported by the automatic patch release path.
 2. Use a valid Conventional Commit PR title and matching commit messages. The
    Release Metadata workflow checks both for non-draft PRs.
 3. Apply the security or major label when required above.
@@ -67,7 +83,7 @@ an explicit signal:
 5. Check the updated Release Drafter draft after merge. Correct the human
    summary when needed; do not treat generated text as a substitute for review.
 
-## Manual Release Checklist
+## Pull Request Release Checklist
 
 1. Confirm the intended target commit and its CI status.
 2. Open the existing Release Drafter draft rather than creating a duplicate.

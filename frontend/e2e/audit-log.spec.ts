@@ -110,7 +110,7 @@ test("admin opens a member log in the details view and table headers stay fixed"
   expect((await searchInput.boundingBox())?.y).toBe(searchTopBefore);
   expect((await filterButton.boundingBox())?.y).toBe(filterTopBefore);
 
-  await page.getByRole("button", { name: "mem000000000000" }).click();
+  await page.getByRole("table").getByText("Member User", { exact: true }).click();
   const logRequest = page.waitForResponse((response) => response.url().includes("/api/bvhub/admin/users/") && response.url().includes("/audit-log"));
   await page.getByRole("button", { name: "Audit log" }).last().click();
   await expect(page.getByText(/Nürnberg/)).toBeVisible();

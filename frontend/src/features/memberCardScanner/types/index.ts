@@ -12,6 +12,7 @@ export type AdminMemberDetails = {
   updated: string;
   memberSince: string;
   groups: Array<{ id: string; name: string }>;
+  avatar?: { id: string; filename: string } | null;
   address: string;
   street: string;
   houseNumber: string;

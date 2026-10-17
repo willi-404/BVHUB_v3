@@ -7,6 +7,8 @@ export interface Member {
   vorname: string;
   nachname: string;
   email: string;
+  active?: boolean;
+  verified?: boolean;
   gruppe: Group;
   memberSince: string;
   adresse: string;
@@ -18,6 +20,7 @@ export interface Member {
   avatarColor: string;
   role?: "GUEST" | "MEMBER" | "ADMIN" | "SUPER_ADMIN";
   groups?: { id: string; membershipId: string; name: string; active: boolean }[];
+  avatar?: { id: string; filename: string } | null;
 }
 
 export const MEMBERS: Member[] = [

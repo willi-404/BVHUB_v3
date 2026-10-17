@@ -249,8 +249,8 @@ export default function RegisterView() {
             </div>
             {input("birthDate", t("register.birthDate"), "date")}
             <div className="grid md:grid-cols-2 gap-4">
-              {input("phone", t("register.phone"), "tel", true)}
-              {input("contactInfo", t("register.contactInfo"), "text", true)}
+              {input("phone", t("register.phone"), "tel")}
+              {input("contactInfo", t("register.contactInfo"))}
             </div>
             <div className="flex flex-col gap-1.5">
               <div className="flex items-start gap-2">

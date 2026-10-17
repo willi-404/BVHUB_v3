@@ -125,7 +125,7 @@ test("exports every member matching selected groups to a timestamped xlsx", asyn
   await page.setViewportSize({ width: 1280, height: 720 })
   await page.goto("/admin/members")
   await page.getByPlaceholder("Search email, display name, or legal name").fill("Member")
-  await expect(page.getByText("Member 0", { exact: true })).toBeVisible()
+  await expect(page.getByRole("table").getByText("Member 0", { exact: true })).toBeVisible()
   await page.getByRole("button", { name: "Filter" }).click()
   await page.getByRole("button", { name: "Member ER" }).click()
   await page.getByRole("button", { name: /Guest/ }).click()

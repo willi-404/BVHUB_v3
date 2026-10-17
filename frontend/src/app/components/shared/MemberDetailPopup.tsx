@@ -1,164 +1,332 @@
-import { useEffect, useState } from "react";
-import { ArrowLeft, ClipboardList, Trash2 } from "lucide-react";
-import { Member, groupConfig, initials } from "./MemberTypes";
-import { Button } from "../ui/button";
-import { Separator } from "../ui/separator";
-import { Select } from "../ui/select";
-import { Checkbox } from "../ui/checkbox";
-import { Input } from "../ui/input";
-import { pb } from "../../../lib/pocketbase";
-import { useAuthUser } from "../../../features/auth/AuthProvider";
-import { canManageMemberGroups, canManageMemberRole } from "../../../features/members/policy";
-import type { Role } from "../../../features/auth/policy";
-import { useI18n } from "../../../i18n";
-import { AuditLogPanel } from "../../../features/auditLog/components/AuditLogPanel";
+import { useEffect, useState } from "react"
+import { ArrowLeft, ClipboardList, Trash2 } from "lucide-react"
+import { Member, groupConfig, initials } from "./MemberTypes"
+import { Button } from "../ui/button"
+import { Separator } from "../ui/separator"
+import { Select } from "../ui/select"
+import { Checkbox } from "../ui/checkbox"
+import { Input } from "../ui/input"
+import { pb } from "../../../lib/pocketbase"
+import { useAuthUser } from "../../../features/auth/AuthProvider"
+import {
+  canManageMemberGroups,
+  canManageMemberRole,
+} from "../../../features/members/policy"
+import type { Role } from "../../../features/auth/policy"
+import { useI18n } from "../../../i18n"
+import { AuditLogPanel } from "../../../features/auditLog/components/AuditLogPanel"
+import { getMemberDetails } from "../../../features/members/api/getMembers"
+import UserAvatar from "../../../features/profile/components/UserAvatar"
+import type { AdminMemberDetails } from "../../../features/memberCardScanner/types"
 
-function Icon({ d, size = 18, className = "" }: { d: string; size?: number; className?: string }) {
+function Icon({
+  d,
+  size = 18,
+  className = "",
+}: {
+  d: string
+  size?: number
+  className?: string
+}) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
       <path d={d} />
     </svg>
-  );
+  )
 }
 
 const ic = {
-  x:         "M18 6 6 18M6 6l12 12",
-  shield:    "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
-  user:      "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
-  mail:      "M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zM22 6l-10 7L2 6",
-  phone:     "M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z",
-  mapPin:    "M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0zM12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6",
-  calendar:  "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z",
-  clock:     "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 6v6l4 2",
-  instagram: "M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37zM17.5 6.5h.01M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5z",
-  copy:      "M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2M8 4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2M8 4h8",
+  x: "M18 6 6 18M6 6l12 12",
+  shield: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
+  user: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
+  mail: "M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zM22 6l-10 7L2 6",
+  phone:
+    "M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z",
+  mapPin:
+    "M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0zM12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6",
+  calendar:
+    "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z",
+  clock: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 6v6l4 2",
+  instagram:
+    "M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37zM17.5 6.5h.01M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5z",
+  copy: "M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2M8 4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2M8 4h8",
   checkCircle: "M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4 12 14.01l-3-3",
-};
+}
 
 function CopyButton({ text }: { text: string }) {
-  const { t } = useI18n();
-  const [copied, setCopied] = useState(false);
+  const { t } = useI18n()
+  const [copied, setCopied] = useState(false)
   function handleCopy() {
     navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    });
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    })
   }
   return (
     <button
       onClick={handleCopy}
-      title={t("common.copyEmail")}
+      title={t("common.copy")}
+      aria-label={t("common.copy")}
       className="shrink-0 h-6 w-6 flex items-center justify-center rounded-md hover:bg-[var(--muted)] transition-colors"
       style={{ color: copied ? "#15803d" : "var(--muted-foreground)" }}
     >
       <Icon d={copied ? ic.checkCircle : ic.copy} size={13} />
     </button>
-  );
+  )
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+}: {
+  title: string
+  children: React.ReactNode
+}) {
   return (
     <div>
-      <p className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-widest mb-2">{title}</p>
+      <p className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-widest mb-2">
+        {title}
+      </p>
       <div className="flex flex-col gap-2">{children}</div>
     </div>
-  );
+  )
 }
 
-function Row({ icon, label, value, mono = false, action }: { icon: string; label: string; value: string; mono?: boolean; action?: React.ReactNode }) {
+function Row({
+  icon,
+  label,
+  value,
+  mono = false,
+  action,
+}: {
+  icon: string
+  label: string
+  value: string
+  mono?: boolean
+  action?: React.ReactNode
+}) {
   return (
     <div className="flex items-start gap-2.5">
-      <span className="text-[var(--muted-foreground)] mt-0.5 shrink-0"><Icon d={icon} size={13} /></span>
+      <span className="text-[var(--muted-foreground)] mt-0.5 shrink-0">
+        <Icon d={icon} size={13} />
+      </span>
       <div className="min-w-0 flex-1">
         <p className="text-[10px] text-[var(--muted-foreground)]">{label}</p>
         <div className="flex items-center gap-1.5">
-          <p className={`text-xs font-medium text-[var(--foreground)] break-all flex-1 ${mono ? "font-mono" : ""}`}>{value}</p>
+          <p
+            className={`text-xs font-medium text-[var(--foreground)] break-all flex-1 ${
+              mono ? "font-mono" : ""
+            }`}
+          >
+            {value}
+          </p>
           {action}
         </div>
       </div>
     </div>
-  );
+  )
 }
 
-export function MemberDetailPopup({ member, onClose, onReload, onDeleted }: { member: Member; onClose: () => void; onReload?: () => Promise<void>; onDeleted?: () => Promise<void> }) {
-  const { t } = useI18n();
-  const cfg = groupConfig[member.gruppe];
-  const initialRole = member.role ?? "GUEST";
-  const { data: currentUser } = useAuthUser();
-  const [groups, setGroups] = useState(member.groups ?? []);
-  const [role, setRole] = useState<Role>(initialRole);
-  const [roleDraft, setRoleDraft] = useState<Role>(initialRole);
-  const [available, setAvailable] = useState<{ id: string; name: string }[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [showAuditLog, setShowAuditLog] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [confirmationId, setConfirmationId] = useState("");
-  const [deletionError, setDeletionError] = useState("");
-  const [deleting, setDeleting] = useState(false);
-  const canDelete = (currentUser?.role === "ADMIN" || currentUser?.role === "SUPER_ADMIN") && role === "GUEST";
-  const canManageGroups = canManageMemberGroups(currentUser?.role, role);
-  const canManageRole = canManageMemberRole(currentUser?.role, role);
-  const localizedRole = role === "SUPER_ADMIN" ? t("roles.superAdmin") : role === "ADMIN" ? t("roles.admin") : role === "MEMBER" ? t("roles.member") : t("roles.guest");
+export function MemberDetailPopup({
+  member,
+  onClose,
+  onReload,
+  onDeleted,
+}: {
+  member: Member
+  onClose: () => void
+  onReload?: () => Promise<void>
+  onDeleted?: () => Promise<void>
+}) {
+  const { t } = useI18n()
+  const cfg = groupConfig[member.gruppe]
+  const initialRole = member.role ?? "GUEST"
+  const { data: currentUser } = useAuthUser()
+  const [groups, setGroups] = useState(member.groups ?? [])
+  const [role, setRole] = useState<Role>(initialRole)
+  const [roleDraft, setRoleDraft] = useState<Role>(initialRole)
+  const [available, setAvailable] = useState<{ id: string; name: string }[]>([])
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [showAuditLog, setShowAuditLog] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmationId, setConfirmationId] = useState("")
+  const [deletionError, setDeletionError] = useState("")
+  const [deleting, setDeleting] = useState(false)
+  const [details, setDetails] = useState<AdminMemberDetails | null>(null)
+  const canDelete =
+    (currentUser?.role === "ADMIN" || currentUser?.role === "SUPER_ADMIN") &&
+    role === "GUEST" &&
+    member.active === true &&
+    member.verified === true
+  const canForceDelete =
+    (currentUser?.role === "ADMIN" || currentUser?.role === "SUPER_ADMIN") &&
+    (role === "GUEST" || role === "MEMBER") &&
+    (member.active === false || member.verified === false)
+  const canManageGroups = canManageMemberGroups(currentUser?.role, role)
+  const canManageRole = canManageMemberRole(currentUser?.role, role)
+  const localizedRole =
+    role === "SUPER_ADMIN"
+      ? t("roles.superAdmin")
+      : role === "ADMIN"
+        ? t("roles.admin")
+        : role === "MEMBER"
+          ? t("roles.member")
+          : t("roles.guest")
   useEffect(() => {
-    setGroups(member.groups ?? []);
-    setRole(member.role ?? "GUEST");
-    setRoleDraft(member.role ?? "GUEST");
-  }, [member]);
+    let current = true
+    setGroups(member.groups ?? [])
+    setRole(member.role ?? "GUEST")
+    setRoleDraft(member.role ?? "GUEST")
+    setDetails(null)
+    void getMemberDetails(member.id)
+      .then((value) => { if (current) setDetails(value) })
+      .catch(() => undefined)
+    return () => { current = false }
+  }, [member])
   useEffect(() => {
-    if (!canManageGroups) return;
-    void pb.send<{ groups: { id: string; name: string }[] }>("/api/bvhub/admin/groups", { method: "GET" }).then((result) => setAvailable(result.groups)).catch(() => setMessage(t("admin.groups.loadError")));
-  }, [canManageGroups, t]);
+    if (!canManageGroups) return
+    void pb
+      .send<{ groups: { id: string; name: string }[] }>(
+        "/api/bvhub/admin/groups",
+        { method: "GET" },
+      )
+      .then((result) => setAvailable(result.groups))
+      .catch(() => setMessage(t("admin.groups.loadError")))
+  }, [canManageGroups, t])
   async function saveGroups() {
-    setSaving(true); setMessage(null);
+    setSaving(true)
+    setMessage(null)
     try {
-      await pb.send(`/api/bvhub/admin/users/${member.id}/groups`, { method: "PUT", body: { groups: groups.map((group) => group.id) } });
-      await onReload?.();
-      setMessage(t("admin.groups.saved"));
-    } catch (_) { setMessage(t("admin.groups.saveError")); }
-    finally { setSaving(false); }
+      await pb.send(`/api/bvhub/admin/users/${member.id}/groups`, {
+        method: "PUT",
+        body: { groups: groups.map((group) => group.id) },
+      })
+      await onReload?.()
+      setMessage(t("admin.groups.saved"))
+    } catch (_) {
+      setMessage(t("admin.groups.saveError"))
+    } finally {
+      setSaving(false)
+    }
   }
   async function saveRole() {
-    if (roleDraft === role) return;
-    if (!window.confirm(`${t("admin.role.confirm")} ${roleDraft}?`)) return;
-    setSaving(true); setMessage(null);
+    if (roleDraft === role) return
+    if (!window.confirm(`${t("admin.role.confirm")} ${roleDraft}?`)) return
+    setSaving(true)
+    setMessage(null)
     try {
-      await pb.send(`/api/bvhub/admin/users/${member.id}/role`, { method: "PATCH", body: { role: roleDraft, confirmation: "ROLE_CHANGE" } });
-      setRole(roleDraft);
-      await onReload?.();
-      setMessage(t("admin.role.saved"));
-    } catch (_) { setMessage(t("admin.role.saveError")); }
-    finally { setSaving(false); }
+      await pb.send(`/api/bvhub/admin/users/${member.id}/role`, {
+        method: "PATCH",
+        body: { role: roleDraft, confirmation: "ROLE_CHANGE" },
+      })
+      setRole(roleDraft)
+      await onReload?.()
+      setMessage(t("admin.role.saved"))
+    } catch (_) {
+      setMessage(t("admin.role.saveError"))
+    } finally {
+      setSaving(false)
+    }
   }
   async function deleteUser() {
-    if (confirmationId !== member.id || deleting) return;
-    setDeleting(true);
-    setDeletionError("");
+    if (confirmationId !== member.id || deleting) return
+    setDeleting(true)
+    setDeletionError("")
     try {
-      await pb.send(`/api/bvhub/admin/users/${encodeURIComponent(member.id)}/deletion`, { method: "POST", body: { confirmationId } });
-      if (onDeleted) await onDeleted().catch(() => undefined);
-      onClose();
+      await pb.send(
+        `/api/bvhub/admin/users/${encodeURIComponent(member.id)}/deletion`,
+        { method: "POST", body: { confirmationId } },
+      )
+      if (onDeleted) await onDeleted().catch(() => undefined)
+      onClose()
     } catch (error) {
-      const code = (error as { response?: { data?: { code?: string } } })?.response?.data?.code;
+      const code = (error as { response?: { data?: { code?: string } } })
+        ?.response?.data?.code
       const messages = {
         DELETION_ROLE: "admin.members.deleteRoleBlocked",
         DELETION_UNPAID: "admin.members.deleteUnpaidBlocked",
         DELETION_ACTIVE_EVENT: "admin.members.deleteEventBlocked",
         DELETION_PENDING: "admin.members.deletePending",
         DELETION_MAIL_FAILED: "admin.members.deleteMailFailed",
-      } as const;
-      setDeletionError(t(code && code in messages ? messages[code as keyof typeof messages] : "admin.members.deleteError"));
+      } as const
+      setDeletionError(
+        t(
+          code && code in messages
+            ? messages[(code as keyof typeof messages)]
+            : "admin.members.deleteError",
+        ),
+      )
     } finally {
-      setDeleting(false);
+      setDeleting(false)
     }
   }
+  async function forceDeleteUser() {
+    if (confirmationId !== member.id || deleting) return
+    setDeleting(true)
+    setDeletionError("")
+    try {
+      await pb.send(
+        `/api/bvhub/admin/users/${encodeURIComponent(member.id)}/force-delete`,
+        { method: "POST", body: { confirmationId } },
+      )
+      if (onDeleted) await onDeleted().catch(() => undefined)
+      onClose()
+    } catch (error) {
+      const code = (error as { response?: { data?: { code?: string } } })
+        ?.response?.data?.code
+      const messages = {
+        DELETION_FORCE_ACTIVE: "admin.members.deleteForceActive",
+      } as const
+      setDeletionError(
+        t(
+          code && code in messages
+            ? messages[(code as keyof typeof messages)]
+            : "admin.members.deleteError",
+        ),
+      )
+    } finally {
+      setDeleting(false)
+    }
+  }
+  const detailAddress =
+    details?.address ||
+    [details?.street, details?.houseNumber].filter(Boolean).join(" ") ||
+    member.adresse ||
+    "-"
+  const detailBirthDate = details?.birthDate || member.geburtstag || "-"
+  const detailPhone = details?.phone || member.phone || "-"
+  const detailContactInfo = details?.contactInfo || "-"
+  const detailUsername = details?.username || member.username
   return (
     <>
-      <div className="fixed inset-0 z-[110] bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="fixed inset-0 z-[110] bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
       <div className="fixed inset-x-4 top-1/2 z-[111] mx-auto flex max-h-[90vh] max-w-md -translate-y-1/2 flex-col overflow-hidden rounded-xl border bg-card text-card-foreground shadow-2xl">
         {/* Header band */}
-        <div className="relative h-20 shrink-0" style={{ background: `linear-gradient(135deg, ${cfg.color}dd, ${cfg.color}88)` }}>
-          <button onClick={onClose} aria-label={t("common.close")} className="absolute top-3 right-3 h-8 w-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors">
+        <div
+          className="relative h-20 shrink-0"
+          style={{
+            background: `linear-gradient(135deg, ${cfg.color}dd, ${cfg.color}88)`,
+          }}
+        >
+          <button
+            onClick={onClose}
+            aria-label={t("common.close")}
+            className="absolute top-3 right-3 h-8 w-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors"
+          >
             <Icon d={ic.x} size={15} />
           </button>
         </div>
@@ -169,11 +337,20 @@ export function MemberDetailPopup({ member, onClose, onReload, onDeleted }: { me
             className="h-18 w-18 rounded-full border-4 border-[var(--card)] flex items-center justify-center text-white text-xl font-bold shadow-lg"
             style={{ background: member.avatarColor, height: 72, width: 72 }}
           >
-            {initials(member)}
+            <UserAvatar
+              avatar={details?.avatar ?? member.avatar}
+              fallback={initials(member)}
+              alt={`${member.vorname} ${member.nachname}`}
+              className="size-18 text-xl"
+            />
           </div>
           <div className="mt-2 text-center">
-            <p className="font-bold text-base">{member.vorname} {member.nachname}</p>
-            <p className="text-xs text-[var(--muted-foreground)]">@{member.username}</p>
+            <p className="font-bold text-base">
+              {member.vorname} {member.nachname}
+            </p>
+            <p className="text-xs text-[var(--muted-foreground)]">
+              @{detailUsername}
+            </p>
             <span
               className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold mt-1.5"
               style={{ background: cfg.bg, color: cfg.color }}
@@ -185,78 +362,321 @@ export function MemberDetailPopup({ member, onClose, onReload, onDeleted }: { me
 
         {/* Body */}
         <div className="overflow-y-auto flex-1 px-5 py-4">
-          {showAuditLog ? <div className="flex flex-col gap-3">
-            <h2 className="text-sm font-semibold">{t("audit.title")}</h2>
-            <AuditLogPanel memberId={member.id} />
-          </div> :
-          <div className="flex flex-col gap-4">
-            <Section title={t("profile.identity")}>
-              <Row icon={ic.shield}   label={t("admin.members.memberId")}   value={member.id} mono />
-              <Row icon={ic.user}     label={t("admin.members.username")}    value={`@${member.username}`} />
-              <Row icon={ic.calendar} label={t("admin.members.memberSince")} value={member.memberSince} />
-              <Row icon={ic.calendar} label={t("profile.birthDate")}  value={member.geburtstag} />
-            </Section>
-            <Separator />
-            <Section title={t("profile.contact")}>
-              <Row icon={ic.mail}   label={t("auth.email")}   value={member.email} action={<CopyButton text={member.email} />} />
-              <Row icon={ic.phone}  label={t("profile.phone")}  value={member.phone} />
-              <Row icon={ic.mapPin} label={t("profile.address")}  value={member.adresse} />
-              {member.instagram && <Row icon={ic.instagram} label={t("profile.instagram")} value={member.instagram} />}
-            </Section>
-            <Separator />
-            <Section title={t("profile.account")}>
-              <Row icon={ic.shield} label={t("profile.role")} value={localizedRole} />
-              <Row icon={ic.shield} label={t("profile.groups")} value={member.groups?.map((group) => group.name).join(", ") || "-"} />
-              <Row icon={ic.clock} label={t("profile.createdAt")} value={member.accountCreated} />
-              <Row icon={ic.clock} label={t("profile.updatedAt")} value={member.accountUpdated} />
-            </Section>
-            {(canManageGroups || canManageRole) && (
-              <>
-                <Separator />
-                <Section title={t("admin.management")}>
-                  <div className="flex flex-col gap-2">
-                    {canManageGroups && available.map((group) => {
-                      const checked = groups.some((item) => item.id === group.id);
-                      return <label key={group.id} className="flex items-center gap-2 text-xs"><Checkbox checked={checked} onChange={() => setGroups((current) => checked ? current.filter((item) => item.id !== group.id) : [...current, { id: group.id, membershipId: "", name: group.name, active: true }])} />{group.name}</label>;
-                    })}
-                    {canManageGroups && <Button size="sm" onClick={() => void saveGroups()} disabled={saving}>{saving ? t("common.saving") : t("admin.groups.save")}</Button>}
-                    {canManageRole && <>
-                      <label className="text-xs font-semibold" htmlFor="member-role">{t("profile.role")}</label>
-                      <Select id="member-role" value={roleDraft} onChange={(event) => setRoleDraft(event.target.value as Role)} disabled={saving} className="h-9">
-                        <option value="GUEST">{t("roles.guest")}</option>
-                        <option value="MEMBER">{t("roles.member")}</option>
-                        {currentUser?.role === "SUPER_ADMIN" && <option value="ADMIN">{t("roles.admin")}</option>}
-                      </Select>
-                      <Button size="sm" variant="outline" onClick={() => void saveRole()} disabled={saving || roleDraft === role}>{saving ? t("common.saving") : t("admin.role.save")}</Button>
-                    </>}
-                    {message && <p role="status" className="text-xs text-[var(--muted-foreground)]">{message}</p>}
-                  </div>
-                </Section>
-              </>
-            )}
-          </div>}
+          {showAuditLog ? (
+            <div className="flex flex-col gap-3">
+              <h2 className="text-sm font-semibold">{t("audit.title")}</h2>
+              <AuditLogPanel memberId={member.id} />
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <Section title={t("profile.identity")}>
+                <Row
+                  icon={ic.shield}
+                  label={t("admin.members.memberId")}
+                  value={member.id}
+                  mono
+                />
+                <Row
+                  icon={ic.user}
+                  label={t("admin.members.username")}
+                  value={`@${detailUsername}`}
+                />
+                <Row
+                  icon={ic.calendar}
+                  label={t("admin.members.memberSince")}
+                  value={member.memberSince}
+                />
+                <Row
+                  icon={ic.calendar}
+                  label={t("profile.birthDate")}
+                  value={detailBirthDate}
+                  action={<CopyButton text={detailBirthDate} />}
+                />
+              </Section>
+              <Separator />
+              <Section title={t("profile.contact")}>
+                <Row
+                  icon={ic.mail}
+                  label={t("auth.email")}
+                  value={member.email}
+                  action={<CopyButton text={member.email} />}
+                />
+                <Row
+                  icon={ic.phone}
+                  label={t("profile.phone")}
+                  value={detailPhone}
+                  action={<CopyButton text={detailPhone} />}
+                />
+                <Row
+                  icon={ic.mapPin}
+                  label={t("profile.address")}
+                  value={detailAddress}
+                  action={<CopyButton text={detailAddress} />}
+                />
+                <Row
+                  icon={ic.user}
+                  label={t("profile.contactInfo")}
+                  value={detailContactInfo}
+                  action={
+                    detailContactInfo !== "-" ? (
+                      <CopyButton text={detailContactInfo} />
+                    ) : undefined
+                  }
+                />
+                {member.instagram && (
+                  <Row
+                    icon={ic.instagram}
+                    label={t("profile.instagram")}
+                    value={member.instagram}
+                  />
+                )}
+              </Section>
+              <Separator />
+              <Section title={t("profile.account")}>
+                <Row
+                  icon={ic.shield}
+                  label={t("profile.role")}
+                  value={localizedRole}
+                />
+                <Row
+                  icon={ic.shield}
+                  label={t("profile.groups")}
+                  value={
+                    member.groups?.map((group) => group.name).join(", ") || "-"
+                  }
+                />
+                <Row
+                  icon={ic.clock}
+                  label={t("profile.createdAt")}
+                  value={member.accountCreated}
+                />
+                <Row
+                  icon={ic.clock}
+                  label={t("profile.updatedAt")}
+                  value={member.accountUpdated}
+                />
+              </Section>
+              {(canManageGroups || canManageRole) && (
+                <>
+                  <Separator />
+                  <Section title={t("admin.management")}>
+                    <div className="flex flex-col gap-2">
+                      {canManageGroups &&
+                        available.map((group) => {
+                          const checked = groups.some(
+                            (item) => item.id === group.id,
+                          )
+                          return (
+                            <label
+                              key={group.id}
+                              className="flex items-center gap-2 text-xs"
+                            >
+                              <Checkbox
+                                checked={checked}
+                                onChange={() =>
+                                  setGroups((current) =>
+                                    checked
+                                      ? current.filter(
+                                          (item) => item.id !== group.id,
+                                        )
+                                      : [
+                                          ...current,
+                                          {
+                                            id: group.id,
+                                            membershipId: "",
+                                            name: group.name,
+                                            active: true,
+                                          },
+                                        ],
+                                  )
+                                }
+                              />
+                              {group.name}
+                            </label>
+                          )
+                        })}
+                      {canManageGroups && (
+                        <Button
+                          size="sm"
+                          onClick={() => void saveGroups()}
+                          disabled={saving}
+                        >
+                          {saving ? t("common.saving") : t("admin.groups.save")}
+                        </Button>
+                      )}
+                      {canManageRole && (
+                        <>
+                          <label
+                            className="text-xs font-semibold"
+                            htmlFor="member-role"
+                          >
+                            {t("profile.role")}
+                          </label>
+                          <Select
+                            id="member-role"
+                            value={roleDraft}
+                            onChange={(event) =>
+                              setRoleDraft(event.target.value as Role)
+                            }
+                            disabled={saving}
+                            className="h-9"
+                          >
+                            <option value="GUEST">{t("roles.guest")}</option>
+                            <option value="MEMBER">{t("roles.member")}</option>
+                            {currentUser?.role === "SUPER_ADMIN" && (
+                              <option value="ADMIN">{t("roles.admin")}</option>
+                            )}
+                          </Select>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void saveRole()}
+                            disabled={saving || roleDraft === role}
+                          >
+                            {saving ? t("common.saving") : t("admin.role.save")}
+                          </Button>
+                        </>
+                      )}
+                      {message && (
+                        <p
+                          role="status"
+                          className="text-xs text-[var(--muted-foreground)]"
+                        >
+                          {message}
+                        </p>
+                      )}
+                    </div>
+                  </Section>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="px-5 py-3 border-t border-[var(--border)] shrink-0">
-          {showAuditLog ? <Button variant="outline" className="mb-2 w-full" onClick={onClose}><ArrowLeft size={16} />{t("audit.backToMembers")}</Button> : <Button variant="outline" className="mb-2 w-full" onClick={() => setShowAuditLog(true)}><ClipboardList size={16} />{t("audit.open")}</Button>}
-          {canDelete && !showAuditLog && <Button variant="destructive" className="mb-2 w-full" onClick={() => { setConfirmationId(""); setDeletionError(""); setConfirmDelete(true); }}><Trash2 size={16} />{t("admin.members.deleteUser")}</Button>}
-          <Button variant="outline" className="w-full" onClick={onClose}>{t("common.close")}</Button>
+          {showAuditLog ? (
+            <Button variant="outline" className="mb-2 w-full" onClick={onClose}>
+              <ArrowLeft size={16} />
+              {t("audit.backToMembers")}
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              className="mb-2 w-full"
+              onClick={() => setShowAuditLog(true)}
+            >
+              <ClipboardList size={16} />
+              {t("audit.open")}
+            </Button>
+          )}
+          {(canDelete || canForceDelete) && !showAuditLog && (
+            <Button
+              variant="destructive"
+              className="mb-2 w-full"
+              onClick={() => {
+                setConfirmationId("")
+                setDeletionError("")
+                setConfirmDelete(true)
+              }}
+            >
+              <Trash2 size={16} />
+              {canForceDelete
+                ? t("admin.members.forceDeleteUser")
+                : t("admin.members.deleteUser")}
+            </Button>
+          )}
+          <Button variant="outline" className="w-full" onClick={onClose}>
+            {t("common.close")}
+          </Button>
         </div>
       </div>
-      {confirmDelete && <div className="fixed inset-0 z-[112] flex items-center justify-center bg-black/60 p-4" role="presentation">
-        <form role="alertdialog" aria-modal="true" aria-labelledby="delete-user-title" aria-describedby="delete-user-description" className="w-full max-w-sm rounded-lg border bg-card p-5 shadow-2xl" onSubmit={(event) => { event.preventDefault(); void deleteUser(); }}>
-          <h2 id="delete-user-title" className="text-base font-semibold text-red-700">{t("admin.members.deleteUser")}</h2>
-          <p id="delete-user-description" className="mt-2 text-sm text-muted-foreground">{t("admin.members.deleteDescription")}</p>
-          <label htmlFor="delete-user-id" className="mt-4 block text-xs font-semibold">{t("admin.members.deleteConfirmId", { id: member.id })}</label>
-          <Input id="delete-user-id" autoFocus autoComplete="off" spellCheck={false} value={confirmationId} onChange={(event) => setConfirmationId(event.target.value)} disabled={deleting} className="mt-2 font-mono" />
-          {confirmationId && confirmationId !== member.id && <p role="alert" className="mt-2 text-xs text-red-700">{t("admin.members.deleteIdMismatch")}</p>}
-          {deletionError && <p role="alert" className="mt-2 text-xs text-red-700">{deletionError}</p>}
-          <div className="mt-5 flex flex-wrap justify-end gap-2">
-            <Button type="button" variant="outline" disabled={deleting} onClick={() => setConfirmDelete(false)} className="w-full sm:w-auto">{t("admin.members.cancelDeletion")}</Button>
-            <Button type="submit" variant="destructive" disabled={deleting || confirmationId !== member.id} className="w-full sm:w-auto"><Trash2 size={16} />{deleting ? t("admin.members.deletingUser") : t("admin.members.deleteUser")}</Button>
-          </div>
-        </form>
-      </div>}
+      {confirmDelete && (
+        <div
+          className="fixed inset-0 z-[112] flex items-center justify-center bg-black/60 p-4"
+          role="presentation"
+        >
+          <form
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-user-title"
+            aria-describedby="delete-user-description"
+            className="w-full max-w-sm rounded-lg border bg-card p-5 shadow-2xl"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void deleteUser()
+            }}
+          >
+            <h2
+              id="delete-user-title"
+              className="text-base font-semibold text-red-700"
+            >
+              {t("admin.members.deleteUser")}
+            </h2>
+            <p
+              id="delete-user-description"
+              className="mt-2 text-sm text-muted-foreground"
+            >
+              {t("admin.members.deleteDescription")}
+            </p>
+            <label
+              htmlFor="delete-user-id"
+              className="mt-4 block text-xs font-semibold"
+            >
+              {t("admin.members.deleteConfirmId", { id: member.id })}
+            </label>
+            <Input
+              id="delete-user-id"
+              autoFocus
+              autoComplete="off"
+              spellCheck={false}
+              value={confirmationId}
+              onChange={(event) => setConfirmationId(event.target.value)}
+              disabled={deleting}
+              className="mt-2 font-mono"
+            />
+            {confirmationId && confirmationId !== member.id && (
+              <p role="alert" className="mt-2 text-xs text-red-700">
+                {t("admin.members.deleteIdMismatch")}
+              </p>
+            )}
+            {deletionError && (
+              <p role="alert" className="mt-2 text-xs text-red-700">
+                {deletionError}
+              </p>
+            )}
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={deleting}
+                onClick={() => setConfirmDelete(false)}
+                className="w-full sm:w-auto"
+              >
+                {t("admin.members.cancelDeletion")}
+              </Button>
+              <Button
+                type="submit"
+                variant="destructive"
+                disabled={deleting || confirmationId !== member.id}
+                className="w-full sm:w-auto"
+                onClick={(event) => {
+                  if (canForceDelete) {
+                    event.preventDefault()
+                    void forceDeleteUser()
+                  }
+                }}
+              >
+                <Trash2 size={16} />
+                {deleting
+                  ? t("admin.members.deletingUser")
+                  : canForceDelete
+                    ? t("admin.members.forceDeleteUser")
+                    : t("admin.members.deleteUser")}
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
     </>
-  );
+  )
 }

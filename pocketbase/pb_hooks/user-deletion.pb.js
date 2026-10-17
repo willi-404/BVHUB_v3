@@ -16,6 +16,15 @@ routerAdd("POST", "/api/bvhub/admin/users/{id}/deletion", (e) => {
   return e.json(202, require(`${__hooks}/user-deletion-service.js`).start(e.app, actor, id));
 }, $apis.requireAuth("users"));
 
+routerAdd("POST", "/api/bvhub/admin/users/{id}/force-delete", (e) => {
+  const admin = require(`${__hooks}/admin-service.js`);
+  const actor = admin.actor(e);
+  const id = admin.pathId(e);
+  const body = admin.body(e);
+  if (Object.keys(body).length !== 1 || body.confirmationId !== id) throw new BadRequestError("Benutzer-ID stimmt nicht überein");
+  return e.json(200, require(`${__hooks}/user-deletion-service.js`).forceDelete(e.app, actor, id));
+}, $apis.requireAuth("users"));
+
 cronAdd("user-deletion-cleanup", "* * * * *", () => {
   const service = require(`${__hooks}/user-deletion-service.js`);
   const now = new Date();

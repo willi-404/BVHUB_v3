@@ -6,6 +6,46 @@ routerAdd("GET", "/api/bvhub/admin/groups", (e) => {
   return e.json(200, { groups: service.groupRecords($app).map((group) => ({ id: group.id, name: group.getString("name"), active: group.getBool("active") })) });
 }, $apis.requireAuth("users"));
 
+routerAdd("POST", "/api/bvhub/admin/users", (e) => {
+  const service = require(`${__hooks}/admin-service.js`);
+  const actor = service.actor(e);
+  const value = service.createPayload(service.body(e));
+  let user;
+  try {
+    $app.runInTransaction((txApp) => {
+      user = new Record(txApp.findCollectionByNameOrId("users"));
+      user.set("email", value.email);
+      user.set("displayName", value.displayName);
+      user.set("firstName", value.firstName);
+      user.set("lastName", value.lastName);
+      user.set("role", "GUEST");
+      user.set("active", true);
+      user.set("emailVisibility", true);
+      user.setVerified(true);
+      user.setRandomPassword();
+      txApp.save(user);
+
+      const guest = txApp.findFirstRecordByData("groups", "name", "Guest");
+      const assignment = new Record(txApp.findCollectionByNameOrId("user_groups"));
+      assignment.set("user", user.id);
+      assignment.set("group", guest.id);
+      txApp.save(assignment);
+
+      const profile = new Record(txApp.findCollectionByNameOrId("user_profiles"));
+      profile.set("user", user.id);
+      ["street", "houseNumber", "postalCode", "city", "birthDate", "phone", "contactInfo"].forEach((key) => {
+        if (value[key] !== undefined && value[key] !== "") profile.set(key, value[key]);
+      });
+      txApp.save(profile);
+      service.audit(txApp, actor.id, user.id, "USER_CREATED", { role: "GUEST", group: "Guest" });
+    });
+  } catch (error) {
+    if (error instanceof ApiError || error instanceof BadRequestError) throw error;
+    throw new BadRequestError("Benutzer konnte nicht erstellt werden");
+  }
+  return e.json(201, service.memberDetailDto($app, user));
+}, $apis.requireAuth("users"));
+
 routerAdd("GET", "/api/bvhub/admin/users", (e) => {
   const service = require(`${__hooks}/admin-service.js`);
   service.actor(e);
