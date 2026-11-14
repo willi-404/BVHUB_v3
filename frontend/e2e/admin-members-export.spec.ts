@@ -19,7 +19,7 @@ async function mockAdmin(page: Page) {
   const detailIds: string[] = []
   const members = Array.from({ length: 125 }, (_, index) => ({
     id: `member-${String(index).padStart(4, "0")}`,
-    displayName: `Member ${index}`,
+    displayName: index === 80 ? "Gloria" : `Member ${index}`,
     firstName: `First${index}`,
     lastName: `Last${index}`,
     email: `member${index}@example.test`,
@@ -118,6 +118,25 @@ async function mockAdmin(page: Page) {
   return { exportPages, detailIds }
 }
 
+test("shows members beyond the first page without a search filter", async ({
+  page,
+}) => {
+  await mockAdmin(page)
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await page.goto("/admin/members")
+
+  await expect(page.getByText("125 members", { exact: true })).toBeVisible()
+  await expect(
+    page.getByRole("table").getByText("Gloria", { exact: true }),
+  ).toBeVisible()
+  await page
+    .getByPlaceholder("Search email, display name, or legal name")
+    .fill("Gloria")
+  await expect(
+    page.getByRole("table").getByText("Gloria", { exact: true }),
+  ).toBeVisible()
+})
+
 test("exports every member matching selected groups to a timestamped xlsx", async ({
   page,
 }) => {
@@ -139,7 +158,7 @@ test("exports every member matching selected groups to a timestamped xlsx", asyn
   const content = await readFile((await download.path())!)
   expect(content.subarray(0, 2).toString()).toBe("PK")
   expect(content.byteLength).toBeGreaterThan(1000)
-  expect(exportPages).toEqual(["1:member", "2:member"])
+  expect(exportPages.slice(-2)).toEqual(["1:member", "2:member"])
   expect(detailIds).toHaveLength(84)
   expect(new Set(detailIds).size).toBe(84)
 })
