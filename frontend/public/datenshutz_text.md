@@ -1,6 +1,6 @@
 # Datenschutzerklärung für das bvHub-Mitgliederportal
 
-_Stand: 7. Oktober 2026_
+_Stand: 14. November 2026_
 
 Diese Datenschutzerklärung gilt für `portal.bv-erlangen2025.de` und die dazugehörige API unter `data-v3.bv-erlangen2025.de`. Die eigenständige Vereinswebsite `bv-erlangen2025.de` ist nicht Gegenstand dieser Erklärung.
 
@@ -23,7 +23,7 @@ Für den Server und die PocketBase-Datenbank nutzen wir einen in Deutschland bet
 
 Bei der Registrierung verarbeiten wir Anzeigenamen, Vor- und Nachnamen, E-Mail-Adresse, Postanschrift und Geburtsdatum. Telefonnummer und weitere Kontaktangaben sind freiwillig. Diese Angaben dienen der Konto-, Vereins- und Veranstaltungsverwaltung. Ohne die Pflichtangaben kann kein Konto angelegt werden. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO. Bitte trage in freie Kontaktfelder keine Gesundheitsdaten oder anderen besonders sensiblen Angaben ein.
 
-Zur Bestätigung der E-Mail-Adresse, Anmeldung und Kontosicherung verarbeiten wir außerdem den Verifizierungsstatus, die zugewiesene Rolle beziehungsweise Mitgliedsgruppe und Anmeldedaten. Gäste und Mitglieder melden sich per E-Mail-Einmalcode an; für Verwaltungskonten besteht eine Passwortanmeldung. Sicherheitsprotokolle können Konto-ID, Zeitpunkt, Vorgangsart, IP-Adresse und Browserkennung enthalten. Ihre Verarbeitung beruht auf Art. 6 Abs. 1 lit. f DSGVO.
+Zur Bestätigung der E-Mail-Adresse, Anmeldung und Kontosicherung verarbeiten wir außerdem den Verifizierungsstatus, die zugewiesene Rolle beziehungsweise Mitgliedsgruppe und Anmeldedaten. Gäste und Mitglieder melden sich per E-Mail-Einmalcode an; für Verwaltungskonten besteht eine Passwortanmeldung. Sicherheitsprotokolle können Konto-ID, Zeitpunkt, Vorgangsart, IP-Adresse, Browserkennung sowie einen aus der IP-Adresse geschätzten Ort auf Stadt-, Regions- und Länderebene enthalten. Diese Ortsangabe kann insbesondere bei VPN-, Mobilfunk- oder Proxy-Verbindungen ungenau sein. Ihre Verarbeitung beruht auf Art. 6 Abs. 1 lit. f DSGVO.
 
 Ein freiwillig hochgeladenes Profilbild speichern wir für die gewünschte Profilfunktion. Es kann angemeldeten Nutzenden im Portal, etwa in Teilnehmerlisten, angezeigt und im Profil wieder entfernt werden. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO.
 

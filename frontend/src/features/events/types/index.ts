@@ -1,4 +1,5 @@
 import type { AvatarRef } from "../../profile/types"
+import type { AdminMemberDetails } from "../../memberCardScanner/types"
 
 export type EventStatus = "MEMBERS_ONLY" | "OPEN_TO_ALL" | "CANCELLED" | "COMPLETED"
 export interface Venue {
@@ -49,6 +50,18 @@ export interface EventParticipants {
   totalItems: number
   waitlist: EventParticipant[]
   myWaitlistPosition: number | null
+}
+export interface AdminEventExportRow extends AdminMemberDetails {
+  registrationId: string
+  registrationStatus: "REGISTERED" | "WAITING"
+  registeredAt: string
+  waitlistPosition: number | null
+  deleted: boolean
+  protected: boolean
+}
+export interface AdminEventExport {
+  event: Pick<EventRecord, "id" | "title">
+  items: AdminEventExportRow[]
 }
 export interface EventInput {
   title: string

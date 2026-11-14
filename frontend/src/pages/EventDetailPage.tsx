@@ -4,6 +4,8 @@ import { Badge } from "../app/components/ui/badge"
 import { Card } from "../app/components/ui/card"
 import { Button } from "../app/components/ui/button"
 import { Progress } from "../app/components/ui/progress"
+import { MemberDetailPopup } from "../app/components/shared/MemberDetailPopup"
+import { groupConfig, type Member } from "../app/components/shared/MemberTypes"
 import UserAvatar from "../features/profile/components/UserAvatar"
 import { isAdminRole } from "../features/auth/policy"
 import { useAuthUser } from "../features/auth/AuthProvider"
@@ -13,6 +15,9 @@ import {
   useEventRealtime,
   useParticipants,
 } from "../features/events/hooks/useEvents"
+import { getAdminEventParticipantDetails } from "../features/events/api/eventsApi"
+import type { EventParticipant } from "../features/events/types"
+import type { AdminMemberDetails } from "../features/memberCardScanner/types"
 import { formatLocaleDateTime, useI18n, type MessageKey } from "../i18n"
 import { mapPBError } from "../lib/errorMapper"
 
@@ -59,6 +64,67 @@ function registrationReason(
   return t("events.registrationReason.closed")
 }
 
+function memberFromDetails(details: AdminMemberDetails): Member {
+  const groupNames = details.groups.map((group) => group.name)
+  const gruppe = details.role === "ADMIN" || details.role === "SUPER_ADMIN"
+    ? "Admin"
+    : details.role === "MEMBER"
+      ? groupNames.includes("Member NUE") ? "MemberNUE" : "MemberER"
+      : "guest"
+  return {
+    id: details.id,
+    displayName: details.displayName,
+    username: details.username,
+    vorname: details.firstName,
+    nachname: details.lastName,
+    email: details.email,
+    active: details.active,
+    verified: details.verified,
+    gruppe,
+    memberSince: details.memberSince.slice(0, 10),
+    adresse: details.address,
+    geburtstag: details.birthDate,
+    phone: details.phone,
+    accountCreated: details.created,
+    accountUpdated: details.updated,
+    avatarColor: groupConfig[gruppe].color,
+    role: details.role as Member["role"],
+    groups: details.groups.map((group) => ({ ...group, membershipId: "", active: true })),
+    avatar: details.avatar,
+  }
+}
+
+function ParticipantIdentity({
+  participant,
+  clickable,
+  loading,
+  onOpen,
+}: {
+  participant: EventParticipant
+  clickable: boolean
+  loading: boolean
+  onOpen: () => void
+}) {
+  const { t } = useI18n()
+  const content = <>
+    <UserAvatar avatar={participant.avatar} fallback={participant.displayName.slice(0, 2).toUpperCase()} />
+    <span className="min-w-0 break-words">{participant.displayName}</span>
+  </>
+  return clickable ? (
+    <button
+      type="button"
+      disabled={loading}
+      onClick={onOpen}
+      aria-label={t("events.viewParticipantDetails", { name: participant.displayName })}
+      className="flex min-w-0 items-center gap-2 rounded-sm text-left hover:text-[var(--primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60"
+    >
+      {content}
+    </button>
+  ) : (
+    <div className="flex min-w-0 items-center gap-2">{content}</div>
+  )
+}
+
 export default function EventDetailPage() {
   const { eventId } = useParams()
   const { t, locale } = useI18n()
@@ -69,6 +135,9 @@ export default function EventDetailPage() {
   const participants = useParticipants(eventId, Boolean(query.data?.published))
   const cancel = useCancelRegistration()
   const [cancelError, setCancelError] = useState<string | null>(null)
+  const [selectedDetails, setSelectedDetails] = useState<AdminMemberDetails | null>(null)
+  const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null)
+  const [detailError, setDetailError] = useState(false)
   const event = query.data
   const adminViewer = isAdminRole(authUser.data?.role)
   const hasRegistration = ["REGISTERED", "WAITING"].includes(
@@ -107,6 +176,21 @@ export default function EventDetailPage() {
       await cancel.mutateAsync(eventId)
     } catch (error) {
       setCancelError(mapPBError(error))
+    }
+  }
+
+  async function openParticipantDetails(userId: string | undefined) {
+    if (!eventId || !userId || !isAdminRole(authUser.data?.role) || detailLoadingId) return
+    setDetailError(false)
+    setDetailLoadingId(userId)
+    try {
+      const details = await getAdminEventParticipantDetails(eventId, userId)
+      if (details.id === userId && isAdminRole(authUser.data?.role)) setSelectedDetails(details)
+      else setDetailError(true)
+    } catch {
+      setDetailError(true)
+    } finally {
+      setDetailLoadingId(null)
     }
   }
 
@@ -266,6 +350,11 @@ export default function EventDetailPage() {
                 {t("events.participantsLoadError")}
               </p>
             )}
+            {detailError && (
+              <p role="alert" className="mt-3 text-sm text-red-700">
+                {t("events.participantDetailsError")}
+              </p>
+            )}
             {participants.isSuccess && participants.data.items.length === 0 && (
               <p className="mt-3 text-sm text-[var(--muted-foreground)]">
                 {t("events.noParticipants")}
@@ -279,10 +368,12 @@ export default function EventDetailPage() {
                 }
                 className="mt-2 flex min-w-0 flex-wrap justify-between gap-2 border-b border-[var(--border)] py-2 text-sm"
               >
-                <div className="flex min-w-0 items-center gap-2">
-                  <UserAvatar avatar={participant.avatar} fallback={participant.displayName.slice(0, 2).toUpperCase()} />
-                  <span className="min-w-0 break-words">{participant.displayName}</span>
-                </div>
+                <ParticipantIdentity
+                  participant={participant}
+                  clickable={adminViewer && Boolean(participant.userId)}
+                  loading={detailLoadingId === participant.userId}
+                  onOpen={() => void openParticipantDetails(participant.userId)}
+                />
                 {adminViewer && participant.userId && (
                   <span className="min-w-0 break-words">
                     {participant.firstName} {participant.lastName}
@@ -304,16 +395,26 @@ export default function EventDetailPage() {
             )}
             {participants.data?.waitlist.map((participant) => (
               <div key={participant.registrationId ?? `${participant.displayName}-${participant.position}`} className="mt-2 flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] py-2 text-sm">
-                <div className="flex min-w-0 items-center gap-2">
-                  <UserAvatar avatar={participant.avatar} fallback={participant.displayName.slice(0, 2).toUpperCase()} />
-                  <span className="min-w-0 break-words">{participant.displayName}</span>
-                </div>
+                <ParticipantIdentity
+                  participant={participant}
+                  clickable={adminViewer && Boolean(participant.userId)}
+                  loading={detailLoadingId === participant.userId}
+                  onOpen={() => void openParticipantDetails(participant.userId)}
+                />
                 <span className="text-[var(--muted-foreground)]">{t("events.waitlistPosition", { position: participant.position ?? 0 })}</span>
               </div>
             ))}
           </section>
         </Card>
       </div>
+      {selectedDetails && (
+        <MemberDetailPopup
+          member={memberFromDetails(selectedDetails)}
+          initialDetails={selectedDetails}
+          readOnly
+          onClose={() => setSelectedDetails(null)}
+        />
+      )}
     </div>
   )
 }

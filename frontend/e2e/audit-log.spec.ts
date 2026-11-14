@@ -7,6 +7,7 @@ const admin = { ...member, id: "admin-000000001", email: "admin@example.test", d
 const logItems = [
   { id: "audit-event0001", eventType: "USER_PROFILE_UPDATED", actorUser: member.id, targetUser: member.id, metadata: { changes: { city: { old: "Erlangen", new: "Nürnberg" } } }, created: "2026-06-01T12:00:00.000Z" },
   { id: "audit-event0002", eventType: "EVENT_REGISTERED", actorUser: member.id, targetUser: member.id, metadata: null, created: "2026-05-01T12:00:00.000Z" },
+  { id: "audit-event0003", eventType: "USER_LOGIN", actorUser: member.id, targetUser: member.id, metadata: { method: "otp", ip: "203.0.113.1", userAgent: "Test browser", location: { city: "Erlangen", region: "Bavaria", country: "DE", source: "cloudflare" } }, created: "2026-04-01T12:00:00.000Z" },
 ];
 
 async function mockSession(page: Page, user: typeof admin | typeof member) {
@@ -58,6 +59,7 @@ test("members open their own log and combine activity filters in place", async (
   await page.getByRole("checkbox", { name: "Login" }).check();
   const response = await filteredResponse;
   expect(new URL(response.url()).searchParams.get("categories")).toBe("1,2,3,4,5");
+  await expect(page.getByText("Erlangen, Bavaria, DE")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Audit log" })).toHaveCount(1);
 });
 
