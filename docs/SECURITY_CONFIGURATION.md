@@ -32,6 +32,18 @@ that an untrusted `X-Forwarded-For` header cannot bypass the limiter.
   `ADMIN`/`SUPER_ADMIN` through the dedicated server routes.
 - Keep `_superusers` API access disabled from the browser.
 
+## Login location headers
+
+Production login audits use Cloudflare's approximate IP location. Enable the
+**Add visitor location headers** Managed Transform for the API zone so the
+origin receives `CF-IPCity`, `CF-Region`, and `CF-IPCountry`.
+
+Keep the PocketBase origin reachable only through the Cloudflare Tunnel. The
+application must not trust these headers on an origin that clients can reach
+directly. Missing headers are allowed and must never block authentication.
+The audit log stores only city, region, and country. It does not store the
+Cloudflare latitude, longitude, postal code, or timezone headers.
+
 ## CSRF boundary
 
 Registration and email verification do not use cookie authentication or any

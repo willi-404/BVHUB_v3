@@ -73,6 +73,12 @@ function Metadata({ item }: { item: AuditLogItem }) {
   const roleChange = item.eventType === "USER_ROLE_CHANGED";
   const groupChange = item.eventType === "USER_GROUPS_CHANGED";
   const login = item.eventType === "USER_LOGIN" || item.eventType === "USER_LOGIN_FAILED";
+  const location = metadata.location && typeof metadata.location === "object" && !Array.isArray(metadata.location)
+    ? metadata.location as Record<string, unknown>
+    : null;
+  const locationLabel = location
+    ? [location.city, location.region, location.country].filter((value) => typeof value === "string" && value).join(", ")
+    : "";
   return <div className="mt-2 flex flex-col gap-1">
     {typeof metadata.eventTitle === "string" && <Detail label={t("audit.eventName")} value={metadata.eventTitle} />}
     {typeof metadata.status === "string" && <Detail label={t("audit.registrationStatus")} value={t(metadata.status === "WAITING" ? "audit.status.waiting" : "audit.status.registered")} />}
@@ -88,6 +94,7 @@ function Metadata({ item }: { item: AuditLogItem }) {
     {login && <>
       <Detail label={t("audit.loginMethod")} value={metadata.method === "otp" ? t("audit.method.otp") : t("audit.method.password")} />
       <Detail label={t("audit.ipAddress")} value={metadata.ip} />
+      <Detail label={t("audit.location")} value={locationLabel} />
       <Detail label={t("audit.device")} value={metadata.userAgent} />
     </>}
   </div>;

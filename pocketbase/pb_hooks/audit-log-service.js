@@ -51,17 +51,36 @@ function list(e, targetUser) {
   return e.json(200, { items, page, perPage, totalItems, totalPages: Math.ceil(totalItems / perPage) });
 }
 
+function headerValue(headers, name) {
+  const key = Object.keys(headers).find((candidate) => candidate.toLowerCase().replace(/_/g, "-") === name);
+  const value = key ? headers[key] : "";
+  return Array.isArray(value) ? value.join(", ") : String(value || "");
+}
+
+function locationText(value, maxLength) {
+  let text = value.trim();
+  try { text = decodeURIComponent(text); } catch (_) {}
+  return text.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, maxLength);
+}
+
+function loginLocation(headers) {
+  const city = locationText(headerValue(headers, "cf-ipcity"), 100);
+  const region = locationText(headerValue(headers, "cf-region"), 100);
+  const rawCountry = locationText(headerValue(headers, "cf-ipcountry"), 2).toUpperCase();
+  const country = /^[A-Z]{2}$/.test(rawCountry) ? rawCountry : "";
+  return city || region || country ? { city, region, country, source: "cloudflare" } : null;
+}
+
 function recordLogin(e, eventType, method) {
   if (!e.record) return;
   const request = require(`${__hooks}/user-deletion-service.js`).requestFor(e.app, e.record.id);
   if (request && ["EMAIL_PENDING", "SCHEDULED"].includes(request.getString("status"))) return;
   const service = require(`${__hooks}/admin-service.js`);
   const headers = e.requestInfo().headers || {};
-  const userAgentKey = Object.keys(headers).find((key) => key.toLowerCase().replace(/_/g, "-") === "user-agent");
-  const userAgentValue = userAgentKey ? headers[userAgentKey] : "";
-  const userAgent = (Array.isArray(userAgentValue) ? userAgentValue.join(", ") : String(userAgentValue)).slice(0, 500);
+  const userAgent = headerValue(headers, "user-agent").slice(0, 500);
+  const location = loginLocation(headers);
   try {
-    service.audit(e.app, e.record.id, e.record.id, eventType, { method, ip: e.realIP(), userAgent });
+    service.audit(e.app, e.record.id, e.record.id, eventType, { method, ip: e.realIP(), userAgent, ...(location ? { location } : {}) });
   } catch (_) {
     console.error(`[bvhub audit] login event could not be stored for user ${e.record.id}`);
   }

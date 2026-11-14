@@ -1,5 +1,6 @@
 import { pb } from "../../../lib/pocketbase"
-import type { EventInput, EventParticipants, EventRecord, Venue } from "../types"
+import type { AdminEventExport, EventInput, EventParticipants, EventRecord, Venue } from "../types"
+import type { AdminMemberDetails } from "../../memberCardScanner/types"
 export async function getEvents(showAll = false): Promise<EventRecord[]> {
   const result = await pb.send<{ items: EventRecord[] }>(`/api/bvhub/events${showAll ? "?showAll=true" : ""}`, {
     method: "GET",
@@ -71,6 +72,21 @@ export async function getParticipants(
 ): Promise<EventParticipants> {
   return pb.send<EventParticipants>(
     `/api/bvhub/events/${encodeURIComponent(id)}/participants`,
+    { method: "GET" },
+  )
+}
+export function getAdminEventParticipantDetails(
+  eventId: string,
+  userId: string,
+): Promise<AdminMemberDetails> {
+  return pb.send<AdminMemberDetails>(
+    `/api/bvhub/admin/events/${encodeURIComponent(eventId)}/participants/${encodeURIComponent(userId)}`,
+    { method: "GET" },
+  )
+}
+export function getAdminEventExport(id: string): Promise<AdminEventExport> {
+  return pb.send<AdminEventExport>(
+    `/api/bvhub/admin/events/${encodeURIComponent(id)}/participants/export`,
     { method: "GET" },
   )
 }

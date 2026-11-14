@@ -142,11 +142,15 @@ export function MemberDetailPopup({
   onClose,
   onReload,
   onDeleted,
+  initialDetails,
+  readOnly = false,
 }: {
   member: Member
   onClose: () => void
   onReload?: () => Promise<void>
   onDeleted?: () => Promise<void>
+  initialDetails?: AdminMemberDetails
+  readOnly?: boolean
 }) {
   const { t } = useI18n()
   const cfg = groupConfig[member.gruppe]
@@ -163,18 +167,20 @@ export function MemberDetailPopup({
   const [confirmationId, setConfirmationId] = useState("")
   const [deletionError, setDeletionError] = useState("")
   const [deleting, setDeleting] = useState(false)
-  const [details, setDetails] = useState<AdminMemberDetails | null>(null)
+  const [details, setDetails] = useState<AdminMemberDetails | null>(initialDetails ?? null)
   const canDelete =
+    !readOnly &&
     (currentUser?.role === "ADMIN" || currentUser?.role === "SUPER_ADMIN") &&
     role === "GUEST" &&
     member.active === true &&
     member.verified === true
   const canForceDelete =
+    !readOnly &&
     (currentUser?.role === "ADMIN" || currentUser?.role === "SUPER_ADMIN") &&
     (role === "GUEST" || role === "MEMBER") &&
     (member.active === false || member.verified === false)
-  const canManageGroups = canManageMemberGroups(currentUser?.role, role)
-  const canManageRole = canManageMemberRole(currentUser?.role, role)
+  const canManageGroups = !readOnly && canManageMemberGroups(currentUser?.role, role)
+  const canManageRole = !readOnly && canManageMemberRole(currentUser?.role, role)
   const localizedRole =
     role === "SUPER_ADMIN"
       ? t("roles.superAdmin")
@@ -188,12 +194,13 @@ export function MemberDetailPopup({
     setGroups(member.groups ?? [])
     setRole(member.role ?? "GUEST")
     setRoleDraft(member.role ?? "GUEST")
-    setDetails(null)
+    setDetails(initialDetails ?? null)
+    if (initialDetails) return () => { current = false }
     void getMemberDetails(member.id)
       .then((value) => { if (current) setDetails(value) })
       .catch(() => undefined)
     return () => { current = false }
-  }, [member])
+  }, [initialDetails, member])
   useEffect(() => {
     if (!canManageGroups) return
     void pb
@@ -314,7 +321,12 @@ export function MemberDetailPopup({
         className="fixed inset-0 z-[110] bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="fixed inset-x-4 top-1/2 z-[111] mx-auto flex max-h-[90vh] max-w-md -translate-y-1/2 flex-col overflow-hidden rounded-xl border bg-card text-card-foreground shadow-2xl">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${member.vorname} ${member.nachname}`.trim()}
+        className="fixed inset-x-4 top-1/2 z-[111] mx-auto flex max-h-[90vh] max-w-md -translate-y-1/2 flex-col overflow-hidden rounded-xl border bg-card text-card-foreground shadow-2xl"
+      >
         {/* Header band */}
         <div
           className="relative h-20 shrink-0"
@@ -362,7 +374,7 @@ export function MemberDetailPopup({
 
         {/* Body */}
         <div className="overflow-y-auto flex-1 px-5 py-4">
-          {showAuditLog ? (
+          {!readOnly && showAuditLog ? (
             <div className="flex flex-col gap-3">
               <h2 className="text-sm font-semibold">{t("audit.title")}</h2>
               <AuditLogPanel memberId={member.id} />
@@ -559,7 +571,7 @@ export function MemberDetailPopup({
               <ArrowLeft size={16} />
               {t("audit.backToMembers")}
             </Button>
-          ) : (
+          ) : !readOnly ? (
             <Button
               variant="outline"
               className="mb-2 w-full"
@@ -568,7 +580,7 @@ export function MemberDetailPopup({
               <ClipboardList size={16} />
               {t("audit.open")}
             </Button>
-          )}
+          ) : null}
           {(canDelete || canForceDelete) && !showAuditLog && (
             <Button
               variant="destructive"

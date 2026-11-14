@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { ArrowDown, ArrowUp, ArrowUpDown, Download, Plus } from "lucide-react"
 import writeExcelFile from "write-excel-file/browser"
 import { Button } from "./ui/button"
@@ -16,7 +17,7 @@ import {
   getAllMembers,
   getMemberDetails,
 } from "../../features/members/api/getMembers"
-import { useMembers } from "../../features/members/hooks/useMembers"
+import { memberKeys } from "../../lib/queryKeys"
 import { useI18n, type MessageKey } from "../../i18n"
 
 function Icon({
@@ -199,16 +200,20 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState(false)
 
-  const membersQuery = useMembers({ search, page: 1, perPage: 50 })
+  const membersQuery = useQuery({
+    queryKey: memberKeys.list({ search, all: true }),
+    queryFn: () => getAllMembers(search),
+    placeholderData: (previous) => previous,
+  })
   const filtered = useMemo(
     () =>
       sortMembers(
-        (membersQuery.data?.items ?? []).filter((member) =>
+        (membersQuery.data ?? []).filter((member) =>
           matchesGroups(member, filterGroups),
         ),
         sort,
       ),
-    [filterGroups, membersQuery.data?.items, sort],
+    [filterGroups, membersQuery.data, sort],
   )
   const hasFilter = filterGroups.length > 0
 
@@ -352,7 +357,7 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
               {t("admin.members.count", {
                 count: hasFilter
                   ? filtered.length
-                  : (membersQuery.data?.totalItems ?? 0),
+                  : (membersQuery.data?.length ?? 0),
               })}
             </p>
           </div>
@@ -694,7 +699,7 @@ export default function AdminMembersView({ onBack }: { onBack: () => void }) {
           }}
           onReload={async () => {
             const result = await membersQuery.refetch()
-            const refreshed = result.data?.items.find(
+            const refreshed = result.data?.find(
               (member) => member.id === selected.id,
             )
             if (refreshed) setSelected(refreshed)

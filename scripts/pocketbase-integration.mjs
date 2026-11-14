@@ -74,12 +74,13 @@ const superuserPassword = process.env.PB_TEST_SUPERUSER_PASSWORD;
 const serverLogPath = process.env.PB_TEST_SERVER_LOG;
 if (!baseUrl || !superuserEmail || !superuserPassword) throw new Error("Missing integration test configuration");
 
-async function request(method, path, { token, body, form } = {}) {
+async function request(method, path, { token, body, form, headers } = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
     method,
     headers: {
       ...(token ? { Authorization: token } : {}),
       ...(body ? { "Content-Type": "application/json" } : {}),
+      ...(headers || {}),
     },
     body: form ?? (body ? JSON.stringify(body) : undefined),
   });
@@ -532,6 +533,7 @@ assert.deepEqual(Object.keys(rateLimited.data || {}).sort(), ["data", "message",
 
 const superLogin = expectStatus(await request("POST", "/api/collections/users/auth-with-password", {
   body: { identity: superAdmin.email, password: "Synthetic-password-12!" },
+  headers: { "CF-IPCity": "Erlangen", "CF-Region": "Bavaria", "CF-IPCountry": "DE" },
 }), 200, "superadmin password login");
 const adminLogin = expectStatus(await request("POST", "/api/collections/users/auth-with-password", {
   body: { identity: admin.email, password: "Synthetic-password-12!" },
@@ -858,6 +860,19 @@ const oldRegistration = expectStatus(await request("POST", "/api/collections/eve
   body: { event: oldPaymentEvent.id, user: guest.id, status: "REGISTERED", registeredAt: "2019-12-01T12:00:00.000Z", checkoutRegion: "ER", termsVersion:
   "PAYMENT-SUMMARY-OLD-EVENT", termsAcceptedAt: "2019-12-01T12:00:00.000Z" },
 }), 200, "create old event registration");
+expectStatus(await request("POST", "/api/collections/event_registrations/records", {
+  token: rootToken,
+  body: { event: oldPaymentEvent.id, user: superAdmin.id, status: "REGISTERED", registeredAt: "2019-12-01T12:01:00.000Z", checkoutRegion: "ER", termsVersion: "EVENT-EXPORT-SUPERADMIN", termsAcceptedAt: "2019-12-01T12:01:00.000Z" },
+}), 200, "create protected superadmin event registration");
+const adminCompletedExport = expectStatus(await request("GET", `/api/bvhub/admin/events/${oldPaymentEvent.id}/participants/export`, { token: adminLogin.token }), 200, "admin exports completed event");
+const protectedExportRow = adminCompletedExport.items.find((item) => item.id === superAdmin.id);
+assert.equal(protectedExportRow.protected, true, "admin export protects superadmin details");
+assert.equal(protectedExportRow.email, "", "admin export omits superadmin email");
+const superCompletedExport = expectStatus(await request("GET", `/api/bvhub/admin/events/${oldPaymentEvent.id}/participants/export`, { token: superLogin.token }), 200, "superadmin exports completed event");
+assert.equal(superCompletedExport.items.find((item) => item.id === superAdmin.id).email, superAdmin.email, "superadmin export includes protected account details");
+expectStatus(await request("GET", `/api/bvhub/admin/events/${oldPaymentEvent.id}/participants/export`, { token: memberLoginToken }), 403, "member cannot export event details");
+expectStatus(await request("GET", `/api/bvhub/admin/events/${oldPaymentEvent.id}/participants/${superAdmin.id}`, { token: adminLogin.token }), 403, "admin cannot read superadmin event details");
+assert.equal(expectStatus(await request("GET", `/api/bvhub/admin/events/${oldPaymentEvent.id}/participants/${superAdmin.id}`, { token: superLogin.token }), 200, "superadmin reads protected event details").email, superAdmin.email);
 const oldPaymentId = "oldpayment00001";
 expectStatus(await request("POST", "/api/collections/payments/records", {
   token: rootToken,
@@ -899,6 +914,10 @@ assert.equal(wuRegistration.status, "REGISTERED");
 const avatarParticipants = expectStatus(await request("GET", `/api/bvhub/events/${validEvent.id}/participants`, { token: guestLoginToken }), 200, "guest reads participant avatars");
 assert.deepEqual(avatarParticipants.items.find((item) => item.displayName === paymentPurposeNames.member)?.avatar, uploadedAvatar, "participant response includes the member avatar without exposing their user id");
 assert.equal(avatarParticipants.items.find((item) => item.displayName === paymentPurposeNames.member)?.userId, undefined);
+const eventMemberDetails = expectStatus(await request("GET", `/api/bvhub/admin/events/${validEvent.id}/participants/${member.id}`, { token: adminLogin.token }), 200, "admin reads registered participant details");
+assert.equal(eventMemberDetails.email, member.email);
+expectStatus(await request("GET", `/api/bvhub/admin/events/${validEvent.id}/participants/${member.id}`, { token: guestLoginToken }), 403, "guest cannot read participant details");
+expectStatus(await request("GET", `/api/bvhub/admin/events/${validEvent.id}/participants/${admin.id}`, { token: adminLogin.token }), 404, "admin cannot read a user outside the event");
 const removedAvatar = expectStatus(await request("DELETE", "/api/bvhub/me/avatar", { token: memberLoginToken }), 200, "member removes avatar");
 assert.equal(removedAvatar.user.avatar, null);
 assert.equal(expectStatus(await request("GET", `/api/bvhub/events/${validEvent.id}/participants`, { token: guestLoginToken }), 200, "participant avatar removed").items.find((item) => item.displayName === paymentPurposeNames.member)?.avatar, null);
@@ -1301,6 +1320,14 @@ assert.ok(audits.items.some((event) => event.eventType === "USER_GROUPS_CHANGED"
 assert.ok(audits.items.some((event) => event.eventType === "MEMBER_CARD_SETTINGS_CHANGED"), "member-card settings changes are audited");
 assert.ok(audits.items.some((event) => event.eventType === "PAYMENT_SETTINGS_CHANGED"), "payment settings changes are audited");
 assert.ok(audits.items.some((event) => event.eventType === "PAYMENT_STATUS_CHANGED"), "payment status changes are audited");
+const locatedLogin = audits.items.find((event) => {
+  if (event.eventType !== "USER_LOGIN" || event.targetUser !== superAdmin.id) return false;
+  const metadata = typeof event.metadata === "string" ? JSON.parse(event.metadata) : event.metadata;
+  return metadata?.location?.city === "Erlangen";
+});
+assert.deepEqual(locatedLogin && (typeof locatedLogin.metadata === "string" ? JSON.parse(locatedLogin.metadata) : locatedLogin.metadata).location, {
+  city: "Erlangen", region: "Bavaria", country: "DE", source: "cloudflare",
+}, "login audit stores approximate Cloudflare location");
 for (const iban of ["DE12500105170648489890", "DE89370400440532013000"]) {
   assert.ok(audits.items.every((event) => !String(event.metadata || "").includes(iban)), "audit metadata contains no full IBAN");
 }

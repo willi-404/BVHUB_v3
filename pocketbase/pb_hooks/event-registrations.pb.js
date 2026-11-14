@@ -114,6 +114,123 @@ routerAdd("GET", "/api/bvhub/events/{id}/participants", (e) => {
   return e.json(200, { items, totalItems: items.length, waitlist, myWaitlistPosition: myWaitlistPosition || null });
 }, $apis.requireAuth("users"));
 
+routerAdd("GET", "/api/bvhub/admin/events/{id}/participants/export", (e) => {
+  const api = require(`${__hooks}/venue-event-service.js`);
+  const adminService = require(`${__hooks}/admin-service.js`);
+  const registrations = require(`${__hooks}/event-registration-service.js`);
+  const admin = adminService.actor(e);
+  const eventId = api.validateEventId(api.idOf(e));
+  const event = api.event($app, eventId);
+  const waitlistPositions = new Map(
+    registrations.waitingRegistrations($app, event).map((record, index) => [record.id, index + 1]),
+  );
+  const records = $app.findRecordsByFilter(
+    "event_registrations",
+    "event = {:event} && (status = 'REGISTERED' || status = 'WAITING')",
+    "status,registeredAt,waitingAt,created,id",
+    100000,
+    0,
+    { event: event.id },
+  );
+  const items = records.map((registration) => {
+    const status = registration.getString("status");
+    const base = {
+      registrationId: registration.id,
+      registrationStatus: status,
+      registeredAt: status === "REGISTERED" ? registration.getString("registeredAt") : registration.getString("waitingAt"),
+      waitlistPosition: waitlistPositions.get(registration.id) || null,
+      deleted: false,
+      protected: false,
+    };
+    const userId = registration.getString("user");
+    if (!userId) {
+      return {
+        ...base,
+        id: "",
+        username: registration.getString("deletedParticipantPublicName"),
+        displayName: registration.getString("deletedParticipantName"),
+        firstName: "",
+        lastName: "",
+        email: "",
+        role: "",
+        active: false,
+        verified: false,
+        created: "",
+        updated: "",
+        memberSince: "",
+        groups: [],
+        address: "",
+        street: "",
+        houseNumber: "",
+        postalCode: "",
+        city: "",
+        birthDate: "",
+        phone: "",
+        contactInfo: "",
+        deleted: true,
+      };
+    }
+    const target = adminService.findUser($app, userId);
+    if (target.getString("role") === "SUPER_ADMIN" && admin.getString("role") !== "SUPER_ADMIN") {
+      return {
+        ...base,
+        id: target.id,
+        username: target.getString("displayName"),
+        displayName: target.getString("displayName"),
+        firstName: target.getString("firstName"),
+        lastName: target.getString("lastName"),
+        email: "",
+        role: "SUPER_ADMIN",
+        active: target.getBool("active"),
+        verified: target.getBool("verified"),
+        created: "",
+        updated: "",
+        memberSince: "",
+        groups: [],
+        address: "",
+        street: "",
+        houseNumber: "",
+        postalCode: "",
+        city: "",
+        birthDate: "",
+        phone: "",
+        contactInfo: "",
+        protected: true,
+      };
+    }
+    return { ...adminService.memberDetailDto($app, target), ...base };
+  });
+  e.response.header().set("Cache-Control", "no-store");
+  e.response.header().set("Pragma", "no-cache");
+  return e.json(200, { event: { id: event.id, title: event.getString("title") }, items });
+}, $apis.requireAuth("users"));
+
+routerAdd("GET", "/api/bvhub/admin/events/{id}/participants/{userId}", (e) => {
+  const api = require(`${__hooks}/venue-event-service.js`);
+  const adminService = require(`${__hooks}/admin-service.js`);
+  const admin = adminService.actor(e);
+  const eventId = api.validateEventId(api.idOf(e));
+  const event = api.event($app, eventId);
+  const userId = e.request && typeof e.request.pathValue === "function" ? e.request.pathValue("userId") : "";
+  if (!/^[a-z0-9]{15}$/.test(userId)) throw new BadRequestError("Ungültige Benutzer-ID");
+  const registration = $app.findRecordsByFilter(
+    "event_registrations",
+    "event = {:event} && user = {:user} && (status = 'REGISTERED' || status = 'WAITING')",
+    "",
+    1,
+    0,
+    { event: event.id, user: userId },
+  )[0];
+  if (!registration) throw new ApiError(404, "Teilnehmer nicht gefunden", {});
+  const target = adminService.findUser($app, userId);
+  if (target.getString("role") === "SUPER_ADMIN" && admin.getString("role") !== "SUPER_ADMIN") {
+    throw new ForbiddenError("Dieser Benutzer darf nicht angezeigt werden");
+  }
+  e.response.header().set("Cache-Control", "no-store");
+  e.response.header().set("Pragma", "no-cache");
+  return e.json(200, adminService.memberDetailDto($app, target));
+}, $apis.requireAuth("users"));
+
 routerAdd("POST", "/api/bvhub/admin/events/{id}/participants", (e) => {
   const api = require(`${__hooks}/venue-event-service.js`);
   const registrations = require(`${__hooks}/event-registration-service.js`);

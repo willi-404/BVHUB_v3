@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react"
 import { useLocation, useNavigate, Link } from "react-router-dom"
+import writeExcelFile from "write-excel-file/browser"
+import { FileSpreadsheet } from "lucide-react"
 import { Button } from "./ui/button"
 import { Card } from "./ui/card"
 import { Input } from "./ui/input"
@@ -16,10 +18,12 @@ import {
   useEventRealtime,
 } from "../../features/events/hooks/useEvents"
 import type {
+  AdminEventExportRow,
   EventRecord,
   EventStatus,
   Venue,
 } from "../../features/events/types"
+import { getAdminEventExport } from "../../features/events/api/eventsApi"
 import { berlinDateTimeInputToIso, formatBerlinDateTimeInput, useI18n, type MessageKey } from "../../i18n"
 import { mapPBError } from "../../lib/errorMapper"
 import { formatEuroInput, parseEuroCents } from "../../features/payments/paymentUtils"
@@ -37,6 +41,26 @@ const emptyEvent = {
   status: "MEMBERS_ONLY" as EventStatus,
 }
 const emptyVenue = { name: "", address: "", description: "", checkoutRegion: "" as "ER" | "NUE" | "" }
+
+function exportStamp() {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Berlin",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date()).reduce<Record<string, string>>((result, part) => {
+    result[part.type] = part.value
+    return result
+  }, {})
+  return `${parts.month}-${parts.day}-${parts.hour}-${parts.minute}-${parts.second}`
+}
+
+function exportFileTitle(title: string) {
+  return title.normalize("NFKC").replace(/[\\/:*?"<>|]/g, "-").replace(/\s+/g, " ").replace(/[. ]+$/g, "").trim().slice(0, 120) || "event"
+}
 
 export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
   const { t } = useI18n()
@@ -58,6 +82,7 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
   const cancelOrDelete = useCancelEvent()
   const deleteDraft = useDeleteEventDraft()
   const [actionError, setActionError] = useState<string | null>(null)
+  const [exportingId, setExportingId] = useState<string | null>(null)
   const venueMutation = useVenueMutation()
   useEffect(() => { if (location.pathname.endsWith("/new")) openEvent() }, [location.pathname])
 
@@ -121,6 +146,68 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
     await venueMutation.mutateAsync({ id: editingVenue?.id, input: venueForm })
     setVenueFormOpen(false)
     setEditingVenue(null)
+  }
+  async function exportEvent(event: EventRecord) {
+    setActionError(null)
+    setExportingId(event.id)
+    try {
+      const result = await getAdminEventExport(event.id)
+      const roleLabel = (role: string) => role
+        ? t((role === "SUPER_ADMIN" ? "roles.superAdmin" : role === "ADMIN" ? "roles.admin" : role === "MEMBER" ? "roles.member" : "roles.guest") as MessageKey)
+        : ""
+      const groupLabels: Record<string, MessageKey> = {
+        "Member ER": "groups.memberER",
+        "Member NUE": "groups.memberNUE",
+        Guest: "groups.guest",
+      }
+      const note = (row: AdminEventExportRow) => row.deleted
+        ? t("admin.events.exportDeleted")
+        : row.protected
+          ? t("admin.events.exportProtected")
+          : ""
+      const columns: Array<[MessageKey, (row: AdminEventExportRow) => unknown]> = [
+        ["admin.events.exportRegistrationStatus", (row) => t(row.registrationStatus === "WAITING" ? "audit.status.waiting" : "audit.status.registered")],
+        ["admin.events.exportRegisteredAt", (row) => row.registeredAt],
+        ["admin.events.exportWaitlistPosition", (row) => row.waitlistPosition ?? ""],
+        ["admin.events.exportRecordNote", note],
+        ["admin.members.memberId", (row) => row.id],
+        ["admin.members.username", (row) => row.username],
+        ["admin.members.displayName", (row) => row.displayName],
+        ["profile.firstName", (row) => row.firstName],
+        ["profile.lastName", (row) => row.lastName],
+        ["auth.email", (row) => row.email],
+        ["profile.role", (row) => roleLabel(row.role)],
+        ["profile.active", (row) => row.deleted ? "" : t(row.active ? "profile.active" : "profile.inactive")],
+        ["profile.verified", (row) => row.deleted ? "" : t(row.verified ? "profile.verified" : "profile.unverified")],
+        ["profile.groups", (row) => row.groups.map((group) => groupLabels[group.name] ? t(groupLabels[group.name]) : group.name).join(", ")],
+        ["admin.members.memberSince", (row) => row.memberSince],
+        ["profile.createdAt", (row) => row.created],
+        ["profile.updatedAt", (row) => row.updated],
+        ["profile.birthDate", (row) => row.birthDate],
+        ["profile.street", (row) => row.street],
+        ["profile.houseNumber", (row) => row.houseNumber],
+        ["profile.postalCode", (row) => row.postalCode],
+        ["profile.city", (row) => row.city],
+        ["profile.address", (row) => row.address],
+        ["profile.phone", (row) => row.phone],
+        ["profile.contactInfo", (row) => row.contactInfo],
+      ]
+      const textCell = (value: unknown, bold = false) => ({
+        value: String(value ?? ""),
+        type: String,
+        format: "@",
+        ...(bold ? { fontWeight: "bold" as const } : {}),
+      })
+      const rows = [
+        columns.map(([key]) => textCell(t(key), true)),
+        ...result.items.map((row) => columns.map(([, value]) => textCell(value(row)))),
+      ]
+      await writeExcelFile(rows).toFile(`${exportFileTitle(result.event.title)}-id-${result.event.id}-${exportStamp()}.xlsx`)
+    } catch {
+      setActionError("admin.events.exportError")
+    } finally {
+      setExportingId(null)
+    }
   }
   const failure = Boolean(actionError) || eventMutation.isError || venueMutation.isError || cancelOrDelete.isError || deleteDraft.isError
 
@@ -200,8 +287,10 @@ export default function AdminEventsView({ onBack }: { onBack?: () => void }) {
             form={eventForm}
             editing={editingEvent}
             saving={eventMutation.isPending || cancelOrDelete.isPending || deleteDraft.isPending}
+            exportingId={exportingId}
             onCreate={() => navigate("/admin/events/new")}
             onEdit={(event) => navigate(`/admin/events/${encodeURIComponent(event.id)}`)}
+            onExport={(event) => void exportEvent(event)}
             onChange={setEventForm}
             onSave={() => void saveEvent({ published: false })}
             onPublishForm={() => void saveEvent({ published: true })}
@@ -392,8 +481,10 @@ function EventPanel({
   form,
   editing,
   saving,
+  exportingId,
   onCreate,
   onEdit,
+  onExport,
   onChange,
   onSave,
   onPublishForm,
@@ -411,8 +502,10 @@ function EventPanel({
   form: typeof emptyEvent
   editing: EventRecord | null
   saving: boolean
+  exportingId: string | null
   onCreate: () => void
   onEdit: (e: EventRecord) => void
+  onExport: (e: EventRecord) => void
   onChange: (v: typeof emptyEvent) => void
   onSave: () => void
   onPublishForm: () => void
@@ -469,6 +562,16 @@ function EventPanel({
               <label className="flex items-center gap-2 text-sm" title={!event.venue.active || !event.venue.checkoutRegion ? t("admin.events.publishVenueRequired") : undefined}><Checkbox checked={event.published} disabled={saving || (!event.published && (!event.venue.active || !event.venue.checkoutRegion))} onChange={(e) => onPublishedChange(event, e.target.checked)} />{event.published ? t("admin.events.published") : t("admin.events.unpublished")}</label>
               {!event.published && (!event.venue.active || !event.venue.checkoutRegion) && <span className="text-xs text-amber-700">{t("admin.events.publishVenueRequired")}</span>}
               <Button size="sm" variant="outline" onClick={() => onEdit(event)}>{t("common.edit")}</Button>
+              <Button
+                data-testid={`export-event-${event.id}`}
+                size="sm"
+                variant="outline"
+                disabled={Boolean(exportingId)}
+                onClick={() => onExport(event)}
+              >
+                <FileSpreadsheet data-icon="inline-start" />
+                {exportingId === event.id ? t("admin.events.exporting") : t("admin.events.exportData")}
+              </Button>
               {event.published && event.status !== "CANCELLED" && (
                 <Button
                   size="sm"
